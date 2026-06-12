@@ -19,7 +19,9 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -250,5 +252,93 @@ public class ChatGPTRequestErrorTests {
         assertTrue(ChatGPTRequest.lastErrorMessage.startsWith("No Internet or Blocked Request"));
         assertNotNull(randomMsg);
         assertEquals("Solution: Check internet connection or firewall", solution.en());
+    }
+
+    @Test
+    public void apiRotationOn429() throws Exception {
+        List<String> authHeadersReceived = Collections.synchronizedList(new ArrayList<>());
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                String auth = exchange.getRequestHeaders().getFirst("Authorization");
+                if (auth != null) {
+                    authHeadersReceived.add(auth);
+                }
+
+                String body = "{\"error\":{\"message\":\"Rate limit exceeded\",\"type\":\"test\",\"code\":\"429\"}}";
+                byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(429, resp.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(resp);
+                }
+            }
+        });
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = buildConfig(url);
+        config.setApiKey("key1,key2,key3");
+
+        executeRequest(config);
+        server.stop(0);
+
+        assertEquals(3, authHeadersReceived.size());
+        assertEquals("Bearer key1", authHeadersReceived.get(0));
+        assertEquals("Bearer key2", authHeadersReceived.get(1));
+        assertEquals("Bearer key3", authHeadersReceived.get(2));
+        assertEquals(429, ChatGPTRequest.lastErrorCode);
+    }
+
+    @Test
+    public void apiRotationSuccessOnSecondKey() throws Exception {
+        List<String> authHeadersReceived = Collections.synchronizedList(new ArrayList<>());
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, new HttpHandler() {
+            int requestCount = 0;
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                requestCount++;
+                String auth = exchange.getRequestHeaders().getFirst("Authorization");
+                if (auth != null) {
+                    authHeadersReceived.add(auth);
+                }
+
+                if (requestCount == 1) {
+                    String body = "{\"error\":{\"message\":\"Rate limit\",\"type\":\"test\",\"code\":\"429\"}}";
+                    byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(429, resp.length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(resp);
+                    }
+                } else {
+                    String body = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Success Response\"}}]}";
+                    byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, resp.length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(resp);
+                    }
+                }
+            }
+        });
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = buildConfig(url);
+        config.setApiKey("key1,key2,key3");
+
+        CompletableFuture<String> future = ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "", new HashMap<>(), new ArrayList<>(), false);
+        String response = future.join();
+
+        server.stop(0);
+
+        assertEquals(2, authHeadersReceived.size());
+        assertEquals("Bearer key1", authHeadersReceived.get(0));
+        assertEquals("Bearer key2", authHeadersReceived.get(1));
+        assertEquals("Success Response", response);
+        assertEquals(0, ChatGPTRequest.lastErrorCode);
     }
 }

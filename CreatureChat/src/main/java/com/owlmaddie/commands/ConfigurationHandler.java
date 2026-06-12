@@ -83,17 +83,58 @@ public class ConfigurationHandler {
         private int maxEntityAutoResponses = 3;
         private int entityAutoCooldownSeconds = 3;
 
+        private transient int currentKeyIndex = 0;
+
+        private String[] parseApiKeys() {
+            if (apiKey == null || apiKey.trim().isEmpty()) {
+                return new String[0];
+            }
+            String[] parts = apiKey.split(",");
+            List<String> validKeys = new ArrayList<>();
+            for (String p : parts) {
+                String trimmed = p.trim();
+                if (!trimmed.isEmpty()) {
+                    validKeys.add(trimmed);
+                }
+            }
+            return validKeys.toArray(new String[0]);
+        }
+
+        public String getActiveApiKey() {
+            String[] keys = parseApiKeys();
+            if (keys.length == 0) {
+                return "";
+            }
+            if (currentKeyIndex < 0 || currentKeyIndex >= keys.length) {
+                currentKeyIndex = 0;
+            }
+            return keys[currentKeyIndex];
+        }
+
+        public void rotateApiKey() {
+            String[] keys = parseApiKeys();
+            if (keys.length > 0) {
+                currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            }
+        }
+
+        public int getApiKeyCount() {
+            return parseApiKeys().length;
+        }
+
         // Getters and setters for existing fields
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) {
-            if (apiKey.startsWith("cc_") && apiKey.length() == 15) {
+            this.apiKey = apiKey;
+            this.currentKeyIndex = 0;
+            String activeKey = getActiveApiKey();
+            if (activeKey.startsWith("cc_") && activeKey.length() == 15) {
                 // Update URL if a CreatureChat API key is detected
                 setUrl("https://api.creaturechat.com/v1/chat/completions");
-            } else if (apiKey.startsWith("sk-")) {
+            } else if (activeKey.startsWith("sk-")) {
                 // Update URL if an OpenAI API key is detected
                 setUrl("https://api.openai.com/v1/chat/completions");
             }
-            this.apiKey = apiKey;
         }
 
         public String getUrl() { return url; }
