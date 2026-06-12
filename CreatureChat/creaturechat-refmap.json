@@ -1,0 +1,94 @@
+{
+  "mappings": {
+    "com/owlmaddie/mixin/MixinBucketable": {
+      "loadDefaultDataFromBucketTag(Lnet/minecraft/world/entity/Mob;Lnet/minecraft/nbt/CompoundTag;)V": "Lnet/minecraft/class_5761;method_35168(Lnet/minecraft/class_1308;Lnet/minecraft/class_2487;)V",
+      "saveDefaultDataToBucketTag(Lnet/minecraft/world/entity/Mob;Lnet/minecraft/world/item/ItemStack;)V": "Lnet/minecraft/class_5761;method_35167(Lnet/minecraft/class_1308;Lnet/minecraft/class_1799;)V"
+    },
+    "com/owlmaddie/mixin/MixinAbstractVillagerEntity": {
+      "getInventory": "Lnet/minecraft/class_3988;method_35199()Lnet/minecraft/class_1277;"
+    },
+    "com/owlmaddie/mixin/MixinMobEntityAccessor": {
+      "goalSelector": "field_6201:Lnet/minecraft/class_1355;"
+    },
+    "com/owlmaddie/mixin/MixinLivingEntity": {
+      "hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z": "Lnet/minecraft/class_1309;method_5643(Lnet/minecraft/class_1282;F)Z",
+      "die(Lnet/minecraft/world/damagesource/DamageSource;)V": "Lnet/minecraft/class_1309;method_6078(Lnet/minecraft/class_1282;)V",
+      "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z": "Lnet/minecraft/class_1309;method_18395(Lnet/minecraft/class_1309;)Z"
+    },
+    "com/owlmaddie/mixin/MixinVexEntity": {
+      "tick": "Lnet/minecraft/class_1634;method_5773()V"
+    },
+    "com/owlmaddie/mixin/MixinWanderingTrader": {
+      "maybeDespawn": "Lnet/minecraft/class_3989;method_20508()V"
+    },
+    "com/owlmaddie/mixin/MixinPillagerEntity": {
+      "getInventory": "Lnet/minecraft/class_1604;method_35199()Lnet/minecraft/class_1277;"
+    },
+    "com/owlmaddie/mixin/MixinEntityChatData": {
+      "saveWithoutId(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag;": "Lnet/minecraft/class_1297;method_5647(Lnet/minecraft/class_2487;)Lnet/minecraft/class_2487;",
+      "load(Lnet/minecraft/nbt/CompoundTag;)V": "Lnet/minecraft/class_1297;method_5651(Lnet/minecraft/class_2487;)V"
+    },
+    "com/owlmaddie/mixin/MixinMobEntity": {
+      "addAdditionalSaveData": "Lnet/minecraft/class_1308;method_5652(Lnet/minecraft/class_2487;)V",
+      "interact": "Lnet/minecraft/class_1308;method_5688(Lnet/minecraft/class_1657;Lnet/minecraft/class_1268;)Lnet/minecraft/class_1269;",
+      "readAdditionalSaveData": "Lnet/minecraft/class_1308;method_5749(Lnet/minecraft/class_2487;)V"
+    },
+    "com/owlmaddie/mixin/MixinPiglinEntity": {
+      "getInventory": "Lnet/minecraft/class_4836;method_35199()Lnet/minecraft/class_1277;"
+    },
+    "com/owlmaddie/mixin/MixinAllayEntity": {
+      "getInventory": "Lnet/minecraft/class_7298;method_35199()Lnet/minecraft/class_1277;"
+    },
+    "com/owlmaddie/mixin/MixinOnChat": {
+      "handleChat(Lnet/minecraft/network/protocol/game/ServerboundChatPacket;)V": "Lnet/minecraft/class_3244;method_12048(Lnet/minecraft/class_2797;)V",
+      "handlePlayerCommand": "Lnet/minecraft/class_3244;method_12045(Lnet/minecraft/class_2848;)V"
+    }
+  },
+  "data": {
+    "named:intermediary": {
+      "com/owlmaddie/mixin/MixinBucketable": {
+        "loadDefaultDataFromBucketTag(Lnet/minecraft/world/entity/Mob;Lnet/minecraft/nbt/CompoundTag;)V": "Lnet/minecraft/class_5761;method_35168(Lnet/minecraft/class_1308;Lnet/minecraft/class_2487;)V",
+        "saveDefaultDataToBucketTag(Lnet/minecraft/world/entity/Mob;Lnet/minecraft/world/item/ItemStack;)V": "Lnet/minecraft/class_5761;method_35167(Lnet/minecraft/class_1308;Lnet/minecraft/class_1799;)V"
+      },
+      "com/owlmaddie/mixin/MixinAbstractVillagerEntity": {
+        "getInventory": "Lnet/minecraft/class_3988;method_35199()Lnet/minecraft/class_1277;"
+      },
+      "com/owlmaddie/mixin/MixinMobEntityAccessor": {
+        "goalSelector": "field_6201:Lnet/minecraft/class_1355;"
+      },
+      "com/owlmaddie/mixin/MixinLivingEntity": {
+        "hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z": "Lnet/minecraft/class_1309;method_5643(Lnet/minecraft/class_1282;F)Z",
+        "die(Lnet/minecraft/world/damagesource/DamageSource;)V": "Lnet/minecraft/class_1309;method_6078(Lnet/minecraft/class_1282;)V",
+        "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z": "Lnet/minecraft/class_1309;method_18395(Lnet/minecraft/class_1309;)Z"
+      },
+      "com/owlmaddie/mixin/MixinVexEntity": {
+        "tick": "Lnet/minecraft/class_1634;method_5773()V"
+      },
+      "com/owlmaddie/mixin/MixinWanderingTrader": {
+        "maybeDespawn": "Lnet/minecraft/class_3989;method_20508()V"
+      },
+      "com/owlmaddie/mixin/MixinPillagerEntity": {
+        "getInventory": "Lnet/minecraft/class_1604;method_35199()Lnet/minecraft/class_1277;"
+      },
+      "com/owlmaddie/mixin/MixinEntityChatData": {
+        "saveWithoutId(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag;": "Lnet/minecraft/class_1297;method_5647(Lnet/minecraft/class_2487;)Lnet/minecraft/class_2487;",
+        "load(Lnet/minecraft/nbt/CompoundTag;)V": "Lnet/minecraft/class_1297;method_5651(Lnet/minecraft/class_2487;)V"
+      },
+      "com/owlmaddie/mixin/MixinMobEntity": {
+        "addAdditionalSaveData": "Lnet/minecraft/class_1308;method_5652(Lnet/minecraft/class_2487;)V",
+        "interact": "Lnet/minecraft/class_1308;method_5688(Lnet/minecraft/class_1657;Lnet/minecraft/class_1268;)Lnet/minecraft/class_1269;",
+        "readAdditionalSaveData": "Lnet/minecraft/class_1308;method_5749(Lnet/minecraft/class_2487;)V"
+      },
+      "com/owlmaddie/mixin/MixinPiglinEntity": {
+        "getInventory": "Lnet/minecraft/class_4836;method_35199()Lnet/minecraft/class_1277;"
+      },
+      "com/owlmaddie/mixin/MixinAllayEntity": {
+        "getInventory": "Lnet/minecraft/class_7298;method_35199()Lnet/minecraft/class_1277;"
+      },
+      "com/owlmaddie/mixin/MixinOnChat": {
+        "handleChat(Lnet/minecraft/network/protocol/game/ServerboundChatPacket;)V": "Lnet/minecraft/class_3244;method_12048(Lnet/minecraft/class_2797;)V",
+        "handlePlayerCommand": "Lnet/minecraft/class_3244;method_12045(Lnet/minecraft/class_2848;)V"
+      }
+    }
+  }
+}

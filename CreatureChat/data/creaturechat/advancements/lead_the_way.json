@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:tag_along",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Where are we going?",
+      "translate": "creaturechat.advancement.lead_the_way.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:compass"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Lead The Way",
+      "translate": "creaturechat.advancement.lead_the_way.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

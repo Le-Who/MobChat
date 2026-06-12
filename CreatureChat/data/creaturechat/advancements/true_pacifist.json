@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:the_neverending_story",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "The best ending.",
+      "translate": "creaturechat.advancement.true_pacifist.desc"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:dragon_egg"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Pacifist Route",
+      "translate": "creaturechat.advancement.true_pacifist.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

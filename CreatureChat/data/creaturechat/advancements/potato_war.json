@@ -1,0 +1,34 @@
+{
+  "parent": "creaturechat:sworn_oath",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "All war is deception.",
+      "translate": "creaturechat.advancement.potato_war.desc"
+    },
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "item": "minecraft:potato"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Potato War",
+      "translate": "creaturechat.advancement.potato_war.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}

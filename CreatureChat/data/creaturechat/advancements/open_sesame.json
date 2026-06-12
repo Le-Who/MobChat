@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:first_impressions",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Your stuff is my stuff.",
+      "translate": "creaturechat.advancement.open_sesame.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:chest"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Open Sesame",
+      "translate": "creaturechat.advancement.open_sesame.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

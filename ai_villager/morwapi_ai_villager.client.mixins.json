@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "package": "com.morwapi.aivillager.mixin.client",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "morwapi-ai-villager-refmap.json"
+}

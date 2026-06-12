@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:open_sesame",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Share the loot.",
+      "translate": "creaturechat.advancement.shared_stash.desc"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:bundle"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Shared Stash",
+      "translate": "creaturechat.advancement.shared_stash.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

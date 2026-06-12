@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:root",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Cold open.",
+      "translate": "creaturechat.advancement.ice_breaker.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:snowball"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Ice Breaker",
+      "translate": "creaturechat.advancement.ice_breaker.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

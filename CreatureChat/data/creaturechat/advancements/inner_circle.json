@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:social_butterfly",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Gathered round the fire.",
+      "translate": "creaturechat.advancement.inner_circle.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:campfire"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Inner Circle",
+      "translate": "creaturechat.advancement.inner_circle.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

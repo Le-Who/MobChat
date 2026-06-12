@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:wordsmith",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Chill out, man.",
+      "translate": "creaturechat.advancement.calm_the_storm.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:powder_snow_bucket"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Calm The Storm",
+      "translate": "creaturechat.advancement.calm_the_storm.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

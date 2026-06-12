@@ -1,0 +1,20 @@
+{
+  "mappings": {
+    "com/owlmaddie/mixin/client/EntityRendererMixin": {
+      "renderNameTag(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/network/chat/Component;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V": "Lnet/minecraft/class_897;method_3926(Lnet/minecraft/class_1297;Lnet/minecraft/class_2561;Lnet/minecraft/class_4587;Lnet/minecraft/class_4597;I)V"
+    },
+    "com/owlmaddie/mixin/client/MixinPlayerSkinTexture": {
+      "loadCallback(Lcom/mojang/blaze3d/platform/NativeImage;)V": "Lnet/minecraft/class_1046;method_4534(Lnet/minecraft/class_1011;)V"
+    }
+  },
+  "data": {
+    "named:intermediary": {
+      "com/owlmaddie/mixin/client/EntityRendererMixin": {
+        "renderNameTag(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/network/chat/Component;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V": "Lnet/minecraft/class_897;method_3926(Lnet/minecraft/class_1297;Lnet/minecraft/class_2561;Lnet/minecraft/class_4587;Lnet/minecraft/class_4597;I)V"
+      },
+      "com/owlmaddie/mixin/client/MixinPlayerSkinTexture": {
+        "loadCallback(Lcom/mojang/blaze3d/platform/NativeImage;)V": "Lnet/minecraft/class_1046;method_4534(Lnet/minecraft/class_1011;)V"
+      }
+    }
+  }
+}

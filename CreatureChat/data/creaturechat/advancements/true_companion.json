@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:first_impressions",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Did we just become best friends?",
+      "translate": "creaturechat.advancement.true_companion.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:name_tag"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "True Companion",
+      "translate": "creaturechat.advancement.true_companion.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

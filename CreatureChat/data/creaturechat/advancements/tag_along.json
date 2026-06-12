@@ -1,0 +1,31 @@
+{
+  "parent": "creaturechat:ice_breaker",
+  "criteria": {
+    "triggered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "fallback": "Follow me, bro.",
+      "translate": "creaturechat.advancement.tag_along.desc"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:lead"
+    },
+    "show_toast": true,
+    "title": {
+      "fallback": "Tag Along",
+      "translate": "creaturechat.advancement.tag_along.title"
+    }
+  },
+  "requirements": [
+    [
+      "triggered"
+    ]
+  ],
+  "sends_telemetry_event": true
+}
