@@ -1,0 +1,17 @@
+# ─── Agent / IDE tooling ──────────────────────────────────────────────────────
+# Agent skill folders — local tooling, not project code
+.agents/
+# Agent dependency lock — machine-local
+skills-lock.json
+
+# ─── OS artifacts ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Python (generate_roles.py tooling) ───────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
