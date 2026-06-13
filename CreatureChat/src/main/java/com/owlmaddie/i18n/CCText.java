@@ -21,6 +21,9 @@ public class CCText {
     public static final TR CONFIG_CHATBUBBLE_ENABLED = new TR("config.chatbubble.enabled", "Player chat bubbles have been enabled.");
     public static final TR CONFIG_CHATBUBBLE_DISABLED = new TR("config.chatbubble.disabled", "Player chat bubbles have been disabled.");
     public static final TR CONFIG_CHATBUBBLE_UPDATE_FAILED = new TR("config.chatbubble.update_failed", "Failed to update player chat bubble setting.");
+    public static final TR CONFIG_SENDTOCHAT_ENABLED = new TR("config.send_to_chat.enabled", "Sending messages to chat has been enabled.");
+    public static final TR CONFIG_SENDTOCHAT_DISABLED = new TR("config.send_to_chat.disabled", "Sending messages to chat has been disabled.");
+    public static final TR CONFIG_SENDTOCHAT_UPDATE_FAILED = new TR("config.send_to_chat.update_failed", "Failed to update send messages to chat setting.");
     public static final TR CONFIG_HELP = new TR("config.help",
             "Commands:\n" +
             " /creaturechat key set <value> [--config default|server]\n" +
@@ -33,6 +36,7 @@ public class CCText {
             " /creaturechat whitelist <entity|all|clear> [--config default|server]\n" +
             " /creaturechat blacklist <entity|all|clear> [--config default|server]\n" +
             " /creaturechat chatbubble set <on|off> [--config default|server]\n" +
+            " /creaturechat send_to_chat set <on|off> [--config default|server]\n" +
             "Optional: Append [--config default | server] to any command to specify configuration scope.\n\n" +
             "Security: Level 4 permission required.");
     public static final TR CONFIG_STORY_SET_SUCCESS = new TR("config.story.set_success", "Story set successfully: %s");
@@ -52,6 +56,9 @@ public class CCText {
             CONFIG_CHATBUBBLE_ENABLED,
             CONFIG_CHATBUBBLE_DISABLED,
             CONFIG_CHATBUBBLE_UPDATE_FAILED,
+            CONFIG_SENDTOCHAT_ENABLED,
+            CONFIG_SENDTOCHAT_DISABLED,
+            CONFIG_SENDTOCHAT_UPDATE_FAILED,
             CONFIG_HELP,
             CONFIG_STORY_SET_SUCCESS,
             CONFIG_STORY_SET_FAILED,

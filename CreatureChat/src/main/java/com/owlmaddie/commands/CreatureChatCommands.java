@@ -54,6 +54,7 @@ public class CreatureChatCommands {
                 .then(registerWhitelistCommand())
                 .then(registerBlacklistCommand())
                 .then(registerChatBubbleCommand())
+                .then(registerSendToChatCommand())
                 .then(registerHelpCommand()));
     }
 
@@ -131,6 +132,37 @@ public class CreatureChatCommands {
             return 1;
         } else {
             Component feedbackMessage = CCText.CONFIG_CHATBUBBLE_UPDATE_FAILED.comp().withStyle(ChatFormatting.RED);
+            source.sendSuccess(() -> feedbackMessage, false);
+            return 0;
+        }
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> registerSendToChatCommand() {
+        return Commands.literal("send_to_chat")
+                .requires(source -> source.hasPermission(4))
+                .then(Commands.literal("set")
+                        .then(Commands.literal("on")
+                                .then(addConfigArgs((context, useServerConfig) -> setSendToChatEnabled(context, true, useServerConfig)))
+                                .executes(context -> setSendToChatEnabled(context, true, false)))
+                        .then(Commands.literal("off")
+                                .then(addConfigArgs((context, useServerConfig) -> setSendToChatEnabled(context, false, useServerConfig)))
+                                .executes(context -> setSendToChatEnabled(context, false, false))));
+    }
+
+    private static int setSendToChatEnabled(CommandContext<CommandSourceStack> context, boolean enabled, boolean useServerConfig) {
+        CommandSourceStack source = context.getSource();
+        ConfigurationHandler configHandler = new ConfigurationHandler(source.getServer());
+        ConfigurationHandler.Config config = configHandler.loadConfig();
+
+        config.setSendToChat(enabled);
+
+        if (configHandler.saveConfig(config, useServerConfig)) {
+            Component feedbackMessage = (enabled ? CCText.CONFIG_SENDTOCHAT_ENABLED : CCText.CONFIG_SENDTOCHAT_DISABLED)
+                    .comp().withStyle(ChatFormatting.GREEN);
+            source.sendSuccess(() -> feedbackMessage, true);
+            return 1;
+        } else {
+            Component feedbackMessage = CCText.CONFIG_SENDTOCHAT_UPDATE_FAILED.comp().withStyle(ChatFormatting.RED);
             source.sendSuccess(() -> feedbackMessage, false);
             return 0;
         }

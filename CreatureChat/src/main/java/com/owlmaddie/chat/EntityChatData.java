@@ -831,6 +831,13 @@ public class EntityChatData {
             Mob entity = (Mob) ServerEntityFinder.getEntityByUUID((ServerLevel) player.level(), UUID.fromString(entityId));
             if (entity != null) {
                 AdvancementHelper.checkInnerCircle(player, entity);
+
+                // Send one-time message to player text chat if enabled
+                ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
+                if (config.getSendToChat()) {
+                    String mobName = entity.getDisplayName().getString();
+                    player.sendSystemMessage(Component.literal("[" + mobName + "] " + truncatedMessage));
+                }
             }
         }
     }
