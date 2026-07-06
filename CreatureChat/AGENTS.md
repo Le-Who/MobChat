@@ -1,6 +1,12 @@
 # CreatureChat™ Agent Instructions
 
-This fabric mod allows players to chat with any mob in Java Minecraft! All creatures can talk & react using AI!
+This Fabric mod allows players to chat with any mob in Java Minecraft. All creatures can talk and react using AI.
+
+## Project Identity
+
+- This is the **MobChat fork of CreatureChat** at `https://github.com/Le-Who/MobChat`, not the public upstream CreatureChat release.
+- The fork started from CreatureChat but has been modified substantially. Treat local files as authoritative.
+- Do not point users, metadata, install docs, error messages, or deployment scripts at upstream CreatureChat services unless the user explicitly asks for upstream comparison or publication.
 
 ## 🛠️ Build Options
 

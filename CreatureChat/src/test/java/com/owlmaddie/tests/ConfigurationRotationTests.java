@@ -3,6 +3,7 @@
 package com.owlmaddie.tests;
 
 import com.owlmaddie.commands.ConfigurationHandler;
+import com.owlmaddie.commands.ConfigurationPresets;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -49,5 +50,58 @@ public class ConfigurationRotationTests {
         
         config.rotateApiKey();
         assertEquals("sk-key3", config.getActiveApiKey());
+    }
+
+    @Test
+    public void testOpenRouterKeyDoesNotResetPresetEndpoint() {
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setUrl("https://openrouter.ai/api/v1/chat/completions");
+
+        config.setApiKey("sk-or-v1-secret");
+
+        assertEquals("https://openrouter.ai/api/v1/chat/completions", config.getUrl());
+    }
+
+    @Test
+    public void testModelRotationWithWhitespace() {
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setModel(" gemini-2.5-flash , gpt-4o-mini , llama-3.1-8b-instant ");
+
+        assertEquals(3, config.getModelCount());
+        assertEquals("gemini-2.5-flash", config.getActiveModel());
+
+        config.rotateModel();
+        assertEquals("gpt-4o-mini", config.getActiveModel());
+
+        config.rotateModel();
+        assertEquals("llama-3.1-8b-instant", config.getActiveModel());
+
+        config.rotateModel();
+        assertEquals("gemini-2.5-flash", config.getActiveModel());
+    }
+
+    @Test
+    public void testAiStudioPresetUsesOpenAiCompatibleEndpoint() {
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        ConfigurationPresets.ProviderPreset preset = ConfigurationPresets.find("ai-studio").orElseThrow();
+
+        ConfigurationPresets.applyPreset(config, preset);
+
+        assertEquals("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", config.getUrl());
+        assertEquals(preset.defaultModel(), config.getActiveModel());
+
+        config.setModel("gemini-custom-exact, gemini-another-exact");
+        assertEquals(2, config.getModelCount());
+        assertEquals("gemini-custom-exact", config.getActiveModel());
+    }
+
+    @Test
+    public void testApiKeyMaskDoesNotExposeSecrets() {
+        String masked = ConfigurationPresets.describeApiKeys("sk-secret-1234567890, AIza-secret-0987654321");
+
+        assertTrue(masked.contains("2 key(s)"));
+        assertFalse(masked.contains("secret"));
+        assertFalse(masked.contains("1234567890"));
+        assertFalse(masked.contains("0987654321"));
     }
 }

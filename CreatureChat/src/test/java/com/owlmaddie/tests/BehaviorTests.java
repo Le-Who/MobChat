@@ -117,8 +117,8 @@ public class BehaviorTests {
         if (API_MODEL != null && !API_MODEL.isEmpty()) {
             config.setModel(API_MODEL);
         }
-        // Verify API key is set correctly
-        assertNotNull(API_KEY, NO_API_KEY);
+        // Live LLM behavior checks run only when an API key is provided.
+        Assumptions.assumeTrue(API_KEY != null && !API_KEY.isEmpty(), NO_API_KEY);
 
         // Load system chat prompt
         systemChatContents = readFileContents(systemChatPath);

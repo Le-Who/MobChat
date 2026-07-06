@@ -45,7 +45,15 @@ public class LookControls {
 
     private static void handleSlimeLook(Slime slime, Vec3 targetPos) {
         float yawChange = calculateYawChange(slime, targetPos);
-        ((Slime.SlimeMoveControl) slime.getMoveControl()).setDirection(slime.getYRot() + yawChange, false);
+        if (isVanillaSlimeMoveControlCompatible(slime.getMoveControl())) {
+            ((Slime.SlimeMoveControl) slime.getMoveControl()).setDirection(slime.getYRot() + yawChange, false);
+            return;
+        }
+        slime.getLookControl().setLookAt(targetPos.x, targetPos.y, targetPos.z, 10.0F, (float) slime.getMaxHeadXRot());
+    }
+
+    public static boolean isVanillaSlimeMoveControlCompatible(Object moveControl) {
+        return moveControl instanceof Slime.SlimeMoveControl;
     }
 
     private static void handleSquidLook(Squid squid, Vec3 targetPos) {

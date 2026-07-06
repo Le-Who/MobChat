@@ -5,9 +5,14 @@ set -e
 CURSEFORGE_API_KEY=${CURSEFORGE_API_KEY}
 CHANGELOG_FILE="./CHANGELOG.md"
 API_URL="https://minecraft.curseforge.com/api"
-PROJECT_ID=1012118
-USER_AGENT="CreatureChat-Minecraft-Mod:curseforge@owlmaddie.com"
+PROJECT_ID=${CURSEFORGE_PROJECT_ID:-}
+USER_AGENT=${CURSEFORGE_USER_AGENT:-"MobChat-CreatureChat-Fork:local"}
 SLEEP_DURATION=5
+
+if [ -z "$PROJECT_ID" ]; then
+  echo "ERROR: Set CURSEFORGE_PROJECT_ID for this fork before deploying."
+  exit 1
+fi
 
 # Function to fetch version types and return the base game type ID
 fetch_base_version_id() {

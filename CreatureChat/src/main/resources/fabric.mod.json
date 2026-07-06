@@ -5,12 +5,11 @@
 	"name": "CreatureChat",
 	"description": "Chat, befriend, and interact with a rich world of creatures like never before! All creatures can talk and respond naturally using AI.",
 	"authors": [
-		"Jonathan Thomas <jonathan@openshot.org>",
-		"owlmaddie <owlmaddie@gmail.com>"
+		"MobChat maintainers",
+		"Original CreatureChat authors"
 	],
 	"contact": {
-		"homepage": "http://discord.creaturechat.com",
-		"sources": "https://github.com/CreatureChat/creature-chat"
+		"sources": "https://github.com/Le-Who/MobChat"
 	},
 	"license": "GPLv3",
 	"icon": "assets/creaturechat/icon.png",

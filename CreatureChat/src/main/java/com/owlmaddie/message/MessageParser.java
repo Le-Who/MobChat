@@ -3,11 +3,15 @@
 // Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © owlmaddie LLC - unauthorized use prohibited
 package com.owlmaddie.message;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,12 +21,33 @@ import java.util.regex.Pattern;
  */
 public class MessageParser {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
+    private static final Gson GSON = new Gson();
+    private static final Set<String> ALLOWED_BEHAVIORS = Set.of(
+            "FOLLOW",
+            "LEAD",
+            "FLEE",
+            "ATTACK",
+            "PROTECT",
+            "FRIENDSHIP",
+            "UNFOLLOW",
+            "UNLEAD",
+            "UNPROTECT",
+            "UNFLEE",
+            "WAIT",
+            "RETURN_HOME",
+            "GUARD_HOME"
+    );
 
     public static ParsedMessage parseMessage(String input) {
         LOGGER.debug("Parsing message: {}", input);
+        ParsedMessage structured = parseStructuredMessage(input);
+        if (structured != null) {
+            return structured;
+        }
+
         StringBuilder cleanedMessage = new StringBuilder();
         List<Behavior> behaviors = new ArrayList<>();
-        Pattern pattern = Pattern.compile("[<*](FOLLOW|LEAD|FLEE|ATTACK|PROTECT|FRIENDSHIP|UNFOLLOW|UNLEAD|UNPROTECT|UNFLEE)[:\\s]*(\\s*[+-]?\\d+)?[>*]", Pattern.CASE_INSENSITIVE);
+        Pattern pattern = Pattern.compile("[<*](FOLLOW|LEAD|FLEE|ATTACK|PROTECT|FRIENDSHIP|UNFOLLOW|UNLEAD|UNPROTECT|UNFLEE|WAIT|RETURN_HOME|GUARD_HOME)[:\\s]*(\\s*[+-]?\\d+)?[>*]", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(input);
 
         while (matcher.find()) {
@@ -46,5 +71,126 @@ public class MessageParser {
         LOGGER.debug("Cleaned message: {}", displayMessage);
 
         return new ParsedMessage(displayMessage, input.trim(), behaviors);
+    }
+
+    private static ParsedMessage parseStructuredMessage(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        String trimmedInput = input.trim();
+        if (trimmedInput.startsWith("{")) {
+            ParsedMessage parsed = parseStructuredJson(trimmedInput, trimmedInput);
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+
+        return parseFirstStructuredJsonObject(trimmedInput);
+    }
+
+    private static ParsedMessage parseStructuredJson(String json, String originalInput) {
+        try {
+            StructuredResponse response = GSON.fromJson(json, StructuredResponse.class);
+            if (response == null || response.message == null || response.message.trim().isEmpty()) {
+                return null;
+            }
+
+            List<Behavior> behaviors = new ArrayList<>();
+            if (response.actions != null) {
+                for (StructuredAction action : response.actions) {
+                    if (action == null || action.type == null) {
+                        continue;
+                    }
+                    String behaviorName = action.type.trim().toUpperCase(Locale.ENGLISH);
+                    if (!ALLOWED_BEHAVIORS.contains(behaviorName)) {
+                        LOGGER.warn("Ignoring unsupported structured behavior: {}", action.type);
+                        continue;
+                    }
+                    Integer argument = action.value != null ? action.value : action.argument;
+                    behaviors.add(new Behavior(behaviorName, argument));
+                }
+            }
+
+            List<String> memoryUpdates = new ArrayList<>();
+            if (response.memory_updates != null) {
+                for (String memory : response.memory_updates) {
+                    if (memory != null && !memory.trim().isEmpty()) {
+                        memoryUpdates.add(memory.trim());
+                    }
+                }
+            }
+
+            return new ParsedMessage(response.message.trim(), originalInput.trim(), behaviors, response.mood, memoryUpdates);
+        } catch (JsonSyntaxException e) {
+            LOGGER.debug("Structured message parse failed; falling back to legacy parser", e);
+            return null;
+        }
+    }
+
+    private static ParsedMessage parseFirstStructuredJsonObject(String input) {
+        int start = -1;
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < input.length(); i++) {
+            char current = input.charAt(i);
+
+            if (start == -1) {
+                if (current == '{') {
+                    start = i;
+                    depth = 1;
+                }
+                continue;
+            }
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (inString && current == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (current == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString) {
+                continue;
+            }
+
+            if (current == '{') {
+                depth++;
+            } else if (current == '}') {
+                depth--;
+                if (depth == 0) {
+                    ParsedMessage parsed = parseStructuredJson(input.substring(start, i + 1), input);
+                    if (parsed != null) {
+                        return parsed;
+                    }
+                    start = -1;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static class StructuredResponse {
+        String message;
+        String mood;
+        List<String> memory_updates;
+        List<StructuredAction> actions;
+    }
+
+    private static class StructuredAction {
+        String type;
+        Integer value;
+        Integer argument;
     }
 }

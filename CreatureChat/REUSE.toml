@@ -3,7 +3,7 @@
 version = 1
 SPDX-PackageName = "CreatureChat"
 SPDX-PackageSupplier = "licensing@openshot.org, licensing@owlmaddie.com"
-SPDX-PackageDownloadLocation = "https://github.com/CreatureChat/creature-chat"
+SPDX-PackageDownloadLocation = "https://github.com/Le-Who/MobChat"
 
 [[annotations]]
 path = ["build.gradle", "settings.gradle", "gradle.properties", "build.sh", "deploy-**.sh"]

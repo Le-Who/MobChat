@@ -5,9 +5,11 @@ package com.owlmaddie.network;
 
 import com.owlmaddie.chat.ChatDataManager;
 import com.owlmaddie.chat.ChatDataSaverScheduler;
+import com.owlmaddie.chat.ChatGPTRequest;
 import com.owlmaddie.chat.EntityChatData;
 import com.owlmaddie.chat.PlayerData;
 import com.owlmaddie.commands.ConfigurationHandler;
+import com.owlmaddie.commands.ConfigurationScreenData;
 import com.owlmaddie.goals.EntityBehaviorManager;
 import com.owlmaddie.goals.GoalPriority;
 import com.owlmaddie.goals.TalkPlayerGoal;
@@ -28,7 +30,6 @@ import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -58,6 +59,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ServerPackets {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
+    private static final int AMBIENT_CONTEXT_MAX_CHARS = 240;
     public static MinecraftServer serverInstance;
     public static ChatDataSaverScheduler scheduler = null;
     public static final ResourceLocation PACKET_C2S_GREETING = new ResourceLocation("creaturechat", "packet_c2s_greeting");
@@ -66,11 +68,15 @@ public class ServerPackets {
     public static final ResourceLocation PACKET_C2S_OPEN_CHAT = new ResourceLocation("creaturechat", "packet_c2s_open_chat");
     public static final ResourceLocation PACKET_C2S_CLOSE_CHAT = new ResourceLocation("creaturechat", "packet_c2s_close_chat");
     public static final ResourceLocation PACKET_C2S_SEND_CHAT = new ResourceLocation("creaturechat", "packet_c2s_send_chat");
+    public static final ResourceLocation PACKET_C2S_CONFIG_SAVE = new ResourceLocation("creaturechat", "packet_c2s_config_save");
+    public static final ResourceLocation PACKET_C2S_CONFIG_TEST = new ResourceLocation("creaturechat", "packet_c2s_config_test");
     public static final ResourceLocation PACKET_S2C_ENTITY_MESSAGE = new ResourceLocation("creaturechat", "packet_s2c_entity_message");
     public static final ResourceLocation PACKET_S2C_PLAYER_MESSAGE = new ResourceLocation("creaturechat", "packet_s2c_player_message");
     public static final ResourceLocation PACKET_S2C_LOGIN = new ResourceLocation("creaturechat", "packet_s2c_login");
     public static final ResourceLocation PACKET_S2C_WHITELIST = new ResourceLocation("creaturechat", "packet_s2c_whitelist");
     public static final ResourceLocation PACKET_S2C_PLAYER_STATUS = new ResourceLocation("creaturechat", "packet_s2c_player_status");
+    public static final ResourceLocation PACKET_S2C_CONFIG_OPEN = new ResourceLocation("creaturechat", "packet_s2c_config_open");
+    public static final ResourceLocation PACKET_S2C_CONFIG_STATUS = new ResourceLocation("creaturechat", "packet_s2c_config_status");
     public static final ParticleType<?> HEART_SMALL_PARTICLE = Particles.HEART_SMALL_PARTICLE;
     public static final ParticleType<?> HEART_BIG_PARTICLE = Particles.HEART_BIG_PARTICLE;
     public static final ParticleType<?> FIRE_SMALL_PARTICLE = Particles.FIRE_SMALL_PARTICLE;
@@ -203,6 +209,32 @@ public class ServerPackets {
             });
         });
 
+        PacketHelper.registerReceiver(PACKET_C2S_CONFIG_SAVE, (server, player, buf) -> {
+            ConfigurationScreenData.SaveData data = new ConfigurationScreenData.SaveData(
+                    buf.readUtf(32767),
+                    buf.readUtf(32767),
+                    buf.readUtf(32767),
+                    buf.readUtf(32767),
+                    buf.readInt(),
+                    buf.readUtf(32767)
+            );
+
+            server.execute(() -> saveConfigFromScreen(server, player, data));
+        });
+
+        PacketHelper.registerReceiver(PACKET_C2S_CONFIG_TEST, (server, player, buf) -> {
+            ConfigurationScreenData.SaveData data = new ConfigurationScreenData.SaveData(
+                    buf.readUtf(32767),
+                    buf.readUtf(32767),
+                    buf.readUtf(32767),
+                    buf.readUtf(32767),
+                    buf.readInt(),
+                    buf.readUtf(32767)
+            );
+
+            server.execute(() -> testConfigFromScreen(server, player, data));
+        });
+
         // Send lite chat data JSON to new player (to populate client data)
         // Data is sent in chunks, to prevent exceeding the 32767 limit per String.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -300,6 +332,100 @@ public class ServerPackets {
                 PacketHelper.send(serverPlayer, PACKET_S2C_WHITELIST, buffer);
             }
         }
+    }
+
+    public static void sendConfigScreen(ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+        ConfigurationHandler.Config config = new ConfigurationHandler(server).loadConfig();
+        ConfigurationScreenData.OpenData data = ConfigurationScreenData.fromConfig(config);
+        FriendlyByteBuf buffer = BufferHelper.create();
+        buffer.writeUtf(data.provider());
+        buffer.writeUtf(data.url());
+        buffer.writeUtf(data.apiKeys());
+        buffer.writeUtf(data.maskedApiKeys());
+        buffer.writeUtf(data.models());
+        buffer.writeInt(data.timeout());
+        buffer.writeUtf(data.thinkingLevel());
+        PacketHelper.send(player, PACKET_S2C_CONFIG_OPEN, buffer);
+    }
+
+    private static void saveConfigFromScreen(MinecraftServer server, ServerPlayer player, ConfigurationScreenData.SaveData data) {
+        if (!isConfigOperator(player)) {
+            sendConfigStatus(player, false, "Only server operators can change CreatureChat configuration.");
+            return;
+        }
+
+        ConfigurationHandler configHandler = new ConfigurationHandler(server);
+        ConfigurationHandler.Config config = configHandler.loadConfig();
+        try {
+            ConfigurationScreenData.applyToConfig(config, data);
+        } catch (IllegalArgumentException e) {
+            sendConfigStatus(player, false, e.getMessage());
+            return;
+        }
+
+        if (configHandler.saveConfig(config, true)) {
+            sendConfigStatus(player, true, "CreatureChat configuration saved.");
+        } else {
+            sendConfigStatus(player, false, "CreatureChat configuration could not be saved. Check server logs.");
+        }
+    }
+
+    private static void testConfigFromScreen(MinecraftServer server, ServerPlayer player, ConfigurationScreenData.SaveData data) {
+        if (!isConfigOperator(player)) {
+            sendConfigStatus(player, false, "Only server operators can test CreatureChat configuration.");
+            return;
+        }
+
+        ConfigurationHandler.Config config = new ConfigurationHandler(server).loadConfig();
+        try {
+            ConfigurationScreenData.applyToConfig(config, data);
+        } catch (IllegalArgumentException e) {
+            sendConfigStatus(player, false, e.getMessage());
+            return;
+        }
+
+        if (config.getActiveApiKey().isBlank()) {
+            sendConfigStatus(player, false, "Cannot test: API key is empty.");
+            return;
+        }
+        if (config.getActiveModel().isBlank()) {
+            sendConfigStatus(player, false, "Cannot test: model is empty.");
+            return;
+        }
+
+        sendConfigStatus(player, true, "Testing CreatureChat AI configuration...");
+        ChatGPTRequest.fetchMessageFromChatGPT(config, "Reply with exactly: OK", new HashMap<>(), new ArrayList<>(), false)
+                .thenAccept(response -> server.execute(() -> {
+                    if (response != null && !response.isBlank()) {
+                        sendConfigStatus(player, true, "CreatureChat AI test succeeded using model: " + config.getActiveModel());
+                    } else {
+                        String message = ChatGPTRequest.lastErrorMessage != null ? ChatGPTRequest.lastErrorMessage : "No response";
+                        sendConfigStatus(player, false, "CreatureChat AI test failed: " + message);
+                    }
+                }));
+    }
+
+    private static void sendConfigStatus(ServerPlayer player, boolean success, String message) {
+        MinecraftServer server = player.getServer();
+        String maskedKeys = "";
+        if (server != null) {
+            ConfigurationHandler.Config config = new ConfigurationHandler(server).loadConfig();
+            maskedKeys = ConfigurationScreenData.fromConfig(config).maskedApiKeys();
+        }
+
+        FriendlyByteBuf buffer = BufferHelper.create();
+        buffer.writeBoolean(success);
+        buffer.writeUtf(message);
+        buffer.writeUtf(maskedKeys);
+        PacketHelper.send(player, PACKET_S2C_CONFIG_STATUS, buffer);
+    }
+
+    private static boolean isConfigOperator(ServerPlayer player) {
+        return player.createCommandSourceStack().hasPermission(4);
     }
 
     public static void generate_character(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, boolean is_auto_message) {
@@ -409,6 +535,145 @@ public class ServerPackets {
         chatData.generateMessage(userLanguage, player, message, is_auto_message);
     }
 
+    public static void handleNearbyPlayerChat(ServerPlayer player, String chatMessage) {
+        if (serverInstance == null || player == null || chatMessage == null || chatMessage.trim().isEmpty()) {
+            return;
+        }
+
+        serverInstance.execute(() -> {
+            ConfigurationHandler.Config config = new ConfigurationHandler(serverInstance).loadConfig();
+            if (!config.getProximityChatEnabled()) {
+                return;
+            }
+
+            int remainingResponses = perMessageLimit(config.getMaxProximityResponsesPerMessage());
+            int radius = ambientRadius(config.getProximityChatRadius());
+            if (remainingResponses <= 0 || !(player.level() instanceof ServerLevel)) {
+                return;
+            }
+
+            List<Mob> nearbyMobs = player.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(radius));
+            nearbyMobs.sort(Comparator.comparingDouble(mob -> mob.distanceToSqr(player)));
+
+            for (Mob mob : nearbyMobs) {
+                if (mob.distanceToSqr(player) > radius * radius) {
+                    continue;
+                }
+                EntityChatData mobChatData = getAmbientCandidateData(mob);
+                if (mobChatData == null) {
+                    continue;
+                }
+
+                String ambientMessage = nearbyPlayerContext(player, chatMessage);
+                if (generate_ambient_chat("N/A", mobChatData, player, mob, ambientMessage, config, false)) {
+                    remainingResponses--;
+                    if (remainingResponses <= 0) {
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    public static void handleNearbyMobChat(ServerPlayer player, Mob sourceEntity, String sourceMessage, ConfigurationHandler.Config config) {
+        if (serverInstance == null || player == null || sourceEntity == null || sourceMessage == null || sourceMessage.trim().isEmpty()) {
+            return;
+        }
+
+        serverInstance.execute(() -> {
+            if (!config.getMobToMobChatEnabled()) {
+                return;
+            }
+
+            int remainingResponses = perMessageLimit(config.getMaxMobToMobResponsesPerMessage());
+            int radius = ambientRadius(config.getMobToMobChatRadius());
+            if (remainingResponses <= 0 || !(sourceEntity.level() instanceof ServerLevel)) {
+                return;
+            }
+            EntityChatData sourceChatData = getAmbientCandidateData(sourceEntity);
+            if (sourceChatData == null || !ChatDataManager.getServerInstance().handleAmbientEntityResponse(sourceChatData, config)) {
+                return;
+            }
+
+            List<Mob> nearbyMobs = sourceEntity.level().getEntitiesOfClass(Mob.class, sourceEntity.getBoundingBox().inflate(radius));
+            nearbyMobs.sort(Comparator.comparingDouble(mob -> mob.distanceToSqr(sourceEntity)));
+
+            for (Mob mob : nearbyMobs) {
+                if (mob == sourceEntity || mob.distanceToSqr(sourceEntity) > radius * radius) {
+                    continue;
+                }
+                EntityChatData mobChatData = getAmbientCandidateData(mob);
+                if (mobChatData == null) {
+                    continue;
+                }
+
+                String ambientMessage = nearbyMobContext(sourceEntity, sourceMessage);
+                if (generate_ambient_chat("N/A", mobChatData, player, mob, ambientMessage, config, false)) {
+                    remainingResponses--;
+                    if (remainingResponses <= 0) {
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    public static boolean generate_ambient_chat(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, String message,
+                                                ConfigurationHandler.Config config, boolean allow_mob_to_mob_reactions) {
+        ChatDataManager manager = ChatDataManager.getServerInstance();
+        if (!manager.handleAmbientResponse(chatData, player, config)) {
+            return false;
+        }
+
+        TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
+        EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
+
+        chatData.generateMessage(userLanguage, player, message, true, allow_mob_to_mob_reactions);
+        return true;
+    }
+
+    private static int perMessageLimit(int configuredLimit) {
+        return Math.max(0, Math.min(configuredLimit, 8));
+    }
+
+    private static int ambientRadius(int configuredRadius) {
+        return Math.max(1, Math.min(configuredRadius, 64));
+    }
+
+    private static EntityChatData getAmbientCandidateData(Mob mob) {
+        if (mob == null || !mob.isAlive()) {
+            return null;
+        }
+        EntityChatData chatData = ChatDataManager.getServerInstance().entityChatDataMap.get(mob.getStringUUID());
+        if (chatData == null || chatData.characterSheet == null || chatData.characterSheet.isEmpty()) {
+            return null;
+        }
+        if (chatData.status == ChatDataManager.ChatStatus.PENDING) {
+            return null;
+        }
+        return chatData;
+    }
+
+    private static String nearbyPlayerContext(ServerPlayer player, String chatMessage) {
+        String playerName = player.getDisplayName().getString();
+        String cleanMessage = cleanAmbientInput(chatMessage);
+        return "[Nearby player chat. Respond only if your character naturally would. " + playerName + " said nearby: " + cleanMessage + "]";
+    }
+
+    private static String nearbyMobContext(Mob sourceEntity, String sourceMessage) {
+        String mobName = sourceEntity.getDisplayName().getString();
+        String cleanMessage = cleanAmbientInput(sourceMessage);
+        return "[Nearby mob chat. Respond only if your character naturally would. " + mobName + " said nearby: " + cleanMessage + "]";
+    }
+
+    private static String cleanAmbientInput(String message) {
+        if (message == null) {
+            return "";
+        }
+        String singleLine = message.replace('\n', ' ').replace('\r', ' ').trim();
+        return EntityChatData.truncateString(singleLine, AMBIENT_CONTEXT_MAX_CHARS);
+    }
+
     // Writing a Map<String, PlayerData> to the buffer
     public static void writePlayerDataMap(FriendlyByteBuf buffer, Map<String, PlayerData> map) {
         buffer.writeInt(map.size()); // Write the size of the map
@@ -421,6 +686,10 @@ public class ServerPackets {
 
     // Send new message to all connected players
     public static void BroadcastEntityMessage(EntityChatData chatData) {
+        if (serverInstance == null) {
+            LOGGER.warn("Skipping entity message broadcast because the server instance is not available.");
+            return;
+        }
         // Log useful information before looping through all players
         LOGGER.info("Broadcasting entity message: entityId={}, status={}, currentMessage={}, currentLineNumber={}, senderType={}",
                 chatData.entityId, chatData.status,
@@ -465,6 +734,10 @@ public class ServerPackets {
 
     // Send new message to all connected players
     public static void BroadcastPlayerMessage(EntityChatData chatData, ServerPlayer sender) {
+        if (serverInstance == null) {
+            LOGGER.warn("Skipping player message broadcast because the server instance is not available.");
+            return;
+        }
         // Log the specific data being sent
         LOGGER.info("Broadcasting player message: senderUUID={}, message={}", sender.getStringUUID(),
                 chatData.currentMessage);
@@ -485,6 +758,10 @@ public class ServerPackets {
 
     // Send new message to all connected players
     public static void BroadcastPlayerStatus(Player player, boolean isChatOpen) {
+        if (serverInstance == null) {
+            LOGGER.warn("Skipping player status broadcast because the server instance is not available.");
+            return;
+        }
         FriendlyByteBuf buffer = BufferHelper.create();
 
         // Write the entity's chat updated data
@@ -500,27 +777,21 @@ public class ServerPackets {
 
     // Send a chat message to all players (i.e. death message)
     public static void BroadcastMessage(Component message) {
+        if (serverInstance == null) {
+            LOGGER.warn("Skipping server chat broadcast because the server instance is not available.");
+            return;
+        }
         for (ServerPlayer serverPlayer : serverInstance.getPlayerList().getPlayers()) {
             serverPlayer.displayClientMessage(message, false);
         };
     }
 
-    // Send a chat message to a player which is clickable (for error messages with a link for help)
-    public static void SendClickableError(Player player, String message, String url) {
-        MutableComponent text = Component.literal(message)
-                .withStyle(ChatFormatting.BLUE)
-                .withStyle(style -> style
-                        .withClickEvent(ClickEventHelper.openUrl(url))
-                        .withUnderlined(true));
-        player.displayClientMessage(text, false);
-    }
-
-    // Send a clickable message to ALL Ops
+    // Send an error message to all ops.
     public static void sendErrorToAllOps(MinecraftServer server, String message) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             // Check if the player is an operator
             if (server.getPlayerList().isOp(player.getGameProfile())) {
-                ServerPackets.SendClickableError(player, message, "http://discord.creaturechat.com");
+                player.displayClientMessage(Component.literal(message).withStyle(ChatFormatting.RED), false);
             }
         }
     }

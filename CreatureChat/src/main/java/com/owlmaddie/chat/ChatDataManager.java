@@ -50,17 +50,20 @@ public class ChatDataManager {
     // HashMap to associate unique entity IDs with their chat data
     public ConcurrentHashMap<String, EntityChatData> entityChatDataMap;
     public ConcurrentHashMap<UUID, AutoMessageBucket> autoResponseBuckets;
+    public ConcurrentHashMap<UUID, AutoMessageBucket> ambientResponseBuckets;
 
     public void clearData() {
         // Clear the chat data for the previous session
         entityChatDataMap.clear();
         autoResponseBuckets.clear();
+        ambientResponseBuckets.clear();
     }
 
     private ChatDataManager(Boolean server_only) {
         // Constructor
         entityChatDataMap = new ConcurrentHashMap<>();
         autoResponseBuckets = new ConcurrentHashMap<>();
+        ambientResponseBuckets = new ConcurrentHashMap<>();
 
         if (server_only) {
             // Generate initial quest
@@ -96,6 +99,18 @@ public class ChatDataManager {
         return chatData.autoBucket;
     }
 
+    private AutoMessageBucket getAmbientPlayerBucket(UUID playerId, ConfigurationHandler.Config config) {
+        return ambientResponseBuckets.computeIfAbsent(playerId,
+                k -> new AutoMessageBucket(config.getMaxPlayerAmbientResponses(), config.getPlayerAmbientCooldownSeconds()));
+    }
+
+    private AutoMessageBucket getAmbientEntityBucket(EntityChatData chatData, ConfigurationHandler.Config config) {
+        if (chatData.ambientBucket == null) {
+            chatData.ambientBucket = new AutoMessageBucket(config.getMaxEntityAmbientResponses(), config.getEntityAmbientCooldownSeconds());
+        }
+        return chatData.ambientBucket;
+    }
+
     public boolean handleAutoResponse(EntityChatData chatData, ServerPlayer player, boolean isAuto, ConfigurationHandler.Config config) {
         AutoMessageBucket entityBucket = getEntityBucket(chatData, config);
         AutoMessageBucket playerBucket = getPlayerBucket(player.getUUID(), config);
@@ -116,6 +131,40 @@ public class ChatDataManager {
 
         entityBucket.consume();
         playerBucket.consume();
+        return true;
+    }
+
+    public boolean handleAmbientResponse(EntityChatData chatData, ServerPlayer player, ConfigurationHandler.Config config) {
+        return handleAmbientResponse(chatData, player.getUUID(), player.getDisplayName().getString(), config);
+    }
+
+    public boolean handleAmbientResponse(EntityChatData chatData, UUID playerId, String playerName, ConfigurationHandler.Config config) {
+        AutoMessageBucket entityBucket = getAmbientEntityBucket(chatData, config);
+        AutoMessageBucket playerBucket = getAmbientPlayerBucket(playerId, config);
+
+        if (!entityBucket.hasTokens()) {
+            LOGGER.info("Ambient response skipped for entity {}: entity cooldown active", chatData.entityId);
+            return false;
+        }
+        if (!playerBucket.hasTokens()) {
+            LOGGER.info("Ambient response skipped for player {}: player cooldown active", playerName);
+            return false;
+        }
+
+        entityBucket.consume();
+        playerBucket.consume();
+        return true;
+    }
+
+    public boolean handleAmbientEntityResponse(EntityChatData chatData, ConfigurationHandler.Config config) {
+        AutoMessageBucket entityBucket = getAmbientEntityBucket(chatData, config);
+
+        if (!entityBucket.hasTokens()) {
+            LOGGER.info("Ambient response skipped for entity {}: entity cooldown active", chatData.entityId);
+            return false;
+        }
+
+        entityBucket.consume();
         return true;
     }
 

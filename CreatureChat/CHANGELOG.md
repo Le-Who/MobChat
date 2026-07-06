@@ -8,10 +8,17 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ### Added
 - Document SPDX header and changelog requirements in AGENTS.md for contributors
+- Add an OP-only `/creaturechat setup` wizard flow with provider presets, masked config status, and live config testing.
+- Add OpenAI-compatible provider presets for OpenAI, Google AI Studio, OpenRouter, Groq, Ollama, and LiteLLM.
+- Add an OP-only client setup screen opened by `/creaturechat setup`, with provider buttons, endpoint/key/model/timeout fields, Save, and Test.
+- Add server-authoritative config screen packets that never send stored API keys back to clients.
 
 ### Changed
 - Convert PNG screenshots to JPEG, compress, and remove less useful ones (smaller jar)
 - Compressed all textures from 32-bit color to 4-bit indexed color, reduced size massively.
+- Document CreatureChat as the local MobChat fork rather than the public upstream release.
+- Remove upstream CreatureChat support, API, download, and deployment targets from docs, metadata, and runtime error messages.
+- Allow comma-separated model lists and rotate through model/API-key combinations on retryable LLM request failures.
 
 
 ## [3.0.0] - 2025-08-27

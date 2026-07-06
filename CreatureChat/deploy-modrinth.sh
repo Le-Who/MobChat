@@ -5,10 +5,14 @@ set -e
 MODRINTH_API_KEY=${MODRINTH_API_KEY}
 CHANGELOG_FILE="./CHANGELOG.md"
 API_URL="https://api.modrinth.com/v2"
-USER_AGENT="CreatureChat-Minecraft-Mod:modrinth@owlmaddie.com"
-PROJECT_ID="rvR0de1E"
-AUTHOR_ID="k6RiShdd"
+USER_AGENT=${MODRINTH_USER_AGENT:-"MobChat-CreatureChat-Fork:local"}
+PROJECT_ID=${MODRINTH_PROJECT_ID:-}
 SLEEP_DURATION=5
+
+if [ -z "$PROJECT_ID" ]; then
+  echo "ERROR: Set MODRINTH_PROJECT_ID for this fork before deploying."
+  exit 1
+fi
 
 # Read the first changelog block
 CHANGELOG=$(awk '/^## \[/{ if (p) exit; p=1 } p' "$CHANGELOG_FILE")

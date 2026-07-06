@@ -70,6 +70,7 @@ public class ConfigurationHandler {
         private String apiKey = "";
         private String url = "https://api.openai.com/v1/chat/completions";
         private String model = "gpt-3.5-turbo";
+        private String thinkingLevel = "auto";
         private int maxContextTokens = 16385;
         private int maxOutputTokens = 200;
         private double percentOfContext = 0.75;
@@ -83,22 +84,41 @@ public class ConfigurationHandler {
         private int playerAutoCooldownSeconds = 3;
         private int maxEntityAutoResponses = 3;
         private int entityAutoCooldownSeconds = 3;
+        private boolean proximityChatEnabled = true;
+        private int proximityChatRadius = 12;
+        private int maxProximityResponsesPerMessage = 1;
+        private int maxPlayerAmbientResponses = 1;
+        private int playerAmbientCooldownSeconds = 45;
+        private int maxEntityAmbientResponses = 1;
+        private int entityAmbientCooldownSeconds = 90;
+        private boolean mobToMobChatEnabled = true;
+        private int mobToMobChatRadius = 10;
+        private int maxMobToMobResponsesPerMessage = 1;
 
         private transient int currentKeyIndex = 0;
+        private transient int currentModelIndex = 0;
 
-        private String[] parseApiKeys() {
-            if (apiKey == null || apiKey.trim().isEmpty()) {
+        private String[] parseCsv(String value) {
+            if (value == null || value.trim().isEmpty()) {
                 return new String[0];
             }
-            String[] parts = apiKey.split(",");
-            List<String> validKeys = new ArrayList<>();
+            String[] parts = value.split(",");
+            List<String> validValues = new ArrayList<>();
             for (String p : parts) {
                 String trimmed = p.trim();
                 if (!trimmed.isEmpty()) {
-                    validKeys.add(trimmed);
+                    validValues.add(trimmed);
                 }
             }
-            return validKeys.toArray(new String[0]);
+            return validValues.toArray(new String[0]);
+        }
+
+        private String[] parseApiKeys() {
+            return parseCsv(apiKey);
+        }
+
+        private String[] parseModels() {
+            return parseCsv(model);
         }
 
         public String getActiveApiKey() {
@@ -123,26 +143,71 @@ public class ConfigurationHandler {
             return parseApiKeys().length;
         }
 
+        public String getActiveModel() {
+            String[] models = parseModels();
+            if (models.length == 0) {
+                return "";
+            }
+            if (currentModelIndex < 0 || currentModelIndex >= models.length) {
+                currentModelIndex = 0;
+            }
+            return models[currentModelIndex];
+        }
+
+        public void rotateModel() {
+            String[] models = parseModels();
+            if (models.length > 0) {
+                currentModelIndex = (currentModelIndex + 1) % models.length;
+            }
+        }
+
+        public int getModelCount() {
+            return parseModels().length;
+        }
+
         // Getters and setters for existing fields
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) {
             this.apiKey = apiKey;
             this.currentKeyIndex = 0;
             String activeKey = getActiveApiKey();
-            if (activeKey.startsWith("cc_") && activeKey.length() == 15) {
-                // Update URL if a CreatureChat API key is detected
-                setUrl("https://api.creaturechat.com/v1/chat/completions");
-            } else if (activeKey.startsWith("sk-")) {
+            if (activeKey.startsWith("sk-") && !activeKey.startsWith("sk-or-") && isOpenAiUrl(url)) {
                 // Update URL if an OpenAI API key is detected
                 setUrl("https://api.openai.com/v1/chat/completions");
             }
+        }
+
+        private boolean isOpenAiUrl(String url) {
+            return url == null || url.isEmpty() || url.contains("api.openai.com");
         }
 
         public String getUrl() { return url; }
         public void setUrl(String url) { this.url = url; }
 
         public String getModel() { return model; }
-        public void setModel(String model) { this.model = model; }
+        public void setModel(String model) {
+            this.model = model;
+            this.currentModelIndex = 0;
+        }
+
+        public String getThinkingLevel() {
+            return normalizeThinkingLevel(thinkingLevel);
+        }
+
+        public void setThinkingLevel(String thinkingLevel) {
+            this.thinkingLevel = normalizeThinkingLevel(thinkingLevel);
+        }
+
+        private String normalizeThinkingLevel(String value) {
+            if (value == null || value.trim().isEmpty()) {
+                return "auto";
+            }
+            String normalized = value.trim().toLowerCase();
+            return switch (normalized) {
+                case "low", "medium", "high" -> normalized;
+                default -> "auto";
+            };
+        }
 
         public int getTimeout() { return timeout; }
         public void setTimeout(int timeout) { this.timeout = timeout; }
@@ -183,5 +248,35 @@ public class ConfigurationHandler {
 
         public int getEntityAutoCooldownSeconds() { return entityAutoCooldownSeconds; }
         public void setEntityAutoCooldownSeconds(int entityAutoCooldownSeconds) { this.entityAutoCooldownSeconds = entityAutoCooldownSeconds; }
+
+        public boolean getProximityChatEnabled() { return proximityChatEnabled; }
+        public void setProximityChatEnabled(boolean proximityChatEnabled) { this.proximityChatEnabled = proximityChatEnabled; }
+
+        public int getProximityChatRadius() { return proximityChatRadius; }
+        public void setProximityChatRadius(int proximityChatRadius) { this.proximityChatRadius = proximityChatRadius; }
+
+        public int getMaxProximityResponsesPerMessage() { return maxProximityResponsesPerMessage; }
+        public void setMaxProximityResponsesPerMessage(int maxProximityResponsesPerMessage) { this.maxProximityResponsesPerMessage = maxProximityResponsesPerMessage; }
+
+        public int getMaxPlayerAmbientResponses() { return maxPlayerAmbientResponses; }
+        public void setMaxPlayerAmbientResponses(int maxPlayerAmbientResponses) { this.maxPlayerAmbientResponses = maxPlayerAmbientResponses; }
+
+        public int getPlayerAmbientCooldownSeconds() { return playerAmbientCooldownSeconds; }
+        public void setPlayerAmbientCooldownSeconds(int playerAmbientCooldownSeconds) { this.playerAmbientCooldownSeconds = playerAmbientCooldownSeconds; }
+
+        public int getMaxEntityAmbientResponses() { return maxEntityAmbientResponses; }
+        public void setMaxEntityAmbientResponses(int maxEntityAmbientResponses) { this.maxEntityAmbientResponses = maxEntityAmbientResponses; }
+
+        public int getEntityAmbientCooldownSeconds() { return entityAmbientCooldownSeconds; }
+        public void setEntityAmbientCooldownSeconds(int entityAmbientCooldownSeconds) { this.entityAmbientCooldownSeconds = entityAmbientCooldownSeconds; }
+
+        public boolean getMobToMobChatEnabled() { return mobToMobChatEnabled; }
+        public void setMobToMobChatEnabled(boolean mobToMobChatEnabled) { this.mobToMobChatEnabled = mobToMobChatEnabled; }
+
+        public int getMobToMobChatRadius() { return mobToMobChatRadius; }
+        public void setMobToMobChatRadius(int mobToMobChatRadius) { this.mobToMobChatRadius = mobToMobChatRadius; }
+
+        public int getMaxMobToMobResponsesPerMessage() { return maxMobToMobResponsesPerMessage; }
+        public void setMaxMobToMobResponsesPerMessage(int maxMobToMobResponsesPerMessage) { this.maxMobToMobResponsesPerMessage = maxMobToMobResponsesPerMessage; }
     }
 }

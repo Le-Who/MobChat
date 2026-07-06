@@ -38,15 +38,11 @@ public abstract class MixinOnChat {
     @Inject(method = "handleChat(Lnet/minecraft/network/protocol/game/ServerboundChatPacket;)V", at = @At("HEAD"), cancellable = true)
     private void onChatMessage(ServerboundChatPacket packet, CallbackInfo ci) {
         ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
+        ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
+        ServerPlayer player = handler.player;
+        String chatMessage = packet.message();
+
         if (config.getChatBubbles()) {
-
-            // Get the player who sent the message
-            ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
-            ServerPlayer player = handler.player;
-
-            // Get the chat message
-            String chatMessage = packet.message();
-
             // Example: Call your broadcast function
             EntityChatData chatData = new EntityChatData(player.getStringUUID());
             chatData.currentMessage = chatMessage;
@@ -55,6 +51,8 @@ public abstract class MixinOnChat {
             // Optionally, cancel the event to prevent the default behavior
             //ci.cancel();
         }
+
+        ServerPackets.handleNearbyPlayerChat(player, chatMessage);
     }
 
     @Inject(method = "handlePlayerCommand", at = @At("HEAD"), cancellable = true)

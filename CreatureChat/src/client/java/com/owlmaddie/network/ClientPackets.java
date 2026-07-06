@@ -8,6 +8,8 @@ import com.google.gson.reflect.TypeToken;
 import com.owlmaddie.chat.ChatDataManager;
 import com.owlmaddie.chat.EntityChatData;
 import com.owlmaddie.chat.PlayerData;
+import com.owlmaddie.commands.ConfigurationScreenData;
+import com.owlmaddie.ui.CreatureChatConfigScreen;
 import com.owlmaddie.ui.BubbleRenderer;
 import com.owlmaddie.ui.PlayerMessageManager;
 import com.owlmaddie.utils.ClientEntityFinder;
@@ -21,6 +23,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -92,6 +95,30 @@ public class ClientPackets {
 
         // Send C2S packet
         ClientPacketHelper.send(ServerPackets.PACKET_C2S_SEND_CHAT, buf);
+    }
+
+    public static void sendConfigSave(ConfigurationScreenData.SaveData data) {
+        FriendlyByteBuf buf = ClientBufferHelper.create();
+        buf.writeUtf(data.provider());
+        buf.writeUtf(data.url());
+        buf.writeUtf(data.apiKeys());
+        buf.writeUtf(data.models());
+        buf.writeInt(data.timeout());
+        buf.writeUtf(data.thinkingLevel());
+
+        ClientPacketHelper.send(ServerPackets.PACKET_C2S_CONFIG_SAVE, buf);
+    }
+
+    public static void sendConfigTest(ConfigurationScreenData.SaveData data) {
+        FriendlyByteBuf buf = ClientBufferHelper.create();
+        buf.writeUtf(data.provider());
+        buf.writeUtf(data.url());
+        buf.writeUtf(data.apiKeys());
+        buf.writeUtf(data.models());
+        buf.writeInt(data.timeout());
+        buf.writeUtf(data.thinkingLevel());
+
+        ClientPacketHelper.send(ServerPackets.PACKET_C2S_CONFIG_TEST, buf);
     }
 
     // Reading a Map<String, PlayerData> from the buffer
@@ -250,6 +277,34 @@ public class ClientPackets {
                     playNearbyUISound(client, player, 0.2f);
                 } else {
                     PlayerMessageManager.closeChatUI(playerId);
+                }
+            });
+        });
+
+        ClientPacketHelper.registerReceiver(ServerPackets.PACKET_S2C_CONFIG_OPEN, (client, handler, buffer, responseSender) -> {
+            ConfigurationScreenData.OpenData data = new ConfigurationScreenData.OpenData(
+                    buffer.readUtf(32767),
+                    buffer.readUtf(32767),
+                    buffer.readUtf(32767),
+                    buffer.readUtf(32767),
+                    buffer.readUtf(32767),
+                    buffer.readInt(),
+                    buffer.readUtf(32767)
+            );
+
+            client.execute(() -> client.setScreen(new CreatureChatConfigScreen(data)));
+        });
+
+        ClientPacketHelper.registerReceiver(ServerPackets.PACKET_S2C_CONFIG_STATUS, (client, handler, buffer, responseSender) -> {
+            boolean success = buffer.readBoolean();
+            String message = buffer.readUtf(32767);
+            String maskedKeys = buffer.readUtf(32767);
+
+            client.execute(() -> {
+                if (client.screen instanceof CreatureChatConfigScreen screen) {
+                    screen.updateServerStatus(success, message, maskedKeys);
+                } else if (client.player != null) {
+                    client.player.displayClientMessage(Component.literal(message), false);
                 }
             });
         });

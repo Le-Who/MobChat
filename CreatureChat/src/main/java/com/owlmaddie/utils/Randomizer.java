@@ -18,7 +18,7 @@ public class Randomizer {
     public enum RandomType { ADJECTIVE, SPEAKING_STYLE, CLASS, ALIGNMENT }
     public enum ErrorType { GENERAL, CONNECTION, CODE401, CODE403, CODE429, CODE500, CODE503 }
 
-    public static final String DISCORD_LINK = "discord.creaturechat.com";
+    public static final String HELP_TARGET = "server logs or your local modpack maintainer";
 
     private static final List<TR> NO_RESPONSE = List.of(
             new TR("no_response.0", "<no response>"),
@@ -40,13 +40,13 @@ public class Randomizer {
             new TR("no_response.16", "<rolls eyes>")
     );
 
-    public static final TR ERROR_GENERAL    = new TR("error.general",    "Something unexpected has gone wrong. Find help at %s.");
-    public static final TR ERROR_CONNECTION = new TR("error.connection", "Can't reach the server. Are you offline? Find help at %s.");
-    public static final TR ERROR_401        = new TR("error.401",        "To get started, you need an AI key or a local LLM. Find help at %s.");
-    public static final TR ERROR_403        = new TR("error.403",        "Country or region unavailable. Find help at %s.");
-    public static final TR ERROR_429        = new TR("error.429",        "Your AI key is out of tokens and needs funds, or you are sending too many messages. Find help at %s.");
-    public static final TR ERROR_500        = new TR("error.500",        "There was an error processing your message request. Please try again or find help at %s.");
-    public static final TR ERROR_503        = new TR("error.503",        "Service is overloaded or temporarily down. Please try again later. Find help at %s.");
+    public static final TR ERROR_GENERAL    = new TR("error.general",    "Something unexpected has gone wrong. Check %s.");
+    public static final TR ERROR_CONNECTION = new TR("error.connection", "Can't reach the configured AI endpoint. Check %s.");
+    public static final TR ERROR_401        = new TR("error.401",        "To get started, configure an AI key or a local LLM. Check %s.");
+    public static final TR ERROR_403        = new TR("error.403",        "The configured AI provider rejected the request. Check %s.");
+    public static final TR ERROR_429        = new TR("error.429",        "The configured AI provider rejected the request due to quota or rate limits. Check %s.");
+    public static final TR ERROR_500        = new TR("error.500",        "There was an error processing your message request. Check %s.");
+    public static final TR ERROR_503        = new TR("error.503",        "The configured AI provider is overloaded or temporarily down. Check %s.");
 
     public static Stream<TR> allErrorText() {
         return Stream.of(

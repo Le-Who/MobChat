@@ -10,6 +10,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.owlmaddie.chat.ChatGPTRequest;
 import com.owlmaddie.network.ServerPackets;
 import com.owlmaddie.i18n.CCText;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -19,14 +20,19 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,6 +56,9 @@ public class CreatureChatCommands {
                 .then(registerSetCommand("url", "URL", StringArgumentType.string()))
                 .then(registerSetCommand("model", "Model", StringArgumentType.string()))
                 .then(registerSetCommand("timeout", "Timeout (seconds)", IntegerArgumentType.integer()))
+                .then(registerSetupCommand())
+                .then(registerPresetCommand())
+                .then(registerConfigCommand())
                 .then(registerStoryCommand())
                 .then(registerWhitelistCommand())
                 .then(registerBlacklistCommand())
@@ -106,6 +115,138 @@ public class CreatureChatCommands {
                 .map(ResourceLocation::toString)
                 .collect(Collectors.toList());
     }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> registerSetupCommand() {
+        return Commands.literal("setup")
+                .requires(source -> source.hasPermission(4))
+                .executes(context -> showSetupWizard(context.getSource()))
+                .then(Commands.literal("provider")
+                        .then(Commands.argument("provider", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(ConfigurationPresets.providerIds(), builder))
+                                .executes(context -> applyPreset(context.getSource(), StringArgumentType.getString(context, "provider"), true))))
+                .then(Commands.literal("key")
+                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                .executes(context -> setConfig(context.getSource(), "key", StringArgumentType.getString(context, "value"), true, "API Key"))))
+                .then(Commands.literal("url")
+                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                .executes(context -> setConfig(context.getSource(), "url", StringArgumentType.getString(context, "value"), true, "URL"))))
+                .then(Commands.literal("model")
+                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                .executes(context -> setConfig(context.getSource(), "model", StringArgumentType.getString(context, "value"), true, "Model"))))
+                .then(Commands.literal("timeout")
+                        .then(Commands.argument("seconds", IntegerArgumentType.integer(1))
+                                .executes(context -> setConfig(context.getSource(), "timeout", IntegerArgumentType.getInteger(context, "seconds"), true, "Timeout (seconds)"))))
+                .then(Commands.literal("show")
+                        .executes(context -> showConfig(context.getSource())))
+                .then(Commands.literal("test")
+                        .executes(context -> testConfig(context.getSource())));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> registerPresetCommand() {
+        return Commands.literal("preset")
+                .requires(source -> source.hasPermission(4))
+                .then(Commands.argument("provider", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(ConfigurationPresets.providerIds(), builder))
+                        .then(addConfigArgs((context, useServerConfig) -> applyPreset(context.getSource(), StringArgumentType.getString(context, "provider"), useServerConfig)))
+                        .executes(context -> applyPreset(context.getSource(), StringArgumentType.getString(context, "provider"), false)));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> registerConfigCommand() {
+        return Commands.literal("config")
+                .requires(source -> source.hasPermission(4))
+                .then(Commands.literal("show")
+                        .executes(context -> showConfig(context.getSource())))
+                .then(Commands.literal("test")
+                        .executes(context -> testConfig(context.getSource())));
+    }
+
+    private static int showSetupWizard(CommandSourceStack source) {
+        if (source.getEntity() instanceof ServerPlayer player) {
+            ServerPackets.sendConfigScreen(player);
+            source.sendSuccess(() -> Component.literal("Opening CreatureChat setup screen...").withStyle(ChatFormatting.GREEN), false);
+            return 1;
+        }
+
+        source.sendSuccess(() -> Component.literal("CreatureChat setup (OP only). Values are saved to this server world's creaturechat.json.").withStyle(ChatFormatting.GOLD), false);
+        source.sendSuccess(() -> commandHint("1. Choose provider preset:", "/creaturechat setup provider ai-studio"), false);
+        source.sendSuccess(() -> Component.literal("   Providers: " + String.join(", ", ConfigurationPresets.providerIds())).withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> commandHint("2. Add one or more API keys:", "/creaturechat setup key <key1,key2>"), false);
+        source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model gemini-3.5-flash,gemini-3.5-pro"), false);
+        source.sendSuccess(() -> Component.literal("4. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> commandHint("5. Review:", "/creaturechat setup show"), false);
+        source.sendSuccess(() -> commandHint("6. Test:", "/creaturechat setup test"), false);
+        return 1;
+    }
+
+    private static MutableComponent commandHint(String label, String command) {
+        return Component.literal(label + " ")
+                .withStyle(ChatFormatting.AQUA)
+                .append(Component.literal(command).withStyle(style -> style
+                        .withColor(ChatFormatting.YELLOW)
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, command))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Click to paste this command")))));
+    }
+
+    private static int applyPreset(CommandSourceStack source, String provider, boolean useServerConfig) {
+        ConfigurationPresets.ProviderPreset preset = ConfigurationPresets.find(provider).orElse(null);
+        if (preset == null) {
+            source.sendSuccess(() -> Component.literal("Unknown provider preset: " + provider + ". Available: " + String.join(", ", ConfigurationPresets.providerIds())).withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+
+        ConfigurationHandler configHandler = new ConfigurationHandler(source.getServer());
+        ConfigurationHandler.Config config = configHandler.loadConfig();
+        ConfigurationPresets.applyPreset(config, preset);
+
+        if (configHandler.saveConfig(config, useServerConfig)) {
+            source.sendSuccess(() -> Component.literal("Preset applied: " + preset.displayName() + " -> " + preset.url() + " / " + preset.defaultModel()).withStyle(ChatFormatting.GREEN), false);
+            return 1;
+        }
+        source.sendSuccess(() -> Component.literal("Failed to save preset: " + preset.displayName()).withStyle(ChatFormatting.RED), false);
+        return 0;
+    }
+
+    private static int showConfig(CommandSourceStack source) {
+        ConfigurationHandler.Config config = new ConfigurationHandler(source.getServer()).loadConfig();
+        MutableComponent message = Component.literal("CreatureChat config\n").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal("URL: " + config.getUrl() + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("API keys: " + ConfigurationPresets.describeApiKeys(config.getApiKey()) + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Models: " + ConfigurationPresets.describeModels(config.getModel()) + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Active model: " + config.getActiveModel() + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Thinking: " + config.getThinkingLevel() + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Timeout: " + config.getTimeout() + "s").withStyle(ChatFormatting.GRAY));
+        source.sendSuccess(() -> message, false);
+        return 1;
+    }
+
+    private static int testConfig(CommandSourceStack source) {
+        ConfigurationHandler.Config config = new ConfigurationHandler(source.getServer()).loadConfig();
+        if (config.getUrl() == null || config.getUrl().isBlank()) {
+            source.sendSuccess(() -> Component.literal("Cannot test: URL is empty.").withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        if (config.getActiveApiKey().isBlank()) {
+            source.sendSuccess(() -> Component.literal("Cannot test: API key is empty.").withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        if (config.getActiveModel().isBlank()) {
+            source.sendSuccess(() -> Component.literal("Cannot test: model is empty.").withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal("Testing CreatureChat AI configuration...").withStyle(ChatFormatting.YELLOW), false);
+        ChatGPTRequest.fetchMessageFromChatGPT(config, "Reply with exactly: OK", new HashMap<>(), new ArrayList<>(), false)
+                .thenAccept(response -> source.getServer().execute(() -> {
+                    if (response != null && !response.isBlank()) {
+                        source.sendSuccess(() -> Component.literal("CreatureChat AI test succeeded using model: " + config.getActiveModel()).withStyle(ChatFormatting.GREEN), false);
+                    } else {
+                        String message = ChatGPTRequest.lastErrorMessage != null ? ChatGPTRequest.lastErrorMessage : "No response";
+                        source.sendSuccess(() -> Component.literal("CreatureChat AI test failed: " + message).withStyle(ChatFormatting.RED), false);
+                    }
+                }));
+        return 1;
+    }
+
     private static LiteralArgumentBuilder<CommandSourceStack> registerChatBubbleCommand() {
         return Commands.literal("chatbubble")
                 .requires(source -> source.hasPermission(4))

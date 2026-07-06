@@ -30,6 +30,15 @@ public class CCText {
             " /creaturechat url set <value> [--config default|server]\n" +
             " /creaturechat model set <value> [--config default|server]\n" +
             " /creaturechat timeout set <value> [--config default|server]\n" +
+            " /creaturechat setup (opens OP setup screen for players)\n" +
+            " /creaturechat setup provider <openai|ai-studio|openrouter|groq|ollama|litellm>\n" +
+            " /creaturechat setup key <key1,key2>\n" +
+            " /creaturechat setup model <model1,model2>\n" +
+            " /creaturechat setup show\n" +
+            " /creaturechat setup test\n" +
+            " /creaturechat preset <provider> [--config default|server]\n" +
+            " /creaturechat config show\n" +
+            " /creaturechat config test\n" +
             " /creaturechat story set <value> [--config default|server]\n" +
             " /creaturechat story clear [--config default|server]\n" +
             " /creaturechat story show\n" +

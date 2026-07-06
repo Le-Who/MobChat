@@ -1,9 +1,6 @@
 # Building CreatureChat™
 
-This **guide** will walk you through the steps required to clone and build the CreatureChat™ 
-**Fabric Mod** from our **Git** repository. _NOTE: Please ensure you have Git installed on your 
-computer before you begin. You will also need Java and an appropriate Gradle setup to 
-build the mod._
+This **guide** explains how to build the MobChat fork of CreatureChat™ from <https://github.com/Le-Who/MobChat>. The fork is already present in this workspace; do not clone or publish against the public upstream CreatureChat repository unless explicitly requested.
 
 ## Prerequisites
 - **Git**: If you don't have Git installed, download and install it from [git-scm.com](https://git-scm.com/).
@@ -12,15 +9,10 @@ build the mod._
   is recommended.
 - **IDE**: Any IDE that supports Java and Gradle, such as **IntelliJ IDEA**, **Eclipse**, or **VS Code**.
 
-## Clone the Repository
-Open a terminal or command prompt and run the following command to clone the repository:
+## Open the Project
+Navigate into the local CreatureChat project:
 ```
-git clone https://github.com/CreatureChat/creature-chat.git
-```
-
-Navigate into the cloned directory:
-```
-cd creature-chat
+cd CreatureChat
 ```
 
 ## Build the Mod
@@ -34,7 +26,7 @@ following command in the terminal within the project directory:
 For **Windows** users, use:
 
 ```
-gradlew.bat build
+.\gradlew.bat build
 ```
 
 This command compiles the project and outputs the build artifacts, including the 
@@ -50,7 +42,7 @@ To test the mod, you can run it in a development environment provided by Fabric:
 For **Windows** users, use:
 
 ```
-gradlew.bat runClient
+.\gradlew.bat runClient
 ```
 
 This command launches a Minecraft client with the mod loaded, allowing you to 

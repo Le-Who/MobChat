@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Pattern;
 
 /**
  * The {@code ChatGPTRequest} class is used to send HTTP requests to our LLM to generate
@@ -45,29 +44,107 @@ public class ChatGPTRequest {
         String model;
         List<ChatGPTRequestMessage> messages;
         ResponseFormat response_format;
+        String reasoning_effort;
         float temperature;
         int max_tokens;
         boolean stream;
 
-        public ChatGPTRequestPayload(String model, List<ChatGPTRequestMessage> messages, Boolean jsonMode, float temperature, int maxTokens) {
+        public ChatGPTRequestPayload(String apiUrl, String model, List<ChatGPTRequestMessage> messages, Boolean jsonMode, float temperature, int maxTokens, String thinkingLevel) {
             this.model = model;
             this.messages = messages;
             this.temperature = temperature;
             this.max_tokens = maxTokens;
             this.stream = false;
+            if (shouldSendReasoningEffort(apiUrl, model, thinkingLevel)) {
+                this.reasoning_effort = thinkingLevel;
+            }
             if (jsonMode) {
-                this.response_format = new ResponseFormat("json_object");
+                this.response_format = ResponseFormat.creatureChatSchema();
             } else {
-                this.response_format = new ResponseFormat("text");
+                this.response_format = ResponseFormat.text();
             }
         }
     }
 
     static class ResponseFormat {
         String type;
+        JsonSchema json_schema;
 
-        public ResponseFormat(String type) {
+        private ResponseFormat(String type) {
             this.type = type;
+        }
+
+        static ResponseFormat text() {
+            return new ResponseFormat("text");
+        }
+
+        static ResponseFormat creatureChatSchema() {
+            ResponseFormat format = new ResponseFormat("json_schema");
+            format.json_schema = JsonSchema.creatureChatResponse();
+            return format;
+        }
+    }
+
+    static class JsonSchema {
+        String name;
+        boolean strict;
+        Map<String, Object> schema;
+
+        private JsonSchema(String name, boolean strict, Map<String, Object> schema) {
+            this.name = name;
+            this.strict = strict;
+            this.schema = schema;
+        }
+
+        static JsonSchema creatureChatResponse() {
+            Map<String, Object> actionSchema = new LinkedHashMap<>();
+            actionSchema.put("type", "object");
+            actionSchema.put("additionalProperties", false);
+            actionSchema.put("properties", Map.of(
+                    "type", Map.of(
+                            "type", "string",
+                            "enum", List.of(
+                                    "FOLLOW",
+                                    "UNFOLLOW",
+                                    "LEAD",
+                                    "UNLEAD",
+                                    "FLEE",
+                                    "UNFLEE",
+                                    "ATTACK",
+                                    "PROTECT",
+                                    "UNPROTECT",
+                                    "FRIENDSHIP",
+                                    "WAIT",
+                                    "RETURN_HOME",
+                                    "GUARD_HOME"
+                            )
+                    ),
+                    "value", Map.of(
+                            "type", "integer",
+                            "minimum", -3,
+                            "maximum", 3
+                    )
+            ));
+            actionSchema.put("required", List.of("type"));
+
+            Map<String, Object> rootSchema = new LinkedHashMap<>();
+            rootSchema.put("type", "object");
+            rootSchema.put("additionalProperties", false);
+            rootSchema.put("properties", Map.of(
+                    "message", Map.of("type", "string"),
+                    "mood", Map.of("type", "string"),
+                    "memory_updates", Map.of(
+                            "type", "array",
+                            "items", Map.of("type", "string")
+                    ),
+                    "actions", Map.of(
+                            "type", "array",
+                            "items", actionSchema
+                    )
+            ));
+            rootSchema.put("required", List.of("message", "actions", "mood", "memory_updates"));
+
+            return new JsonSchema("creaturechat_response", true, rootSchema);
         }
     }
 
@@ -127,9 +204,9 @@ public class ChatGPTRequest {
     public static String replacePlaceholders(String template, Map<String, String> replacements) {
         String result = template;
         for (Map.Entry<String, String> entry : replacements.entrySet()) {
-            result = result.replaceAll(Pattern.quote("{{" + entry.getKey() + "}}"), entry.getValue());
+            result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
         }
-        return result.replace("\"", "") ;
+        return result;
     }
 
     // Function to roughly estimate # of OpenAI tokens in String
@@ -145,7 +222,6 @@ public class ChatGPTRequest {
     }    public static CompletableFuture<String> fetchMessageFromChatGPT(ConfigurationHandler.Config config, String systemPrompt, Map<String, String> contextData, List<ChatMessage> messageHistory, Boolean jsonMode) {
         // Init API & LLM details
         String apiUrl = config.getUrl();
-        String modelName = config.getModel();
         Integer timeout = config.getTimeout() * 1000;
         int maxContextTokens = config.getMaxContextTokens();
         int maxOutputTokens = config.getMaxOutputTokens();
@@ -153,13 +229,13 @@ public class ChatGPTRequest {
 
         return CompletableFuture.supplyAsync(() -> {
             lastErrorCode = 0;
-            int maxAttempts = config.getApiKeyCount();
-            if (maxAttempts == 0) {
-                maxAttempts = 1;
-            }
+            int keyCount = Math.max(1, config.getApiKeyCount());
+            int modelCount = Math.max(1, config.getModelCount());
+            int maxAttempts = keyCount * modelCount;
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                 String activeKey = config.getActiveApiKey();
+                String modelName = config.getActiveModel();
                 HttpURLConnection connection = null;
                 try {
                     // Replace placeholders
@@ -209,7 +285,7 @@ public class ChatGPTRequest {
 
                     // Convert JSON to String
                     ChatGPTRequestPayload payload = new ChatGPTRequestPayload(
-                            modelName, messages, jsonMode, 1.0f, maxOutputTokens);
+                            apiUrl, modelName, messages, jsonMode, 1.0f, maxOutputTokens, config.getThinkingLevel());
 
                     Gson gsonInput = new Gson();
                     String jsonInputString = gsonInput.toJson(payload);
@@ -223,9 +299,9 @@ public class ChatGPTRequest {
                     // Check for error message in response
                     int statusCode = connection.getResponseCode();
                     if (statusCode >= HttpURLConnection.HTTP_BAD_REQUEST) {
-                        if (statusCode == 429 && attempt < maxAttempts) {
-                            LOGGER.warn("API request returned 429 (Too Many Requests). Rotating API key (attempt " + attempt + " of " + maxAttempts + ").");
-                            config.rotateApiKey();
+                        if (shouldTryNextCandidate(statusCode, attempt, maxAttempts)) {
+                            LOGGER.warn("API request returned HTTP " + statusCode + ". Trying next API key/model candidate (attempt " + attempt + " of " + maxAttempts + ").");
+                            rotateCandidate(config, attempt, keyCount, modelCount);
                             if (connection != null) {
                                 try {
                                     connection.disconnect();
@@ -334,5 +410,42 @@ public class ChatGPTRequest {
             }
             return null;
         });
+    }
+
+    private static boolean shouldTryNextCandidate(int statusCode, int attempt, int maxAttempts) {
+        if (attempt >= maxAttempts) {
+            return false;
+        }
+        return statusCode == 400
+                || statusCode == 401
+                || statusCode == 403
+                || statusCode == 404
+                || statusCode == 408
+                || statusCode == 409
+                || statusCode == 429
+                || statusCode >= 500;
+    }
+
+    private static void rotateCandidate(ConfigurationHandler.Config config, int attempt, int keyCount, int modelCount) {
+        if (modelCount > 1) {
+            config.rotateModel();
+        }
+        if (keyCount > 1 && (modelCount <= 1 || attempt % modelCount == 0)) {
+            config.rotateApiKey();
+        }
+    }
+
+    private static boolean shouldSendReasoningEffort(String apiUrl, String modelName, String thinkingLevel) {
+        if (thinkingLevel == null || thinkingLevel.equals("auto")) {
+            return false;
+        }
+        String normalizedThinking = thinkingLevel.trim().toLowerCase(Locale.ENGLISH);
+        if (!List.of("low", "medium", "high").contains(normalizedThinking)) {
+            return false;
+        }
+        String normalizedUrl = apiUrl == null ? "" : apiUrl.toLowerCase(Locale.ENGLISH);
+        String normalizedModel = modelName == null ? "" : modelName.toLowerCase(Locale.ENGLISH);
+        return normalizedUrl.contains("generativelanguage.googleapis.com")
+                || normalizedModel.startsWith("gemini-");
     }
 }

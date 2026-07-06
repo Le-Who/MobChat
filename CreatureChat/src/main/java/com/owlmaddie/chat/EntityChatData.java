@@ -13,7 +13,6 @@ import com.owlmaddie.message.Behavior;
 import com.owlmaddie.message.MessageParser;
 import com.owlmaddie.message.ParsedMessage;
 import com.owlmaddie.network.ServerPackets;
-import com.owlmaddie.network.ClickEventHelper;
 import com.owlmaddie.i18n.TR;
 import com.owlmaddie.particle.ParticleEmitter;
 import com.owlmaddie.utils.*;
@@ -24,8 +23,10 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -43,6 +44,7 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.ChatFormatting;
@@ -56,7 +58,9 @@ import static com.owlmaddie.network.ServerPackets.*;
  */
 public class EntityChatData {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
-    public static final TR INFO_HELP_LINK = new TR("info.help_link", "Help is available at %s");
+    public static final int MAX_MEMORY_ENTRIES = 20;
+    public static final int MAX_MEMORY_CHARS = 180;
+    public static final TR INFO_HELP_LINK = new TR("info.help_link", "Help: check %s");
     public static final TR ERROR_PREFIX = new TR("error.prefix", "Error: ");
     public static final List<TR> ERROR_MISC = List.of(
             INFO_HELP_LINK,
@@ -87,9 +91,17 @@ public class EntityChatData {
     public ChatDataManager.ChatSender sender;
     public int auto_generated;
     public List<ChatMessage> previousMessages;
+    public String mood;
+    public List<String> memories;
+    public String homeDimension;
+    public int homeX;
+    public int homeY;
+    public int homeZ;
+    public boolean guardingHome;
     public Long born;
     public Long death;
     public transient AutoMessageBucket autoBucket;
+    public transient AutoMessageBucket ambientBucket;
 
     @SerializedName("playerId")
     @Expose(serialize = false)
@@ -112,8 +124,16 @@ public class EntityChatData {
         this.sender = ChatDataManager.ChatSender.USER;
         this.auto_generated = 0;
         this.previousMessages = new ArrayList<>();
+        this.mood = "";
+        this.memories = new ArrayList<>();
+        this.homeDimension = "";
+        this.homeX = 0;
+        this.homeY = 0;
+        this.homeZ = 0;
+        this.guardingHome = false;
         this.born = System.currentTimeMillis();;
         this.autoBucket = null;
+        this.ambientBucket = null;
 
         // Old, unused migrated properties
         this.legacyPlayerId = null;
@@ -125,8 +145,86 @@ public class EntityChatData {
         if (this.players == null) {
             this.players = new HashMap<>(); // Ensure players map is initialized
         }
+        if (this.memories == null) {
+            this.memories = new ArrayList<>();
+        }
+        if (this.mood == null) {
+            this.mood = "";
+        }
+        if (this.homeDimension == null) {
+            this.homeDimension = "";
+        }
         if (this.legacyPlayerId != null && !this.legacyPlayerId.isEmpty()) {
             this.migrateData();
+        }
+    }
+
+    public boolean hasHome() {
+        return this.homeDimension != null && !this.homeDimension.isEmpty();
+    }
+
+    public void setHome(String dimension, int x, int y, int z) {
+        this.homeDimension = dimension == null ? "" : dimension;
+        this.homeX = x;
+        this.homeY = y;
+        this.homeZ = z;
+    }
+
+    public void clearHome() {
+        this.homeDimension = "";
+        this.homeX = 0;
+        this.homeY = 0;
+        this.homeZ = 0;
+        this.guardingHome = false;
+    }
+
+    public BlockPos getHomeBlockPos() {
+        return new BlockPos(this.homeX, this.homeY, this.homeZ);
+    }
+
+    private boolean ensureBestFriendHome(ServerPlayer player, PlayerData playerData) {
+        if (!hasHome()) {
+            if (playerData.friendship < 3) {
+                LOGGER.info("Home action ignored for entity {} because player {} is not a best friend", entityId, player.getDisplayName().getString());
+                return false;
+            }
+
+            BlockPos spawnPos = player.getRespawnPosition();
+            ResourceKey<Level> spawnDimension = player.getRespawnDimension();
+            if (spawnPos == null || spawnDimension == null) {
+                spawnPos = serverInstance.overworld().getSharedSpawnPos();
+                spawnDimension = Level.OVERWORLD;
+            }
+            setHome(spawnDimension.location().toString(), spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
+        }
+        return true;
+    }
+
+    private boolean isHomeInCurrentDimension(Mob entity) {
+        return hasHome() && entity.level().dimension().location().toString().equals(this.homeDimension);
+    }
+
+    public void applyStructuredMetadata(ParsedMessage parsedMessage) {
+        if (parsedMessage == null) {
+            return;
+        }
+        String parsedMood = parsedMessage.getMood();
+        if (!parsedMood.isEmpty()) {
+            this.mood = truncateString(parsedMood, MAX_MEMORY_CHARS);
+        }
+        if (this.memories == null) {
+            this.memories = new ArrayList<>();
+        }
+        for (String memory : parsedMessage.getMemoryUpdates()) {
+            if (memory == null || memory.trim().isEmpty()) {
+                continue;
+            }
+            String cleanedMemory = truncateString(memory.trim().replace("\n", " "), MAX_MEMORY_CHARS);
+            this.memories.remove(cleanedMemory);
+            this.memories.add(cleanedMemory);
+        }
+        while (this.memories.size() > MAX_MEMORY_ENTRIES) {
+            this.memories.remove(0);
         }
     }
 
@@ -292,6 +390,12 @@ public class EntityChatData {
         contextData.put("entity_class", getCharacterProp("Class"));
         contextData.put("entity_skills", getCharacterProp("Skills"));
         contextData.put("entity_background", getCharacterProp("Background"));
+        contextData.put("entity_mood", this.mood == null || this.mood.isEmpty() ? "neutral" : this.mood);
+        if (this.memories == null || this.memories.isEmpty()) {
+            contextData.put("entity_memories", "none");
+        } else {
+            contextData.put("entity_memories", String.join("; ", this.memories));
+        }
         if (entity.tickCount < 0) {
             contextData.put("entity_maturity", "Baby");
         } else {
@@ -365,14 +469,11 @@ public class EntityChatData {
                 } else if (code == 503) {
                     type = Randomizer.ErrorType.CODE503;
                 }
-                Component link = Component.literal(Randomizer.DISCORD_LINK)
-                        .withStyle(ChatFormatting.BLUE)
-                        .withStyle(style -> style
-                                .withClickEvent(ClickEventHelper.openUrl("http://" + Randomizer.DISCORD_LINK))
-                                .withUnderlined(true));
+                Component helpTarget = Component.literal(Randomizer.HELP_TARGET)
+                        .withStyle(ChatFormatting.BLUE);
 
                 TR randomError = Randomizer.getRandomError(type);
-                MutableComponent randomComp = randomError.comp(link);
+                MutableComponent randomComp = randomError.comp(helpTarget);
                 this.addMessage(randomComp.getString(), ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt, false);
 
                 MutableComponent errorComp = ERROR_PREFIX.comp();
@@ -391,13 +492,17 @@ public class EntityChatData {
                     player.displayClientMessage(solution.comp().withStyle(ChatFormatting.BLUE), false);
                 }
 
-                player.displayClientMessage(INFO_HELP_LINK.comp(link), false);
+                player.displayClientMessage(INFO_HELP_LINK.comp(helpTarget), false);
             }
         });
     }
 
     // Generate greeting
     public void generateMessage(String userLanguage, ServerPlayer player, String userMessage, boolean is_auto_message) {
+        generateMessage(userLanguage, player, userMessage, is_auto_message, !is_auto_message);
+    }
+
+    public void generateMessage(String userLanguage, ServerPlayer player, String userMessage, boolean is_auto_message, boolean allow_mob_to_mob_reactions) {
         String systemPrompt = "system-chat";
         if (is_auto_message) {
             // Increment an auto-generated message
@@ -426,11 +531,12 @@ public class EntityChatData {
         }
 
         // fetch HTTP response from ChatGPT
-        ChatGPTRequest.fetchMessageFromChatGPT(config, promptText, contextData, previousMessages, false).thenAccept(output_message -> {
+        ChatGPTRequest.fetchMessageFromChatGPT(config, promptText, contextData, previousMessages, true).thenAccept(output_message -> {
             try {
                 if (output_message != null) {
                     // Chat Message: Parse message for behaviors
                     ParsedMessage result = MessageParser.parseMessage(output_message.replace("\n", " "));
+                    this.applyStructuredMetadata(result);
                     Mob entity = (Mob) ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), UUID.fromString(entityId));
 
                     if (entity != null) {
@@ -452,6 +558,9 @@ public class EntityChatData {
                                 EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, WaitHereGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, ReturnHomeGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, GuardHomeGoal.class);
                                 EntityBehaviorManager.addGoal(entity, followGoal, GoalPriority.FOLLOW_PLAYER);
                                 if (playerData.attacking) {
                                     AdvancementHelper.calmTheStorm(player);
@@ -476,6 +585,9 @@ public class EntityChatData {
                                 EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, ProtectPlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, WaitHereGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, ReturnHomeGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, GuardHomeGoal.class);
                                 EntityBehaviorManager.addGoal(entity, fleeGoal, GoalPriority.FLEE_PLAYER);
                                 ParticleEmitter.emitCreatureParticle((ServerLevel) entity.level(), entity, (ParticleOptions) FLEE_PARTICLE, 0.5, 1);
                                 playerData.fleeing = true;
@@ -498,6 +610,9 @@ public class EntityChatData {
                                 EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, ProtectPlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, WaitHereGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, ReturnHomeGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, GuardHomeGoal.class);
                                 EntityBehaviorManager.addGoal(entity, attackGoal, GoalPriority.ATTACK_PLAYER);
                                 ParticleEmitter.emitCreatureParticle((ServerLevel) entity.level(), entity, (ParticleOptions) FLEE_PARTICLE, 0.5, 1);
                                 playerData.attacking = true;
@@ -538,6 +653,9 @@ public class EntityChatData {
                                 EntityBehaviorManager.removeGoal(entity, FollowPlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
                                 EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, WaitHereGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, ReturnHomeGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, GuardHomeGoal.class);
                                 EntityBehaviorManager.addGoal(entity, leadGoal, GoalPriority.LEAD_PLAYER);
                                 if (playerData.attacking) {
                                     AdvancementHelper.calmTheStorm(player);
@@ -553,7 +671,51 @@ public class EntityChatData {
                             } else if (behavior.getName().equals("UNLEAD")) {
                                 EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
 
+                            } else if (behavior.getName().equals("WAIT")) {
+                                WaitHereGoal waitGoal = new WaitHereGoal(entity, entitySpeedMedium);
+                                EntityBehaviorManager.removeGoal(entity, FollowPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, ProtectPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, ReturnHomeGoal.class);
+                                EntityBehaviorManager.removeGoal(entity, GuardHomeGoal.class);
+                                EntityBehaviorManager.addGoal(entity, waitGoal, GoalPriority.WAIT_HERE);
+                                playerData.fleeing = false;
+                                playerData.attacking = false;
+
+                            } else if (behavior.getName().equals("RETURN_HOME")) {
+                                if (ensureBestFriendHome(player, playerData) && isHomeInCurrentDimension(entity)) {
+                                    ReturnHomeGoal returnHomeGoal = new ReturnHomeGoal(entity, getHomeBlockPos(), entitySpeedMedium);
+                                    EntityBehaviorManager.removeGoal(entity, FollowPlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, WaitHereGoal.class);
+                                    EntityBehaviorManager.addGoal(entity, returnHomeGoal, GoalPriority.RETURN_HOME);
+                                    playerData.fleeing = false;
+                                    playerData.attacking = false;
+                                }
+
+                            } else if (behavior.getName().equals("GUARD_HOME")) {
+                                if (ensureBestFriendHome(player, playerData) && isHomeInCurrentDimension(entity)) {
+                                    GuardHomeGoal guardHomeGoal = new GuardHomeGoal(entity, getHomeBlockPos(), entitySpeedMedium);
+                                    EntityBehaviorManager.removeGoal(entity, FollowPlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, LeadPlayerGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, WaitHereGoal.class);
+                                    EntityBehaviorManager.removeGoal(entity, ReturnHomeGoal.class);
+                                    EntityBehaviorManager.addGoal(entity, guardHomeGoal, GoalPriority.GUARD_HOME);
+                                    this.guardingHome = true;
+                                    playerData.fleeing = false;
+                                    playerData.attacking = false;
+                                }
+
                             } else if (behavior.getName().equals("FRIENDSHIP")) {
+                                if (behavior.getArgument() == null) {
+                                    continue;
+                                }
                                 int new_friendship = Math.max(-3, Math.min(3, behavior.getArgument()));
                                 int old_friendship = playerData.friendship;
 
@@ -700,6 +862,10 @@ public class EntityChatData {
                     this.previousMessages.set(this.previousMessages.size() - 1,
                             new ChatMessage(result.getOriginalMessage(), ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
 
+                    if (allow_mob_to_mob_reactions && entity != null) {
+                        ServerPackets.handleNearbyMobChat(player, entity, cleanedMessage, config);
+                    }
+
                 } else {
                     // No valid LLM response
                     throw new RuntimeException(ChatGPTRequest.lastErrorMessage);
@@ -724,14 +890,11 @@ public class EntityChatData {
                 } else if (code == 503) {
                     type = Randomizer.ErrorType.CODE503;
                 }
-                Component link = Component.literal(Randomizer.DISCORD_LINK)
-                        .withStyle(ChatFormatting.BLUE)
-                        .withStyle(style -> style
-                                .withClickEvent(ClickEventHelper.openUrl("http://" + Randomizer.DISCORD_LINK))
-                                .withUnderlined(true));
+                Component helpTarget = Component.literal(Randomizer.HELP_TARGET)
+                        .withStyle(ChatFormatting.BLUE);
 
                 TR randomError = Randomizer.getRandomError(type);
-                MutableComponent randomComp = randomError.comp(link);
+                MutableComponent randomComp = randomError.comp(helpTarget);
                 this.addMessage(randomComp.getString(), ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt, false);
 
                 MutableComponent errorComp = ERROR_PREFIX.comp();
@@ -750,7 +913,7 @@ public class EntityChatData {
                     player.displayClientMessage(solution.comp().withStyle(ChatFormatting.BLUE), false);
                 }
 
-                player.displayClientMessage(INFO_HELP_LINK.comp(link), false);
+                player.displayClientMessage(INFO_HELP_LINK.comp(helpTarget), false);
             }
         });
     }

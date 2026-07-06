@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,7 +104,7 @@ public class ChatGPTRequestErrorTests {
         server.stop(0);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(code));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(code);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -125,7 +127,7 @@ public class ChatGPTRequestErrorTests {
         server.stop(0);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(code));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(code);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -148,7 +150,7 @@ public class ChatGPTRequestErrorTests {
         server.stop(0);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(code));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(code);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -171,7 +173,7 @@ public class ChatGPTRequestErrorTests {
         server.stop(0);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(code));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(code);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -194,7 +196,7 @@ public class ChatGPTRequestErrorTests {
         server.stop(0);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(code));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(code);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -211,7 +213,7 @@ public class ChatGPTRequestErrorTests {
         executeRequest(config);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(0));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(0);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -228,7 +230,7 @@ public class ChatGPTRequestErrorTests {
         executeRequest(config);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(-1));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(-1);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -244,7 +246,7 @@ public class ChatGPTRequestErrorTests {
         executeRequest(config);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(-1));
-        String randomMsg = String.format(tr.en(), Randomizer.DISCORD_LINK);
+        String randomMsg = String.format(tr.en(), Randomizer.HELP_TARGET);
         TR solution = EntityChatData.getSolutionMessage(-1);
         logOutput(ChatGPTRequest.lastErrorMessage, ChatGPTRequest.lastErrorCode, randomMsg, solution.en());
 
@@ -338,6 +340,60 @@ public class ChatGPTRequestErrorTests {
         assertEquals(2, authHeadersReceived.size());
         assertEquals("Bearer key1", authHeadersReceived.get(0));
         assertEquals("Bearer key2", authHeadersReceived.get(1));
+        assertEquals("Success Response", response);
+        assertEquals(0, ChatGPTRequest.lastErrorCode);
+    }
+
+    @Test
+    public void modelRotationSuccessOnSecondModel() throws Exception {
+        List<String> modelsReceived = Collections.synchronizedList(new ArrayList<>());
+        Pattern modelPattern = Pattern.compile("\"model\"\\s*:\\s*\"([^\"]+)\"");
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, new HttpHandler() {
+            int requestCount = 0;
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                requestCount++;
+                String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                Matcher matcher = modelPattern.matcher(requestBody);
+                if (matcher.find()) {
+                    modelsReceived.add(matcher.group(1));
+                }
+
+                if (requestCount == 1) {
+                    String body = "{\"error\":{\"message\":\"Rate limit\",\"type\":\"test\",\"code\":\"429\"}}";
+                    byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(429, resp.length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(resp);
+                    }
+                } else {
+                    String body = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Success Response\"}}]}";
+                    byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, resp.length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(resp);
+                    }
+                }
+            }
+        });
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = buildConfig(url);
+        config.setApiKey("single-key");
+        config.setModel("model-one,model-two");
+
+        CompletableFuture<String> future = ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "", new HashMap<>(), new ArrayList<>(), false);
+        String response = future.join();
+
+        server.stop(0);
+
+        assertEquals(2, modelsReceived.size());
+        assertEquals("model-one", modelsReceived.get(0));
+        assertEquals("model-two", modelsReceived.get(1));
         assertEquals("Success Response", response);
         assertEquals(0, ChatGPTRequest.lastErrorCode);
     }
