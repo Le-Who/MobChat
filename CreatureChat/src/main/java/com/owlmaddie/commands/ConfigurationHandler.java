@@ -60,7 +60,12 @@ public class ConfigurationHandler {
 
     private Config loadConfigFromFile(Path filePath) {
         try (Reader reader = Files.newBufferedReader(filePath)) {
-            return gson.fromJson(reader, Config.class);
+            Config config = gson.fromJson(reader, Config.class);
+            if (config != null) {
+                Path parent = filePath.getParent();
+                config.setUsageDataPath((parent == null ? Paths.get(".") : parent).resolve("creaturechat_usage.json"));
+            }
+            return config;
         } catch (IOException e) {
             return null; // File does not exist or other IO errors
         }
@@ -69,6 +74,7 @@ public class ConfigurationHandler {
     public static class Config {
         public static final int DEFAULT_MAX_OUTPUT_TOKENS = 1024;
         public static final int MIN_MAX_OUTPUT_TOKENS = 64;
+        public static final Path DEFAULT_USAGE_DATA_PATH = Paths.get(".", "creaturechat_usage.json");
 
         private String apiKey = "";
         private String url = "https://api.openai.com/v1/chat/completions";
@@ -88,6 +94,10 @@ public class ConfigurationHandler {
         private int maxEntityAutoResponses = 3;
         private int entityAutoCooldownSeconds = 3;
         private int damageReactionCooldownSeconds = 25;
+        private boolean geminiUsageLimitsEnabled = true;
+        private int geminiRequestsPerMinute = 14;
+        private int geminiRequestsPerDay = 450;
+        private String geminiUsageLimitScope = "per_key";
         private boolean proximityChatEnabled = true;
         private int proximityChatRadius = 12;
         private int maxProximityResponsesPerMessage = 1;
@@ -101,6 +111,7 @@ public class ConfigurationHandler {
 
         private transient int currentKeyIndex = 0;
         private transient int currentModelIndex = 0;
+        private transient Path usageDataPath = DEFAULT_USAGE_DATA_PATH;
 
         private String[] parseCsv(String value) {
             if (value == null || value.trim().isEmpty()) {
@@ -213,6 +224,17 @@ public class ConfigurationHandler {
             };
         }
 
+        private String normalizeGeminiUsageLimitScope(String value) {
+            if (value == null || value.trim().isEmpty()) {
+                return "per_key";
+            }
+            String normalized = value.trim().toLowerCase();
+            return switch (normalized) {
+                case "shared", "global", "project" -> "shared";
+                default -> "per_key";
+            };
+        }
+
         public int getTimeout() { return timeout; }
         public void setTimeout(int timeout) { this.timeout = timeout; }
 
@@ -255,6 +277,21 @@ public class ConfigurationHandler {
 
         public int getDamageReactionCooldownSeconds() { return damageReactionCooldownSeconds; }
         public void setDamageReactionCooldownSeconds(int damageReactionCooldownSeconds) { this.damageReactionCooldownSeconds = Math.max(0, damageReactionCooldownSeconds); }
+
+        public boolean getGeminiUsageLimitsEnabled() { return geminiUsageLimitsEnabled; }
+        public void setGeminiUsageLimitsEnabled(boolean geminiUsageLimitsEnabled) { this.geminiUsageLimitsEnabled = geminiUsageLimitsEnabled; }
+
+        public int getGeminiRequestsPerMinute() { return geminiRequestsPerMinute; }
+        public void setGeminiRequestsPerMinute(int geminiRequestsPerMinute) { this.geminiRequestsPerMinute = Math.max(0, geminiRequestsPerMinute); }
+
+        public int getGeminiRequestsPerDay() { return geminiRequestsPerDay; }
+        public void setGeminiRequestsPerDay(int geminiRequestsPerDay) { this.geminiRequestsPerDay = Math.max(0, geminiRequestsPerDay); }
+
+        public String getGeminiUsageLimitScope() { return normalizeGeminiUsageLimitScope(geminiUsageLimitScope); }
+        public void setGeminiUsageLimitScope(String geminiUsageLimitScope) { this.geminiUsageLimitScope = normalizeGeminiUsageLimitScope(geminiUsageLimitScope); }
+
+        public Path getUsageDataPath() { return usageDataPath == null ? DEFAULT_USAGE_DATA_PATH : usageDataPath; }
+        public void setUsageDataPath(Path usageDataPath) { this.usageDataPath = usageDataPath == null ? DEFAULT_USAGE_DATA_PATH : usageDataPath; }
 
         public boolean getProximityChatEnabled() { return proximityChatEnabled; }
         public void setProximityChatEnabled(boolean proximityChatEnabled) { this.proximityChatEnabled = proximityChatEnabled; }

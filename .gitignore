@@ -9,6 +9,9 @@ skills-lock.json
 Thumbs.db
 desktop.ini
 
+# ─── CreatureChat runtime state ───────────────────────────────────────────────
+creaturechat_usage.json
+
 # ─── Python (generate_roles.py tooling) ───────────────────────────────────────
 __pycache__/
 *.py[cod]

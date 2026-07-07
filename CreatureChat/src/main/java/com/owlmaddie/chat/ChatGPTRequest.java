@@ -34,6 +34,7 @@ public class ChatGPTRequest {
     public static String lastResponsePreview;
     public static String lastStructuredResponseWarning;
     public static int lastRequestedMaxOutputTokens;
+    private static ApiUsageLimiter usageLimiter = new ApiUsageLimiter();
 
     public enum StructuredOutputMode {
         NONE,
@@ -306,12 +307,18 @@ public class ChatGPTRequest {
         return (int) Math.round(text.length() / 3.5);
     }
 
+    public static void resetUsageLimiterForTests() {
+        usageLimiter = new ApiUsageLimiter();
+    }
+
     private static String sanitizeApiKey(String message, String apiKey) {
         if (message == null || apiKey == null || apiKey.isEmpty()) {
             return message;
         }
         return message.replace(apiKey, "**********");
-    }    public static CompletableFuture<String> fetchMessageFromChatGPT(ConfigurationHandler.Config config, String systemPrompt, Map<String, String> contextData, List<ChatMessage> messageHistory, Boolean jsonMode) {
+    }
+
+    public static CompletableFuture<String> fetchMessageFromChatGPT(ConfigurationHandler.Config config, String systemPrompt, Map<String, String> contextData, List<ChatMessage> messageHistory, Boolean jsonMode) {
         // Init API & LLM details
         String apiUrl = config.getUrl();
         Integer timeout = config.getTimeout() * 1000;
@@ -331,12 +338,30 @@ public class ChatGPTRequest {
             int keyCount = Math.max(1, config.getApiKeyCount());
             int modelCount = Math.max(1, config.getModelCount());
             int maxAttempts = keyCount * modelCount;
+            boolean skippedByLocalUsageLimit = false;
+            boolean attemptedRequest = false;
+            long shortestRetryAfterMillis = Long.MAX_VALUE;
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                 String activeKey = config.getActiveApiKey();
                 String modelName = config.getActiveModel();
                 HttpURLConnection connection = null;
                 try {
+                    ApiUsageLimiter.Reservation reservation = usageLimiter.tryReserve(config, apiUrl, activeKey, modelName);
+                    if (!reservation.allowed()) {
+                        skippedByLocalUsageLimit = true;
+                        if (reservation.retryAfterMillis() > 0) {
+                            shortestRetryAfterMillis = Math.min(shortestRetryAfterMillis, reservation.retryAfterMillis());
+                        }
+                        LOGGER.warn("Skipping AI request candidate due to local usage limit: model={}, reason={}, retry_after_ms={}",
+                                modelName,
+                                reservation.reason(),
+                                reservation.retryAfterMillis());
+                        rotateCandidate(config, attempt, keyCount, modelCount);
+                        continue;
+                    }
+                    attemptedRequest = true;
+
                     // Replace placeholders
                     String systemMessage = replacePlaceholders(systemPrompt, contextData);
 
@@ -398,6 +423,9 @@ public class ChatGPTRequest {
                     // Check for error message in response
                     int statusCode = connection.getResponseCode();
                     if (statusCode >= HttpURLConnection.HTTP_BAD_REQUEST) {
+                        if (statusCode == 429) {
+                            usageLimiter.markProviderRateLimited(config, apiUrl, activeKey, modelName);
+                        }
                         if (shouldTryNextCandidate(statusCode, attempt, maxAttempts)) {
                             LOGGER.warn("API request returned HTTP " + statusCode + ". Trying next API key/model candidate (attempt " + attempt + " of " + maxAttempts + ").");
                             rotateCandidate(config, attempt, keyCount, modelCount);
@@ -525,6 +553,15 @@ public class ChatGPTRequest {
                     lastErrorCode = 0;
                     return null;
                 }
+            }
+            if (skippedByLocalUsageLimit && !attemptedRequest) {
+                lastErrorCode = 429;
+                long retrySeconds = shortestRetryAfterMillis == Long.MAX_VALUE
+                        ? 0L
+                        : Math.max(1L, (shortestRetryAfterMillis + 999L) / 1000L);
+                lastErrorMessage = retrySeconds > 0
+                        ? "Local AI usage limit reached for all configured candidates. Try again in about " + retrySeconds + " seconds."
+                        : "Local AI usage limit reached for all configured candidates.";
             }
             return null;
         });

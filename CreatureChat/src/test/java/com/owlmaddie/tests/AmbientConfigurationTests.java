@@ -22,6 +22,10 @@ public class AmbientConfigurationTests {
         assertEquals(1, config.getMaxEntityAmbientResponses());
         assertEquals(90, config.getEntityAmbientCooldownSeconds());
         assertEquals(25, config.getDamageReactionCooldownSeconds());
+        assertTrue(config.getGeminiUsageLimitsEnabled());
+        assertEquals(14, config.getGeminiRequestsPerMinute());
+        assertEquals(450, config.getGeminiRequestsPerDay());
+        assertEquals("per_key", config.getGeminiUsageLimitScope());
         assertTrue(config.getMobToMobChatEnabled());
         assertEquals(10, config.getMobToMobChatRadius());
         assertEquals(1, config.getMaxMobToMobResponsesPerMessage());

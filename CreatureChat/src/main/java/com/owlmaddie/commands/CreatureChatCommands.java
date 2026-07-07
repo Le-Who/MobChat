@@ -58,6 +58,9 @@ public class CreatureChatCommands {
                 .then(registerSetCommand("timeout", "Timeout (seconds)", IntegerArgumentType.integer()))
                 .then(registerSetCommand("outputtokens", "Output tokens", IntegerArgumentType.integer(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS)))
                 .then(registerSetCommand("damagecooldown", "Damage reaction cooldown (seconds)", IntegerArgumentType.integer(0)))
+                .then(registerSetCommand("geminirpm", "Gemini requests per minute", IntegerArgumentType.integer(0)))
+                .then(registerSetCommand("geminidaily", "Gemini requests per day", IntegerArgumentType.integer(0)))
+                .then(registerSetCommand("geminiscope", "Gemini usage limit scope", StringArgumentType.word()))
                 .then(registerSetupCommand())
                 .then(registerPresetCommand())
                 .then(registerConfigCommand())
@@ -144,6 +147,16 @@ public class CreatureChatCommands {
                 .then(Commands.literal("damagecooldown")
                         .then(Commands.argument("seconds", IntegerArgumentType.integer(0))
                                 .executes(context -> setConfig(context.getSource(), "damagecooldown", IntegerArgumentType.getInteger(context, "seconds"), true, "Damage reaction cooldown (seconds)"))))
+                .then(Commands.literal("geminirpm")
+                        .then(Commands.argument("requests", IntegerArgumentType.integer(0))
+                                .executes(context -> setConfig(context.getSource(), "geminirpm", IntegerArgumentType.getInteger(context, "requests"), true, "Gemini requests per minute"))))
+                .then(Commands.literal("geminidaily")
+                        .then(Commands.argument("requests", IntegerArgumentType.integer(0))
+                                .executes(context -> setConfig(context.getSource(), "geminidaily", IntegerArgumentType.getInteger(context, "requests"), true, "Gemini requests per day"))))
+                .then(Commands.literal("geminiscope")
+                        .then(Commands.argument("scope", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(List.of("per_key", "shared"), builder))
+                                .executes(context -> setConfig(context.getSource(), "geminiscope", StringArgumentType.getString(context, "scope"), true, "Gemini usage limit scope"))))
                 .then(Commands.literal("show")
                         .executes(context -> showConfig(context.getSource())))
                 .then(Commands.literal("test")
@@ -182,9 +195,12 @@ public class CreatureChatCommands {
         source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model gemini-3.1-flash-lite"), false);
         source.sendSuccess(() -> commandHint("4. Optional output budget:", "/creaturechat setup outputtokens 1024"), false);
         source.sendSuccess(() -> commandHint("5. Optional damage reaction cooldown:", "/creaturechat setup damagecooldown 25"), false);
-        source.sendSuccess(() -> Component.literal("6. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
-        source.sendSuccess(() -> commandHint("7. Review:", "/creaturechat setup show"), false);
-        source.sendSuccess(() -> commandHint("8. Test:", "/creaturechat setup test"), false);
+        source.sendSuccess(() -> commandHint("6. Optional Gemini RPM/RPD:", "/creaturechat setup geminirpm 14"), false);
+        source.sendSuccess(() -> commandHint("7. Optional Gemini daily limit:", "/creaturechat setup geminidaily 450"), false);
+        source.sendSuccess(() -> commandHint("8. Optional Gemini scope:", "/creaturechat setup geminiscope per_key"), false);
+        source.sendSuccess(() -> Component.literal("9. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> commandHint("10. Review:", "/creaturechat setup show"), false);
+        source.sendSuccess(() -> commandHint("11. Test:", "/creaturechat setup test"), false);
         return 1;
     }
 
@@ -226,6 +242,10 @@ public class CreatureChatCommands {
                 .append(Component.literal("Thinking: " + config.getThinkingLevel() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Output tokens: " + config.getMaxOutputTokens() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Damage reaction cooldown: " + config.getDamageReactionCooldownSeconds() + "s\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Gemini usage limits: " + (config.getGeminiUsageLimitsEnabled() ? "on" : "off")
+                        + ", " + config.getGeminiRequestsPerMinute() + " RPM"
+                        + ", " + config.getGeminiRequestsPerDay() + " RPD"
+                        + ", scope=" + config.getGeminiUsageLimitScope() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Timeout: " + config.getTimeout() + "s").withStyle(ChatFormatting.GRAY));
         source.sendSuccess(() -> message, false);
         return 1;
@@ -435,6 +455,31 @@ public class CreatureChatCommands {
                         config.setDamageReactionCooldownSeconds((Integer) value);
                     } else {
                         throw new IllegalArgumentException("Invalid type for damage reaction cooldown, must be Integer.");
+                    }
+                    break;
+                case "geminirpm":
+                    if (value instanceof Integer) {
+                        config.setGeminiRequestsPerMinute((Integer) value);
+                    } else {
+                        throw new IllegalArgumentException("Invalid type for Gemini RPM, must be Integer.");
+                    }
+                    break;
+                case "geminidaily":
+                    if (value instanceof Integer) {
+                        config.setGeminiRequestsPerDay((Integer) value);
+                    } else {
+                        throw new IllegalArgumentException("Invalid type for Gemini daily limit, must be Integer.");
+                    }
+                    break;
+                case "geminiscope":
+                    if (value instanceof String) {
+                        String scope = ((String) value).trim();
+                        if (!scope.equalsIgnoreCase("per_key") && !scope.equalsIgnoreCase("shared")) {
+                            throw new IllegalArgumentException("Gemini usage limit scope must be per_key or shared.");
+                        }
+                        config.setGeminiUsageLimitScope(scope);
+                    } else {
+                        throw new IllegalArgumentException("Invalid type for Gemini usage limit scope, must be String.");
                     }
                     break;
                 default:
