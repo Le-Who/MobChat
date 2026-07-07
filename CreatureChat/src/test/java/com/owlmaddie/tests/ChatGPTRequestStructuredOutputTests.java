@@ -52,6 +52,8 @@ public class ChatGPTRequestStructuredOutputTests {
         assertTrue(body.contains("\"name\":\"creaturechat_response\""));
         assertTrue(body.contains("\"FOLLOW\""));
         assertTrue(body.contains("\"FRIENDSHIP\""));
+        assertTrue(body.contains("\"required\":[\"type\",\"value\"]"));
+        assertTrue(body.contains("\"type\":[\"integer\",\"null\"]"));
     }
 
     @Test

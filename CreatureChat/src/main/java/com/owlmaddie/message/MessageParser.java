@@ -84,13 +84,22 @@ public class MessageParser {
             if (parsed != null) {
                 return parsed;
             }
+            return new ParsedMessage("", "", new ArrayList<>());
         }
 
         if (isStructuredJsonBoilerplateOnly(trimmedInput)) {
             return new ParsedMessage("", "", new ArrayList<>());
         }
 
-        return parseFirstStructuredJsonObject(trimmedInput);
+        ParsedMessage embedded = parseFirstStructuredJsonObject(trimmedInput);
+        if (embedded != null) {
+            return embedded;
+        }
+        if (isMalformedStructuredJsonAttempt(trimmedInput)) {
+            return new ParsedMessage("", "", new ArrayList<>());
+        }
+
+        return null;
     }
 
     private static boolean isStructuredJsonBoilerplateOnly(String input) {
@@ -109,6 +118,17 @@ public class MessageParser {
                 || normalized.equals("here's the json requested")
                 || normalized.equals("here is the requested json")
                 || normalized.equals("the requested json");
+    }
+
+    private static boolean isMalformedStructuredJsonAttempt(String input) {
+        if (input == null || !input.contains("{")) {
+            return false;
+        }
+        String normalized = input.toLowerCase(Locale.ENGLISH);
+        return normalized.contains("\"message\"")
+                || normalized.contains("\"actions\"")
+                || normalized.contains("\"memory_updates\"")
+                || normalized.contains("\"mood\"");
     }
 
     private static ParsedMessage parseStructuredJson(String json, String originalInput) {

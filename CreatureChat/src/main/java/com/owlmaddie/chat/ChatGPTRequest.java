@@ -147,12 +147,12 @@ public class ChatGPTRequest {
                             )
                     ),
                     "value", Map.of(
-                            "type", "integer",
+                            "type", List.of("integer", "null"),
                             "minimum", -3,
                             "maximum", 3
                     )
             ));
-            actionSchema.put("required", List.of("type"));
+            actionSchema.put("required", List.of("type", "value"));
 
             Map<String, Object> rootSchema = new LinkedHashMap<>();
             rootSchema.put("type", "object");

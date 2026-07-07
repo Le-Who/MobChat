@@ -86,6 +86,24 @@ public class StructuredResponseParserTests {
     }
 
     @Test
+    public void malformedStructuredJsonResponseIsSuppressed() {
+        ParsedMessage parsed = MessageParser.parseMessage("{ \"message\": \"");
+
+        assertEquals("", parsed.getCleanedMessage());
+        assertEquals("", parsed.getOriginalMessage());
+        assertTrue(parsed.getBehaviors().isEmpty());
+    }
+
+    @Test
+    public void malformedStructuredJsonAfterPreambleIsSuppressed() {
+        ParsedMessage parsed = MessageParser.parseMessage("Here is the JSON requested: { \"message\": \"Иго-го!\", \"actions\": [");
+
+        assertEquals("", parsed.getCleanedMessage());
+        assertEquals("", parsed.getOriginalMessage());
+        assertTrue(parsed.getBehaviors().isEmpty());
+    }
+
+    @Test
     public void legacyResponseHasNoStructuredMetadata() {
         ParsedMessage parsed = MessageParser.parseMessage("Okay, I'll follow. <FOLLOW>");
 
