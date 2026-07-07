@@ -20,16 +20,16 @@ This file applies to all work inside `CreatureChat/`. It narrows the root `AGENT
 
 ## Folder Map
 
-- `src/main/java/com/owlmaddie/chat/`: chat state, prompt flow, LLM request handling, memories, social events, usage limiting, and parsing helpers.
-- `src/main/java/com/owlmaddie/commands/`: config loading/saving, provider presets, setup commands, custom roles.
-- `src/main/java/com/owlmaddie/goals/`: AI-driven entity goals and `EntityBehaviorManager`.
-- `src/main/java/com/owlmaddie/mixin/`: server/common mixins into Minecraft entities and chat hooks.
-- `src/main/java/com/owlmaddie/network/`: server packets and server/client sync entry points.
-- `src/main/java/com/owlmaddie/inventory/`: mob inventory menu, loot, and inventory behavior.
-- `src/client/java/com/owlmaddie/`: client-only UI, rendering, packet handlers, particles, and screens.
+- `src/main/java/com/lewho/chat/`: chat state, prompt flow, LLM request handling, memories, social events, usage limiting, and parsing helpers.
+- `src/main/java/com/lewho/commands/`: config loading/saving, provider presets, setup commands, custom roles.
+- `src/main/java/com/lewho/goals/`: AI-driven entity goals and `EntityBehaviorManager`.
+- `src/main/java/com/lewho/mixin/`: server/common mixins into Minecraft entities and chat hooks.
+- `src/main/java/com/lewho/network/`: server packets and server/client sync entry points.
+- `src/main/java/com/lewho/inventory/`: mob inventory menu, loot, and inventory behavior.
+- `src/client/java/com/lewho/`: client-only UI, rendering, packet handlers, particles, and screens.
 - `src/main/resources/data/creaturechat/prompts/`: LLM prompt templates.
 - `src/main/resources/assets/creaturechat/lang/`: translations.
-- `src/test/java/com/owlmaddie/tests/`: JUnit tests for parser, request, configuration, rate limit, behavior policy, and data classes.
+- `src/test/java/com/lewho/tests/`: JUnit tests for parser, request, configuration, rate limit, behavior policy, and data classes.
 
 ## Build Commands
 
@@ -43,9 +43,9 @@ Use the Gradle wrapper from `CreatureChat/`.
 Targeted tests:
 
 ```powershell
-.\gradlew.bat test --tests com.owlmaddie.tests.ChatGPTRequestStructuredOutputTests
-.\gradlew.bat test --tests com.owlmaddie.tests.ChatGPTRequestUsageLimitTests
-.\gradlew.bat test --tests com.owlmaddie.tests.DamageReactionRateLimitTests
+.\gradlew.bat test --tests com.lewho.tests.ChatGPTRequestStructuredOutputTests
+.\gradlew.bat test --tests com.lewho.tests.ChatGPTRequestUsageLimitTests
+.\gradlew.bat test --tests com.lewho.tests.DamageReactionRateLimitTests
 ```
 
 The release jar is generated under:
@@ -149,7 +149,7 @@ Before finishing source changes, run the relevant targeted tests and then `.\gra
 New Java files should start with the project SPDX header used by nearby files:
 
 ```java
-// SPDX-FileCopyrightText: 2026 owlmaddie LLC
+// SPDX-FileCopyrightText: 2026 lewho LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 ```
 

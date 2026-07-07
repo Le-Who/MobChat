@@ -16,13 +16,13 @@
 	"environment": "*",
     "entrypoints": {
         "main": [
-          "com.owlmaddie.ModInit"
+          "com.lewho.ModInit"
         ],
         "client": [
-          "com.owlmaddie.ClientInit"
+          "com.lewho.ClientInit"
         ],
         "fabric-datagen": [
-          "com.owlmaddie.datagen.CreatureChatDataGenerator"
+          "com.lewho.datagen.CreatureChatDataGenerator"
         ]
     },
 	"mixins": [

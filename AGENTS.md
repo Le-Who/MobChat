@@ -12,8 +12,8 @@ These instructions apply to the whole `E:\Projects\MobChat` workspace. The `Crea
 ## Repository Map
 
 - `CreatureChat/`: main Fabric mod project, Gradle wrapper, Java sources, resources, tests, docs, and build scripts.
-- `CreatureChat/src/main/java/com/owlmaddie/`: shared/server-side mod logic.
-- `CreatureChat/src/client/java/com/owlmaddie/`: client UI, rendering, packets, and client-only helpers.
+- `CreatureChat/src/main/java/com/lewho/`: shared/server-side mod logic.
+- `CreatureChat/src/client/java/com/lewho/`: client UI, rendering, packets, and client-only helpers.
 - `CreatureChat/src/main/resources/data/creaturechat/prompts/`: system prompts for chat, character generation, and quests.
 - `CreatureChat/src/main/resources/data/creaturechat/loot_tables/`: loot tables used by mob inventories.
 - `CreatureChat/src/vs/`: version-specific Java source overrides.
@@ -41,7 +41,7 @@ Run commands from `CreatureChat/` unless noted otherwise.
 Useful targeted test form:
 
 ```powershell
-.\gradlew.bat test --tests com.owlmaddie.tests.ChatGPTRequestUsageLimitTests
+.\gradlew.bat test --tests com.lewho.tests.ChatGPTRequestUsageLimitTests
 ```
 
 The built jar is written to:

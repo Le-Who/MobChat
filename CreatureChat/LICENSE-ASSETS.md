@@ -22,7 +22,7 @@ You are free to:
 Under the following terms:
 
 ### Attribution
-You must give appropriate credit (e.g., *"Based on CreatureChat assets by owlmaddie LLC"*), provide a link to this license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests endorsement by the original authors.
+You must give appropriate credit (e.g., *"Based on CreatureChat assets by lewho LLC"*), provide a link to this license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests endorsement by the original authors.
 
 ### NonCommercial
 You may not use the material for **commercial purposes**. This includes paid modpacks, monetized distribution, marketplace listings, corporate-owned or sponsored mods, or any use intended for financial gain, even indirectly (e.g., using assets in a YouTube video with ads, bundling in paid apps, or gating access via Patreon).
@@ -34,7 +34,7 @@ If you remix, transform, or build upon the material, you must distribute your co
 
 ## Exclusions and Trademark Notice
 
-The name **CreatureChat**, its logo, and other branding elements are **trademarks of owlmaddie LLC**.  
+The name **CreatureChat**, its logo, and other branding elements are **trademarks of lewho LLC**.
 They may **not be used**, in original or modified form, without prior written permission, including in mod forks or derivative projects.
 
 ---
@@ -44,7 +44,7 @@ They may **not be used**, in original or modified form, without prior written pe
 To request permission for commercial use or branding-related inquiries, please contact:
 
 - licensing@openshot.org
-- licensing@owlmaddie.com
+- licensing@lewho.com
 
 Full license text: <https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode>
 

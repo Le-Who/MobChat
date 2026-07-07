@@ -47,7 +47,7 @@ For targeted checks:
 
 ```powershell
 .\gradlew.bat test
-.\gradlew.bat test --tests com.owlmaddie.tests.ChatGPTRequestUsageLimitTests
+.\gradlew.bat test --tests com.lewho.tests.ChatGPTRequestUsageLimitTests
 ```
 
 ## Installation
@@ -213,4 +213,4 @@ If omitted, legacy commands use the default scope unless the `/creaturechat setu
 - Review [Terms](TERMS.md) and [Privacy](PRIVACY.md) before operating any public server or remote AI service with this fork.
 - CreatureChat(TM) is an independent project and is not endorsed by Mojang AB, Microsoft Corp., OpenAI, Google, or any LLM provider.
 - Minecraft(R) is a trademark of Mojang AB. ChatGPT(R) is a trademark of OpenAI OpCo, LLC. All trademarks appear here for identification only.
-- CreatureChat(TM) is a trademark of owlmaddie LLC (registration pending). Factual nominative references such as "Fork of CreatureChat" that do not imply endorsement are allowed; all other uses of the name or logo require prior permission.
+- CreatureChat(TM) is a trademark of lewho LLC (registration pending). Factual nominative references such as "Fork of CreatureChat" that do not imply endorsement are allowed; all other uses of the name or logo require prior permission.

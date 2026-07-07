@@ -295,7 +295,7 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 ## [1.0.6] - 2024-06-17
 
 ### Added
-- **Naturalist** mod **icon art** and full-support for all entities, expect snails (owlmaddie)
+- **Naturalist** mod **icon art** and full-support for all entities, expect snails (lewho)
 - New **Prompt Testing** module, for faster validation of LLMs and prompt changes
 - New `stream = false` parameter to HTTP API requests (since some APIs default to `true`)
 
@@ -312,7 +312,7 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 - New automated deployments for Modrinth and CurseForge (GitLab CI Pipeline)
 - Death messages added for all named creatures except players and tamed ones (RIP)
 - Added Minecraft Forge installation instructions
-- Alex's Mobs icon art and full-support for all entities (owlmaddie)
+- Alex's Mobs icon art and full-support for all entities (lewho)
 
 ### Fixed
 - Fabulous video bug causing chat bubbles to be invisible
