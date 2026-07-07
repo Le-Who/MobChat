@@ -56,6 +56,7 @@ public class CreatureChatCommands {
                 .then(registerSetCommand("url", "URL", StringArgumentType.string()))
                 .then(registerSetCommand("model", "Model", StringArgumentType.string()))
                 .then(registerSetCommand("timeout", "Timeout (seconds)", IntegerArgumentType.integer()))
+                .then(registerSetCommand("outputtokens", "Output tokens", IntegerArgumentType.integer(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS)))
                 .then(registerSetupCommand())
                 .then(registerPresetCommand())
                 .then(registerConfigCommand())
@@ -136,6 +137,9 @@ public class CreatureChatCommands {
                 .then(Commands.literal("timeout")
                         .then(Commands.argument("seconds", IntegerArgumentType.integer(1))
                                 .executes(context -> setConfig(context.getSource(), "timeout", IntegerArgumentType.getInteger(context, "seconds"), true, "Timeout (seconds)"))))
+                .then(Commands.literal("outputtokens")
+                        .then(Commands.argument("tokens", IntegerArgumentType.integer(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS))
+                                .executes(context -> setConfig(context.getSource(), "outputtokens", IntegerArgumentType.getInteger(context, "tokens"), true, "Output tokens"))))
                 .then(Commands.literal("show")
                         .executes(context -> showConfig(context.getSource())))
                 .then(Commands.literal("test")
@@ -171,10 +175,11 @@ public class CreatureChatCommands {
         source.sendSuccess(() -> commandHint("1. Choose provider preset:", "/creaturechat setup provider ai-studio"), false);
         source.sendSuccess(() -> Component.literal("   Providers: " + String.join(", ", ConfigurationPresets.providerIds())).withStyle(ChatFormatting.GRAY), false);
         source.sendSuccess(() -> commandHint("2. Add one or more API keys:", "/creaturechat setup key <key1,key2>"), false);
-        source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model gemini-3.5-flash,gemini-3.5-pro"), false);
-        source.sendSuccess(() -> Component.literal("4. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
-        source.sendSuccess(() -> commandHint("5. Review:", "/creaturechat setup show"), false);
-        source.sendSuccess(() -> commandHint("6. Test:", "/creaturechat setup test"), false);
+        source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model gemini-3.1-flash-lite"), false);
+        source.sendSuccess(() -> commandHint("4. Optional output budget:", "/creaturechat setup outputtokens 512"), false);
+        source.sendSuccess(() -> Component.literal("5. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> commandHint("6. Review:", "/creaturechat setup show"), false);
+        source.sendSuccess(() -> commandHint("7. Test:", "/creaturechat setup test"), false);
         return 1;
     }
 
@@ -214,6 +219,7 @@ public class CreatureChatCommands {
                 .append(Component.literal("Models: " + ConfigurationPresets.describeModels(config.getModel()) + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Active model: " + config.getActiveModel() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Thinking: " + config.getThinkingLevel() + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Output tokens: " + config.getMaxOutputTokens() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Timeout: " + config.getTimeout() + "s").withStyle(ChatFormatting.GRAY));
         source.sendSuccess(() -> message, false);
         return 1;
@@ -409,6 +415,13 @@ public class CreatureChatCommands {
                         config.setTimeout((Integer) value);
                     } else {
                         throw new IllegalArgumentException(CCText.CONFIG_TIMEOUT_INVALID_TYPE.comp().getString());
+                    }
+                    break;
+                case "outputtokens":
+                    if (value instanceof Integer) {
+                        config.setMaxOutputTokens((Integer) value);
+                    } else {
+                        throw new IllegalArgumentException("Invalid type for output tokens, must be Integer.");
                     }
                     break;
                 default:

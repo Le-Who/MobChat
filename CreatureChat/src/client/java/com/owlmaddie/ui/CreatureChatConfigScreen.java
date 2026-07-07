@@ -5,6 +5,7 @@ package com.owlmaddie.ui;
 
 import com.owlmaddie.commands.ConfigurationPresets;
 import com.owlmaddie.commands.ConfigurationScreenData;
+import com.owlmaddie.commands.ConfigurationHandler;
 import com.owlmaddie.network.ClientPackets;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -18,10 +19,10 @@ import net.minecraft.network.chat.Component;
  */
 public class CreatureChatConfigScreen extends Screen {
     private static final int PANEL_WIDTH = 560;
-    private static final int PANEL_HEIGHT = 326;
+    private static final int PANEL_HEIGHT = 360;
     private static final int ROW_HEIGHT = 34;
     private static final int BUTTON_HEIGHT = 20;
-    private static final String[] THINKING_LEVELS = {"auto", "low", "medium", "high"};
+    private static final String[] THINKING_LEVELS = {"auto", "minimal", "low", "medium", "high"};
 
     private final ConfigurationScreenData.OpenData initialData;
     private String selectedProvider;
@@ -34,6 +35,7 @@ public class CreatureChatConfigScreen extends Screen {
     private EditBox apiKeysField;
     private EditBox modelsField;
     private EditBox timeoutField;
+    private EditBox outputTokensField;
     private Button thinkingButton;
 
     public CreatureChatConfigScreen(ConfigurationScreenData.OpenData initialData) {
@@ -86,8 +88,13 @@ public class CreatureChatConfigScreen extends Screen {
         timeoutField.setValue(Integer.toString(initialData.timeout()));
         addRenderableWidget(timeoutField);
 
+        outputTokensField = new EditBox(this.font, fieldX, rowY + ROW_HEIGHT * 4 + 12, 80, 20, Component.literal("Output tokens"));
+        outputTokensField.setMaxLength(5);
+        outputTokensField.setValue(Integer.toString(initialData.maxOutputTokens()));
+        addRenderableWidget(outputTokensField);
+
         thinkingButton = addRenderableWidget(Button.builder(thinkingLabel(), button -> cycleThinkingLevel())
-                .bounds(fieldX, rowY + ROW_HEIGHT * 4 + 12, 112, BUTTON_HEIGHT)
+                .bounds(fieldX, rowY + ROW_HEIGHT * 5 + 12, 112, BUTTON_HEIGHT)
                 .build());
 
         int buttonY = panelY + PANEL_HEIGHT - 36;
@@ -108,10 +115,11 @@ public class CreatureChatConfigScreen extends Screen {
         this.selectedProvider = preset.id();
         urlField.setValue(preset.url());
         modelsField.setValue(preset.defaultModel());
-        if ("ai-studio".equals(preset.id()) && "auto".equals(selectedThinkingLevel)) {
-            selectedThinkingLevel = "medium";
-            updateThinkingButtonLabel();
+        if (parsePositiveInt(outputTokensField.getValue(), 0) < ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS) {
+            outputTokensField.setValue(Integer.toString(ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS));
         }
+        selectedThinkingLevel = normalizeThinkingLevel(preset.defaultThinkingLevel());
+        updateThinkingButtonLabel();
         statusMessage = "Preset selected: " + preset.displayName();
         statusColor = 0xF0E68C;
     }
@@ -136,10 +144,24 @@ public class CreatureChatConfigScreen extends Screen {
 
     private ConfigurationScreenData.SaveData collectDraft() {
         int timeout;
+        int outputTokens;
         try {
-            timeout = Integer.parseInt(timeoutField.getValue().trim());
+            timeout = parsePositiveInt(timeoutField.getValue(), -1);
+            if (timeout < 1) {
+                throw new NumberFormatException();
+            }
         } catch (NumberFormatException e) {
             updateLocalStatus(false, "Timeout must be a number.");
+            return null;
+        }
+        try {
+            outputTokens = parsePositiveInt(outputTokensField.getValue(), -1);
+            if (outputTokens < ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS) {
+                updateLocalStatus(false, "Output tokens must be at least " + ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS + ".");
+                return null;
+            }
+        } catch (NumberFormatException e) {
+            updateLocalStatus(false, "Output tokens must be a number.");
             return null;
         }
 
@@ -149,6 +171,7 @@ public class CreatureChatConfigScreen extends Screen {
                 apiKeysField.getValue(),
                 modelsField.getValue(),
                 timeout,
+                outputTokens,
                 selectedThinkingLevel
         );
     }
@@ -163,6 +186,13 @@ public class CreatureChatConfigScreen extends Screen {
         }
         selectedThinkingLevel = THINKING_LEVELS[(currentIndex + 1) % THINKING_LEVELS.length];
         updateThinkingButtonLabel();
+    }
+
+    private int parsePositiveInt(String value, int fallback) {
+        if (value == null || value.trim().isEmpty()) {
+            return fallback;
+        }
+        return Integer.parseInt(value.trim());
     }
 
     private void updateThinkingButtonLabel() {
@@ -220,7 +250,8 @@ public class CreatureChatConfigScreen extends Screen {
         graphics.drawString(this.font, Component.literal(maskedApiKeys + " | leave blank to keep existing keys"), fieldX + 70, rowY + ROW_HEIGHT, 0xA0A0A0);
         graphics.drawString(this.font, Component.literal("Models"), fieldX, rowY + ROW_HEIGHT * 2, 0xFFFFFF);
         graphics.drawString(this.font, Component.literal("Timeout"), fieldX, rowY + ROW_HEIGHT * 3, 0xFFFFFF);
-        graphics.drawString(this.font, Component.literal("Thinking (Gemini)"), fieldX, rowY + ROW_HEIGHT * 4, 0xFFFFFF);
+        graphics.drawString(this.font, Component.literal("Output tokens"), fieldX, rowY + ROW_HEIGHT * 4, 0xFFFFFF);
+        graphics.drawString(this.font, Component.literal("Thinking (Gemini)"), fieldX, rowY + ROW_HEIGHT * 5, 0xFFFFFF);
 
         if (!statusMessage.isEmpty()) {
             graphics.drawString(this.font, Component.literal(statusMessage), fieldX, panelY + PANEL_HEIGHT - 56, statusColor);

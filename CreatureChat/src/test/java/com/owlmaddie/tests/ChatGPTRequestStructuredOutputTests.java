@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ChatGPTRequestStructuredOutputTests {
@@ -53,7 +54,9 @@ public class ChatGPTRequestStructuredOutputTests {
         assertTrue(body.contains("\"FOLLOW\""));
         assertTrue(body.contains("\"FRIENDSHIP\""));
         assertTrue(body.contains("\"required\":[\"type\",\"value\"]"));
-        assertTrue(body.contains("\"type\":[\"integer\",\"null\"]"));
+        assertTrue(body.contains("\"value\":{"));
+        assertTrue(body.contains("\"type\":\"integer\""));
+        assertFalse(body.contains("\"type\":[\"integer\",\"null\"]"));
     }
 
     @Test
@@ -145,6 +148,92 @@ public class ChatGPTRequestStructuredOutputTests {
 
         assertEquals(1, requestBodies.size());
         assertTrue(requestBodies.get(0).contains("\"reasoning_effort\":\"high\""));
+    }
+
+    @Test
+    public void geminiMinimalThinkingLevelAddsReasoningEffort() throws Exception {
+        List<String> requestBodies = new ArrayList<>();
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, exchange -> handleSuccess(exchange, requestBodies));
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setUrl(url);
+        config.setApiKey("test-key");
+        config.setModel("gemini-3.1-flash-lite");
+        config.setThinkingLevel("minimal");
+        config.setTimeout(1);
+
+        ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "Reply as JSON.", new HashMap<>(), new ArrayList<>(), true).join();
+
+        server.stop(0);
+
+        assertEquals(1, requestBodies.size());
+        assertTrue(requestBodies.get(0).contains("\"reasoning_effort\":\"minimal\""));
+    }
+
+    @Test
+    public void structuredHighThinkingUsesSafeOutputTokenFloor() throws Exception {
+        List<String> requestBodies = new ArrayList<>();
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, exchange -> handleSuccess(exchange, requestBodies));
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setUrl(url);
+        config.setApiKey("test-key");
+        config.setModel("gemini-3.1-flash-lite");
+        config.setThinkingLevel("high");
+        config.setMaxOutputTokens(200);
+        config.setTimeout(1);
+
+        ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "Reply as JSON.", new HashMap<>(), new ArrayList<>(), true).join();
+
+        server.stop(0);
+
+        assertEquals(1, requestBodies.size());
+        assertTrue(requestBodies.get(0).contains("\"max_tokens\":1024"));
+        assertEquals(1024, ChatGPTRequest.lastRequestedMaxOutputTokens);
+    }
+
+    @Test
+    public void structuredLengthFinishReasonIsCapturedForDiagnostics() throws Exception {
+        List<String> requestBodies = new ArrayList<>();
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, exchange -> {
+            requestBodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            String body = "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":\"Here is the JSON requested\"}}],\"usage\":{\"completion_tokens\":7}}";
+            byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, resp.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(resp);
+            }
+        });
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setUrl(url);
+        config.setApiKey("test-key");
+        config.setModel("gemini-3.1-flash-lite");
+        config.setTimeout(1);
+
+        String response = ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "Reply as JSON.", new HashMap<>(), new ArrayList<>(), true).join();
+
+        server.stop(0);
+
+        assertEquals("Here is the JSON requested", response);
+        assertEquals("length", ChatGPTRequest.lastFinishReason);
+        assertEquals(7, ChatGPTRequest.lastCompletionTokens);
+        assertTrue(ChatGPTRequest.lastStructuredResponseWarning.contains("truncated"));
     }
 
     @Test

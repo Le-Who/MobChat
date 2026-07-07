@@ -21,6 +21,7 @@ public final class ConfigurationScreenData {
                 ConfigurationPresets.describeApiKeys(config.getApiKey()),
                 toMultiline(config.getModel()),
                 config.getTimeout(),
+                config.getMaxOutputTokens(),
                 config.getThinkingLevel()
         );
     }
@@ -39,10 +40,14 @@ public final class ConfigurationScreenData {
         if (data.timeout() < 1) {
             throw new IllegalArgumentException("Timeout must be at least 1 second.");
         }
+        if (data.maxOutputTokens() < ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS) {
+            throw new IllegalArgumentException("Output tokens must be at least " + ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS + ".");
+        }
 
         config.setUrl(url);
         config.setModel(models);
         config.setTimeout(data.timeout());
+        config.setMaxOutputTokens(data.maxOutputTokens());
         config.setThinkingLevel(data.thinkingLevel());
         if (!apiKeys.isEmpty()) {
             config.setApiKey(apiKeys);
@@ -68,15 +73,23 @@ public final class ConfigurationScreenData {
         return String.join("\n", values);
     }
 
-    public record OpenData(String provider, String url, String apiKeys, String maskedApiKeys, String models, int timeout, String thinkingLevel) {
+    public record OpenData(String provider, String url, String apiKeys, String maskedApiKeys, String models, int timeout, int maxOutputTokens, String thinkingLevel) {
+        public OpenData(String provider, String url, String apiKeys, String maskedApiKeys, String models, int timeout, String thinkingLevel) {
+            this(provider, url, apiKeys, maskedApiKeys, models, timeout, ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS, thinkingLevel);
+        }
+
         public OpenData(String provider, String url, String apiKeys, String maskedApiKeys, String models, int timeout) {
-            this(provider, url, apiKeys, maskedApiKeys, models, timeout, "auto");
+            this(provider, url, apiKeys, maskedApiKeys, models, timeout, ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS, "auto");
         }
     }
 
-    public record SaveData(String provider, String url, String apiKeys, String models, int timeout, String thinkingLevel) {
+    public record SaveData(String provider, String url, String apiKeys, String models, int timeout, int maxOutputTokens, String thinkingLevel) {
+        public SaveData(String provider, String url, String apiKeys, String models, int timeout, String thinkingLevel) {
+            this(provider, url, apiKeys, models, timeout, ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS, thinkingLevel);
+        }
+
         public SaveData(String provider, String url, String apiKeys, String models, int timeout) {
-            this(provider, url, apiKeys, models, timeout, "auto");
+            this(provider, url, apiKeys, models, timeout, ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS, "auto");
         }
     }
 }

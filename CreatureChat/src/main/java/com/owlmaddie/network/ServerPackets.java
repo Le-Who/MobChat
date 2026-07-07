@@ -216,6 +216,7 @@ public class ServerPackets {
                     buf.readUtf(32767),
                     buf.readUtf(32767),
                     buf.readInt(),
+                    buf.readInt(),
                     buf.readUtf(32767)
             );
 
@@ -228,6 +229,7 @@ public class ServerPackets {
                     buf.readUtf(32767),
                     buf.readUtf(32767),
                     buf.readUtf(32767),
+                    buf.readInt(),
                     buf.readInt(),
                     buf.readUtf(32767)
             );
@@ -348,6 +350,7 @@ public class ServerPackets {
         buffer.writeUtf(data.maskedApiKeys());
         buffer.writeUtf(data.models());
         buffer.writeInt(data.timeout());
+        buffer.writeInt(data.maxOutputTokens());
         buffer.writeUtf(data.thinkingLevel());
         PacketHelper.send(player, PACKET_S2C_CONFIG_OPEN, buffer);
     }

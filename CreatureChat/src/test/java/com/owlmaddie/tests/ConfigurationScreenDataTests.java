@@ -22,6 +22,7 @@ public class ConfigurationScreenDataTests {
         assertTrue(data.maskedApiKeys().contains("2 key(s)"));
         assertFalse(data.maskedApiKeys().contains("secret"));
         assertEquals("gpt-4o-mini\ngemini-3.5-flash", data.models());
+        assertEquals(config.getMaxOutputTokens(), data.maxOutputTokens());
     }
 
     @Test
@@ -52,6 +53,7 @@ public class ConfigurationScreenDataTests {
                 "key-one\nkey-two, key-three",
                 "gemini-3.5-flash\ngemini-3.5-pro, gemini-custom",
                 15,
+                1024,
                 "high"
         );
 
@@ -60,6 +62,7 @@ public class ConfigurationScreenDataTests {
         assertEquals("key-one,key-two,key-three", config.getApiKey());
         assertEquals("gemini-3.5-flash,gemini-3.5-pro,gemini-custom", config.getModel());
         assertEquals("high", config.getThinkingLevel());
+        assertEquals(1024, config.getMaxOutputTokens());
         assertEquals(3, config.getApiKeyCount());
         assertEquals(3, config.getModelCount());
     }
@@ -67,11 +70,32 @@ public class ConfigurationScreenDataTests {
     @Test
     public void openDataIncludesStoredThinkingLevel() {
         ConfigurationHandler.Config config = new ConfigurationHandler.Config();
-        config.setThinkingLevel("medium");
+        config.setThinkingLevel("minimal");
 
         ConfigurationScreenData.OpenData data = ConfigurationScreenData.fromConfig(config);
 
-        assertEquals("medium", data.thinkingLevel());
+        assertEquals("minimal", data.thinkingLevel());
+    }
+
+    @Test
+    public void saveDraftRejectsTooSmallOutputTokenBudget() {
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+
+        ConfigurationScreenData.SaveData draft = new ConfigurationScreenData.SaveData(
+                "custom",
+                "https://api.openai.com/v1/chat/completions",
+                "",
+                "gpt-4o-mini",
+                10,
+                63,
+                "auto"
+        );
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> ConfigurationScreenData.applyToConfig(config, draft)
+        );
+        assertTrue(error.getMessage().contains("Output tokens"));
     }
 
     @Test

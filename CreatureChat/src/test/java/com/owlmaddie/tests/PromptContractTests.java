@@ -18,6 +18,7 @@ public class PromptContractTests {
 
         assertTrue(prompt.contains("awakened roleplay character"));
         assertTrue(prompt.contains("do not answer with only animal noises"));
+        assertTrue(prompt.contains("brief animal sound is allowed only if"));
     }
 
     @Test
@@ -34,6 +35,8 @@ public class PromptContractTests {
 
         assertTrue(prompt.contains("awakened roleplay character"));
         assertTrue(prompt.contains("animal sounds and physical traits are flavor"));
+        assertTrue(prompt.contains("not only an animal noise"));
+        assertTrue(prompt.contains("brief animal sound is allowed only if"));
     }
 
     private static String normalizedPrompt(String name) throws IOException {

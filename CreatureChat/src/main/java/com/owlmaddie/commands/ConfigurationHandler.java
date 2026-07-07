@@ -67,12 +67,15 @@ public class ConfigurationHandler {
     }
 
     public static class Config {
+        public static final int DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+        public static final int MIN_MAX_OUTPUT_TOKENS = 64;
+
         private String apiKey = "";
         private String url = "https://api.openai.com/v1/chat/completions";
         private String model = "gpt-3.5-turbo";
         private String thinkingLevel = "auto";
         private int maxContextTokens = 16385;
-        private int maxOutputTokens = 200;
+        private int maxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
         private double percentOfContext = 0.75;
         private int timeout = 10;
         private boolean chatBubbles = true;
@@ -204,7 +207,7 @@ public class ConfigurationHandler {
             }
             String normalized = value.trim().toLowerCase();
             return switch (normalized) {
-                case "low", "medium", "high" -> normalized;
+                case "minimal", "low", "medium", "high" -> normalized;
                 default -> "auto";
             };
         }
@@ -216,7 +219,7 @@ public class ConfigurationHandler {
         public void setMaxContextTokens(int maxContextTokens) { this.maxContextTokens = maxContextTokens; }
 
         public int getMaxOutputTokens() { return maxOutputTokens; }
-        public void setMaxOutputTokens(int maxOutputTokens) { this.maxOutputTokens = maxOutputTokens; }
+        public void setMaxOutputTokens(int maxOutputTokens) { this.maxOutputTokens = Math.max(MIN_MAX_OUTPUT_TOKENS, maxOutputTokens); }
 
         public double getPercentOfContext() { return percentOfContext; }
         public void setPercentOfContext(double percentOfContext) { this.percentOfContext = percentOfContext; }

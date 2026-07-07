@@ -29,6 +29,11 @@ public class ChatGPTRequest {
     private static final Gson GSON = new Gson();
     public static String lastErrorMessage;
     public static int lastErrorCode = 0;
+    public static String lastFinishReason;
+    public static Integer lastCompletionTokens;
+    public static String lastResponsePreview;
+    public static String lastStructuredResponseWarning;
+    public static int lastRequestedMaxOutputTokens;
 
     public enum StructuredOutputMode {
         NONE,
@@ -147,7 +152,7 @@ public class ChatGPTRequest {
                             )
                     ),
                     "value", Map.of(
-                            "type", List.of("integer", "null"),
+                            "type", "integer",
                             "minimum", -3,
                             "maximum", 3
                     )
@@ -311,12 +316,18 @@ public class ChatGPTRequest {
         String apiUrl = config.getUrl();
         Integer timeout = config.getTimeout() * 1000;
         int maxContextTokens = config.getMaxContextTokens();
-        int maxOutputTokens = config.getMaxOutputTokens();
         double percentOfContext = config.getPercentOfContext();
         StructuredOutputMode normalizedOutputMode = outputModeFrom(messageHistory, jsonMode);
+        String thinkingLevel = config.getThinkingLevel();
+        int maxOutputTokens = effectiveMaxOutputTokens(config.getMaxOutputTokens(), normalizedOutputMode, thinkingLevel);
 
         return CompletableFuture.supplyAsync(() -> {
             lastErrorCode = 0;
+            lastFinishReason = null;
+            lastCompletionTokens = null;
+            lastResponsePreview = null;
+            lastStructuredResponseWarning = null;
+            lastRequestedMaxOutputTokens = maxOutputTokens;
             int keyCount = Math.max(1, config.getApiKeyCount());
             int modelCount = Math.max(1, config.getModelCount());
             int maxAttempts = keyCount * modelCount;
@@ -345,7 +356,7 @@ public class ChatGPTRequest {
                     List<ChatGPTRequestMessage> messages = new ArrayList<>();
 
                     // Don't exceed a specific % of total context window (to limit message history in request)
-                    int remainingContextTokens = (int) ((maxContextTokens - maxOutputTokens) * percentOfContext);
+                    int remainingContextTokens = (int) (Math.max(0, maxContextTokens - maxOutputTokens) * percentOfContext);
                     int usedTokens = estimateTokenSize("system: " + systemMessage);
 
                     // Iterate backwards through the message history
@@ -373,7 +384,7 @@ public class ChatGPTRequest {
 
                     // Convert JSON to String
                     ChatGPTRequestPayload payload = new ChatGPTRequestPayload(
-                            apiUrl, modelName, messages, normalizedOutputMode, 1.0f, maxOutputTokens, config.getThinkingLevel());
+                            apiUrl, modelName, messages, normalizedOutputMode, 1.0f, maxOutputTokens, thinkingLevel);
 
                     Gson gsonInput = new Gson();
                     String jsonInputString = gsonInput.toJson(payload);
@@ -479,7 +490,26 @@ public class ChatGPTRequest {
 
                         ChatGPTResponse chatGPTResponse = GSON.fromJson(response.toString(), ChatGPTResponse.class);
                         if (chatGPTResponse != null && chatGPTResponse.choices != null && !chatGPTResponse.choices.isEmpty()) {
-                            return chatGPTResponse.choices.get(0).message.content;
+                            ChatGPTResponse.ChatGPTChoice choice = chatGPTResponse.choices.get(0);
+                            lastFinishReason = choice.finish_reason;
+                            lastCompletionTokens = chatGPTResponse.usage == null ? null : chatGPTResponse.usage.completion_tokens;
+
+                            String content = "";
+                            if (choice.message != null) {
+                                content = choice.message.content != null ? choice.message.content : choice.message.refusal;
+                            }
+                            lastResponsePreview = preview(content);
+                            lastStructuredResponseWarning = structuredResponseWarning(
+                                    normalizedOutputMode,
+                                    content,
+                                    lastFinishReason,
+                                    modelName,
+                                    maxOutputTokens,
+                                    lastCompletionTokens);
+                            if (lastStructuredResponseWarning != null) {
+                                LOGGER.warn(lastStructuredResponseWarning);
+                            }
+                            return content;
                         }
                         lastErrorMessage = "Failed to parse response";
                         return null;
@@ -528,12 +558,122 @@ public class ChatGPTRequest {
             return false;
         }
         String normalizedThinking = thinkingLevel.trim().toLowerCase(Locale.ENGLISH);
-        if (!List.of("low", "medium", "high").contains(normalizedThinking)) {
+        if (!List.of("minimal", "low", "medium", "high").contains(normalizedThinking)) {
             return false;
         }
         String normalizedUrl = apiUrl == null ? "" : apiUrl.toLowerCase(Locale.ENGLISH);
         String normalizedModel = modelName == null ? "" : modelName.toLowerCase(Locale.ENGLISH);
         return normalizedUrl.contains("generativelanguage.googleapis.com")
                 || normalizedModel.startsWith("gemini-");
+    }
+
+    private static int effectiveMaxOutputTokens(int configuredTokens, StructuredOutputMode outputMode, String thinkingLevel) {
+        int configured = Math.max(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS, configuredTokens);
+        StructuredOutputMode mode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
+        if (mode == StructuredOutputMode.NONE) {
+            return configured;
+        }
+
+        String normalizedThinking = thinkingLevel == null ? "auto" : thinkingLevel.trim().toLowerCase(Locale.ENGLISH);
+        int floor = mode == StructuredOutputMode.CHARACTER ? 512 : 256;
+        if ("medium".equals(normalizedThinking)) {
+            floor = mode == StructuredOutputMode.CHARACTER ? 1024 : 512;
+        } else if ("high".equals(normalizedThinking)) {
+            floor = mode == StructuredOutputMode.CHARACTER ? 1536 : 1024;
+        }
+        return Math.max(configured, floor);
+    }
+
+    private static String structuredResponseWarning(
+            StructuredOutputMode outputMode,
+            String content,
+            String finishReason,
+            String modelName,
+            int maxOutputTokens,
+            Integer completionTokens) {
+        if (outputMode == null || outputMode == StructuredOutputMode.NONE) {
+            return null;
+        }
+
+        String preview = preview(content);
+        if ("length".equalsIgnoreCase(finishReason)) {
+            return "Structured AI response was truncated: mode=" + outputMode
+                    + ", model=" + modelName
+                    + ", finish_reason=" + finishReason
+                    + ", max_tokens=" + maxOutputTokens
+                    + ", completion_tokens=" + completionTokens
+                    + ", preview=" + preview;
+        }
+        if (content == null || content.trim().isEmpty()) {
+            return "Structured AI response was empty: mode=" + outputMode
+                    + ", model=" + modelName
+                    + ", finish_reason=" + finishReason
+                    + ", max_tokens=" + maxOutputTokens;
+        }
+        if (!containsCompleteJsonObject(content)) {
+            return "Structured AI response did not include a complete JSON object: mode=" + outputMode
+                    + ", model=" + modelName
+                    + ", finish_reason=" + finishReason
+                    + ", max_tokens=" + maxOutputTokens
+                    + ", completion_tokens=" + completionTokens
+                    + ", preview=" + preview;
+        }
+        return null;
+    }
+
+    private static String preview(String content) {
+        if (content == null) {
+            return "";
+        }
+        String normalized = content.replace("\r", " ").replace("\n", " ").trim();
+        while (normalized.contains("  ")) {
+            normalized = normalized.replace("  ", " ");
+        }
+        return normalized.length() > 160 ? normalized.substring(0, 160) + "..." : normalized;
+    }
+
+    private static boolean containsCompleteJsonObject(String input) {
+        if (input == null) {
+            return false;
+        }
+        int depth = 0;
+        boolean started = false;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < input.length(); i++) {
+            char current = input.charAt(i);
+            if (!started) {
+                if (current == '{') {
+                    started = true;
+                    depth = 1;
+                }
+                continue;
+            }
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (inString && current == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (current == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) {
+                continue;
+            }
+            if (current == '{') {
+                depth++;
+            } else if (current == '}') {
+                depth--;
+                if (depth == 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

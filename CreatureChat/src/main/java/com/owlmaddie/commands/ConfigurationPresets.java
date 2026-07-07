@@ -22,7 +22,7 @@ public final class ConfigurationPresets {
     private static final List<ProviderPreset> PRESETS = List.of(
             new ProviderPreset("openai", "OpenAI", OPENAI_CHAT_COMPLETIONS_URL, "gpt-4o-mini",
                     List.of("chatgpt")),
-            new ProviderPreset("ai-studio", "Google AI Studio", AI_STUDIO_CHAT_COMPLETIONS_URL, "gemini-3.5-flash",
+            new ProviderPreset("ai-studio", "Google AI Studio", AI_STUDIO_CHAT_COMPLETIONS_URL, "gemini-3.1-flash-lite", "minimal",
                     List.of("aistudio", "google", "gemini")),
             new ProviderPreset("openrouter", "OpenRouter", OPENROUTER_CHAT_COMPLETIONS_URL, "openai/gpt-4o-mini",
                     List.of("router")),
@@ -58,6 +58,10 @@ public final class ConfigurationPresets {
     public static void applyPreset(ConfigurationHandler.Config config, ProviderPreset preset) {
         config.setUrl(preset.url());
         config.setModel(preset.defaultModel());
+        config.setThinkingLevel(preset.defaultThinkingLevel());
+        if (config.getMaxOutputTokens() < ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS) {
+            config.setMaxOutputTokens(ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS);
+        }
     }
 
     public static String describeApiKeys(String apiKeys) {
@@ -99,6 +103,9 @@ public final class ConfigurationPresets {
         return value.substring(0, visible) + "...";
     }
 
-    public record ProviderPreset(String id, String displayName, String url, String defaultModel, List<String> aliases) {
+    public record ProviderPreset(String id, String displayName, String url, String defaultModel, String defaultThinkingLevel, List<String> aliases) {
+        public ProviderPreset(String id, String displayName, String url, String defaultModel, List<String> aliases) {
+            this(id, displayName, url, defaultModel, "auto", aliases);
+        }
     }
 }
