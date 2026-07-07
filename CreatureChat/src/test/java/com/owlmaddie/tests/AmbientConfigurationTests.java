@@ -21,6 +21,7 @@ public class AmbientConfigurationTests {
         assertEquals(45, config.getPlayerAmbientCooldownSeconds());
         assertEquals(1, config.getMaxEntityAmbientResponses());
         assertEquals(90, config.getEntityAmbientCooldownSeconds());
+        assertEquals(25, config.getDamageReactionCooldownSeconds());
         assertTrue(config.getMobToMobChatEnabled());
         assertEquals(10, config.getMobToMobChatRadius());
         assertEquals(1, config.getMaxMobToMobResponsesPerMessage());

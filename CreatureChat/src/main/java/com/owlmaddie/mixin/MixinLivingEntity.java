@@ -8,6 +8,7 @@ import com.owlmaddie.chat.EntityChatData;
 import com.owlmaddie.chat.PlayerData;
 import com.owlmaddie.chat.SocialEventRecorder;
 import com.owlmaddie.chat.SocialEventType;
+import com.owlmaddie.commands.ConfigurationHandler;
 import com.owlmaddie.network.ServerPackets;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -75,6 +76,10 @@ public class MixinLivingEntity {
             playerData.wordsmithDamaged = true;
             SocialEventRecorder.record(chatData, player, SocialEventType.DAMAGE_DEALT, "Player attacked this entity.");
             if (!chatData.characterSheet.isEmpty()) {
+                ConfigurationHandler.Config config = new ConfigurationHandler(player.getServer()).loadConfig();
+                if (!ChatDataManager.getServerInstance().handleDamageReaction(chatData, playerData, player.getDisplayName().getString(), config)) {
+                    return;
+                }
 
                 ItemStack weapon = player.getMainHandItem();
                 String weaponName = weapon.isEmpty() ? "with fists" : "with " + weapon.getItem().toString();
@@ -84,6 +89,10 @@ public class MixinLivingEntity {
                 String directness = isIndirect ? "indirectly" : "directly";
 
                 String attackedMessage = "<" + player.getDisplayName().getString() + " attacked you " + directness + " with " + weaponName + ">";
+                String suppressedDamageSummary = playerData.consumeSuppressedDamageReactionSummary();
+                if (!suppressedDamageSummary.isEmpty()) {
+                    attackedMessage += " " + suppressedDamageSummary;
+                }
                 ServerPackets.generate_chat("N/A", chatData, player, (Mob) thisEntity, attackedMessage, true);
             }
         }

@@ -87,6 +87,7 @@ public class ConfigurationHandler {
         private int playerAutoCooldownSeconds = 3;
         private int maxEntityAutoResponses = 3;
         private int entityAutoCooldownSeconds = 3;
+        private int damageReactionCooldownSeconds = 25;
         private boolean proximityChatEnabled = true;
         private int proximityChatRadius = 12;
         private int maxProximityResponsesPerMessage = 1;
@@ -251,6 +252,9 @@ public class ConfigurationHandler {
 
         public int getEntityAutoCooldownSeconds() { return entityAutoCooldownSeconds; }
         public void setEntityAutoCooldownSeconds(int entityAutoCooldownSeconds) { this.entityAutoCooldownSeconds = entityAutoCooldownSeconds; }
+
+        public int getDamageReactionCooldownSeconds() { return damageReactionCooldownSeconds; }
+        public void setDamageReactionCooldownSeconds(int damageReactionCooldownSeconds) { this.damageReactionCooldownSeconds = Math.max(0, damageReactionCooldownSeconds); }
 
         public boolean getProximityChatEnabled() { return proximityChatEnabled; }
         public void setProximityChatEnabled(boolean proximityChatEnabled) { this.proximityChatEnabled = proximityChatEnabled; }

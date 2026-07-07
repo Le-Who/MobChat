@@ -57,6 +57,7 @@ public class CreatureChatCommands {
                 .then(registerSetCommand("model", "Model", StringArgumentType.string()))
                 .then(registerSetCommand("timeout", "Timeout (seconds)", IntegerArgumentType.integer()))
                 .then(registerSetCommand("outputtokens", "Output tokens", IntegerArgumentType.integer(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS)))
+                .then(registerSetCommand("damagecooldown", "Damage reaction cooldown (seconds)", IntegerArgumentType.integer(0)))
                 .then(registerSetupCommand())
                 .then(registerPresetCommand())
                 .then(registerConfigCommand())
@@ -140,6 +141,9 @@ public class CreatureChatCommands {
                 .then(Commands.literal("outputtokens")
                         .then(Commands.argument("tokens", IntegerArgumentType.integer(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS))
                                 .executes(context -> setConfig(context.getSource(), "outputtokens", IntegerArgumentType.getInteger(context, "tokens"), true, "Output tokens"))))
+                .then(Commands.literal("damagecooldown")
+                        .then(Commands.argument("seconds", IntegerArgumentType.integer(0))
+                                .executes(context -> setConfig(context.getSource(), "damagecooldown", IntegerArgumentType.getInteger(context, "seconds"), true, "Damage reaction cooldown (seconds)"))))
                 .then(Commands.literal("show")
                         .executes(context -> showConfig(context.getSource())))
                 .then(Commands.literal("test")
@@ -176,10 +180,11 @@ public class CreatureChatCommands {
         source.sendSuccess(() -> Component.literal("   Providers: " + String.join(", ", ConfigurationPresets.providerIds())).withStyle(ChatFormatting.GRAY), false);
         source.sendSuccess(() -> commandHint("2. Add one or more API keys:", "/creaturechat setup key <key1,key2>"), false);
         source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model gemini-3.1-flash-lite"), false);
-        source.sendSuccess(() -> commandHint("4. Optional output budget:", "/creaturechat setup outputtokens 512"), false);
-        source.sendSuccess(() -> Component.literal("5. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
-        source.sendSuccess(() -> commandHint("6. Review:", "/creaturechat setup show"), false);
-        source.sendSuccess(() -> commandHint("7. Test:", "/creaturechat setup test"), false);
+        source.sendSuccess(() -> commandHint("4. Optional output budget:", "/creaturechat setup outputtokens 1024"), false);
+        source.sendSuccess(() -> commandHint("5. Optional damage reaction cooldown:", "/creaturechat setup damagecooldown 25"), false);
+        source.sendSuccess(() -> Component.literal("6. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> commandHint("7. Review:", "/creaturechat setup show"), false);
+        source.sendSuccess(() -> commandHint("8. Test:", "/creaturechat setup test"), false);
         return 1;
     }
 
@@ -220,6 +225,7 @@ public class CreatureChatCommands {
                 .append(Component.literal("Active model: " + config.getActiveModel() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Thinking: " + config.getThinkingLevel() + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Output tokens: " + config.getMaxOutputTokens() + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Damage reaction cooldown: " + config.getDamageReactionCooldownSeconds() + "s\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Timeout: " + config.getTimeout() + "s").withStyle(ChatFormatting.GRAY));
         source.sendSuccess(() -> message, false);
         return 1;
@@ -422,6 +428,13 @@ public class CreatureChatCommands {
                         config.setMaxOutputTokens((Integer) value);
                     } else {
                         throw new IllegalArgumentException("Invalid type for output tokens, must be Integer.");
+                    }
+                    break;
+                case "damagecooldown":
+                    if (value instanceof Integer) {
+                        config.setDamageReactionCooldownSeconds((Integer) value);
+                    } else {
+                        throw new IllegalArgumentException("Invalid type for damage reaction cooldown, must be Integer.");
                     }
                     break;
                 default:

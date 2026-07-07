@@ -117,6 +117,7 @@ public class ChatDataManager {
 
         if (!isAuto) {
             playerBucket.reset();
+            resetReactiveCooldowns(chatData, chatData.getPlayerData(player));
             return true;
         }
 
@@ -132,6 +133,40 @@ public class ChatDataManager {
         entityBucket.consume();
         playerBucket.consume();
         return true;
+    }
+
+    public boolean handleDamageReaction(EntityChatData chatData, PlayerData playerData, String playerName, ConfigurationHandler.Config config) {
+        if (playerData == null) {
+            return true;
+        }
+
+        int cooldownSeconds = config == null ? 25 : config.getDamageReactionCooldownSeconds();
+        if (cooldownSeconds <= 0) {
+            playerData.lastDamageReactionAt = System.currentTimeMillis();
+            return true;
+        }
+
+        long now = System.currentTimeMillis();
+        long cooldownMillis = cooldownSeconds * 1000L;
+        if (playerData.lastDamageReactionAt <= 0L || now - playerData.lastDamageReactionAt >= cooldownMillis) {
+            playerData.lastDamageReactionAt = now;
+            return true;
+        }
+
+        playerData.suppressedDamageReactionCount++;
+        String entityId = chatData == null ? "<unknown>" : chatData.entityId;
+        LOGGER.info("Damage reaction skipped for entity {} and player {}: damage cooldown active ({} suppressed hit(s))",
+                entityId,
+                playerName == null || playerName.isEmpty() ? "<unknown>" : playerName,
+                playerData.suppressedDamageReactionCount);
+        return false;
+    }
+
+    public void resetReactiveCooldowns(EntityChatData chatData, PlayerData playerData) {
+        if (playerData == null) {
+            return;
+        }
+        playerData.resetDamageReactionCooldown();
     }
 
     public boolean handleAmbientResponse(EntityChatData chatData, ServerPlayer player, ConfigurationHandler.Config config) {

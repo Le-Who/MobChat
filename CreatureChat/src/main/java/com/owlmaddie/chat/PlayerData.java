@@ -36,6 +36,8 @@ public class PlayerData {
     public int harmfulActions;
     public int socialEventCount;
     public String socialSummary;
+    public long lastDamageReactionAt;
+    public int suppressedDamageReactionCount;
 
     public PlayerData() {
         this.friendship = 0;
@@ -64,6 +66,8 @@ public class PlayerData {
         this.harmfulActions = 0;
         this.socialEventCount = 0;
         this.socialSummary = "";
+        this.lastDamageReactionAt = 0L;
+        this.suppressedDamageReactionCount = 0;
     }
 
     public void recordSocialEvent(SocialEventType type, String summary) {
@@ -97,6 +101,22 @@ public class PlayerData {
             this.socialSummary = "Friendship dropped from " + oldFriendship + " to " + newFriendship + ".";
         }
         this.socialEventCount++;
+    }
+
+    public String consumeSuppressedDamageReactionSummary() {
+        if (suppressedDamageReactionCount <= 0) {
+            return "";
+        }
+        int count = suppressedDamageReactionCount;
+        suppressedDamageReactionCount = 0;
+        return count == 1
+                ? "There was 1 additional hit during the cooldown."
+                : "There were " + count + " additional hits during the cooldown.";
+    }
+
+    public void resetDamageReactionCooldown() {
+        lastDamageReactionAt = 0L;
+        suppressedDamageReactionCount = 0;
     }
 
     private static String truncate(String value) {
