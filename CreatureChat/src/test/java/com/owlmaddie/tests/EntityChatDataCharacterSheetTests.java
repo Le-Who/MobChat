@@ -79,6 +79,25 @@ public class EntityChatDataCharacterSheetTests {
     }
 
     @Test
+    public void truncatedStructuredCharacterJsonKeepsCompleteGreeting() {
+        String normalized = CharacterSheetNormalizer.normalize("""
+                {
+                  "name": "Yra-Keth",
+                  "personality": "grave but helpful",
+                  "speaking_style": "stoic",
+                  "class_name": "bone bard",
+                  "short_greeting": "Кости стучат, но я отвечу."
+                """);
+
+        EntityChatData data = new EntityChatData("entity-id");
+        data.characterSheet = normalized;
+
+        assertEquals("Yra-Keth", data.getCharacterProp("Name"));
+        assertEquals("stoic", data.getCharacterProp("Speaking Style / Tone"));
+        assertEquals("Кости стучат, но я отвечу.", data.getShortGreetingOrFallback("Hello there."));
+    }
+
+    @Test
     public void legacyCharacterSheetIsPreservedWhenResponseIsNotJson() {
         String legacySheet = """
                 - Name: Yen

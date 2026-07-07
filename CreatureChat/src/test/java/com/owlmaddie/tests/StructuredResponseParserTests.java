@@ -104,8 +104,32 @@ public class StructuredResponseParserTests {
     }
 
     @Test
-    public void malformedStructuredJsonAfterPreambleIsSuppressed() {
+    public void malformedStructuredJsonAfterPreambleKeepsCompleteVisibleMessage() {
         ParsedMessage parsed = MessageParser.parseMessage("Here is the JSON requested: { \"message\": \"Иго-го!\", \"actions\": [");
+
+        assertEquals("Иго-го!", parsed.getCleanedMessage());
+        assertEquals("Here is the JSON requested: { \"message\": \"Иго-го!\", \"actions\": [", parsed.getOriginalMessage());
+        assertTrue(parsed.getBehaviors().isEmpty());
+    }
+
+    @Test
+    public void truncatedStructuredJsonKeepsCompleteVisibleMessage() {
+        ParsedMessage parsed = MessageParser.parseMessage("""
+                {
+                  "message": "Дух спокоен. Мой бит: *кр-р-х, тук-тук*, стук костей — ритм древних. Рэп — шум, но дух в нем есть.",
+                  "mood": "neutral",
+                  "memory_updates":
+                """.replace("\n", " "));
+
+        assertEquals("Дух спокоен. Мой бит: *кр-р-х, тук-тук*, стук костей — ритм древних. Рэп — шум, но дух в нем есть.", parsed.getCleanedMessage());
+        assertEquals("neutral", parsed.getMood());
+        assertTrue(parsed.getBehaviors().isEmpty());
+        assertTrue(parsed.getMemoryUpdates().isEmpty());
+    }
+
+    @Test
+    public void incompleteMessageStringIsStillSuppressed() {
+        ParsedMessage parsed = MessageParser.parseMessage("{ \"message\": \"Иго");
 
         assertEquals("", parsed.getCleanedMessage());
         assertEquals("", parsed.getOriginalMessage());

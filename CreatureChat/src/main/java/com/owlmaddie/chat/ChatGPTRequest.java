@@ -575,11 +575,11 @@ public class ChatGPTRequest {
         }
 
         String normalizedThinking = thinkingLevel == null ? "auto" : thinkingLevel.trim().toLowerCase(Locale.ENGLISH);
-        int floor = mode == StructuredOutputMode.CHARACTER ? 512 : 256;
+        int floor = mode == StructuredOutputMode.CHARACTER ? 1536 : 1024;
         if ("medium".equals(normalizedThinking)) {
-            floor = mode == StructuredOutputMode.CHARACTER ? 1024 : 512;
+            floor = mode == StructuredOutputMode.CHARACTER ? 2048 : 1536;
         } else if ("high".equals(normalizedThinking)) {
-            floor = mode == StructuredOutputMode.CHARACTER ? 1536 : 1024;
+            floor = mode == StructuredOutputMode.CHARACTER ? 3072 : 2048;
         }
         return Math.max(configured, floor);
     }

@@ -198,8 +198,35 @@ public class ChatGPTRequestStructuredOutputTests {
         server.stop(0);
 
         assertEquals(1, requestBodies.size());
-        assertTrue(requestBodies.get(0).contains("\"max_tokens\":1024"));
-        assertEquals(1024, ChatGPTRequest.lastRequestedMaxOutputTokens);
+        assertTrue(requestBodies.get(0).contains("\"max_tokens\":2048"));
+        assertEquals(2048, ChatGPTRequest.lastRequestedMaxOutputTokens);
+    }
+
+    @Test
+    public void structuredMediumThinkingUsesLargerOutputTokenFloor() throws Exception {
+        List<String> requestBodies = new ArrayList<>();
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, exchange -> handleSuccess(exchange, requestBodies));
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setUrl(url);
+        config.setApiKey("test-key");
+        config.setModel("gemini-3.1-flash-lite");
+        config.setThinkingLevel("medium");
+        config.setMaxOutputTokens(200);
+        config.setTimeout(1);
+
+        ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "Reply as JSON.", new HashMap<>(), new ArrayList<>(), true).join();
+
+        server.stop(0);
+
+        assertEquals(1, requestBodies.size());
+        assertTrue(requestBodies.get(0).contains("\"max_tokens\":1536"));
+        assertEquals(1536, ChatGPTRequest.lastRequestedMaxOutputTokens);
     }
 
     @Test

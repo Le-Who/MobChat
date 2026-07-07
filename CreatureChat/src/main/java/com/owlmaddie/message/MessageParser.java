@@ -84,6 +84,10 @@ public class MessageParser {
             if (parsed != null) {
                 return parsed;
             }
+            ParsedMessage partial = parsePartialStructuredMessage(trimmedInput);
+            if (partial != null) {
+                return partial;
+            }
             return new ParsedMessage("", "", new ArrayList<>());
         }
 
@@ -96,6 +100,10 @@ public class MessageParser {
             return embedded;
         }
         if (isMalformedStructuredJsonAttempt(trimmedInput)) {
+            ParsedMessage partial = parsePartialStructuredMessage(trimmedInput);
+            if (partial != null) {
+                return partial;
+            }
             return new ParsedMessage("", "", new ArrayList<>());
         }
 
@@ -176,6 +184,34 @@ public class MessageParser {
             return new ParsedMessage(response.message.trim(), originalInput.trim(), behaviors, response.mood, memoryUpdates);
         } catch (JsonSyntaxException e) {
             LOGGER.debug("Structured message parse failed; falling back to legacy parser", e);
+            return null;
+        }
+    }
+
+    private static ParsedMessage parsePartialStructuredMessage(String input) {
+        String message = extractJsonStringField(input, "message");
+        if (message == null || message.trim().isEmpty()) {
+            return null;
+        }
+        String mood = extractJsonStringField(input, "mood");
+        return new ParsedMessage(message.trim(), input.trim(), new ArrayList<>(), mood, new ArrayList<>());
+    }
+
+    private static String extractJsonStringField(String input, String fieldName) {
+        if (input == null || fieldName == null || fieldName.isEmpty()) {
+            return null;
+        }
+
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"", Pattern.DOTALL);
+        Matcher matcher = pattern.matcher(input);
+        if (!matcher.find()) {
+            return null;
+        }
+
+        try {
+            return GSON.fromJson("\"" + matcher.group(1) + "\"", String.class);
+        } catch (JsonSyntaxException e) {
+            LOGGER.debug("Failed to decode partial structured field: {}", fieldName, e);
             return null;
         }
     }

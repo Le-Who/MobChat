@@ -10,6 +10,8 @@ import com.google.gson.JsonSyntaxException;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Converts structured character JSON into the legacy dash-list character sheet
@@ -26,7 +28,11 @@ public class CharacterSheetNormalizer {
 
         String trimmed = response.trim();
         JsonObject character = parseFirstJsonObject(trimmed);
-        if (character == null || !looksLikeCharacterJson(character)) {
+        if (character == null) {
+            String partial = normalizePartialCharacterJson(trimmed);
+            return partial == null ? trimmed : partial;
+        }
+        if (!looksLikeCharacterJson(character)) {
             return trimmed;
         }
 
@@ -48,6 +54,56 @@ public class CharacterSheetNormalizer {
         return object.has("name")
                 && (object.has("short_greeting") || object.has("greeting"))
                 && (object.has("speaking_style") || object.has("class_name") || object.has("personality"));
+    }
+
+    private static String normalizePartialCharacterJson(String input) {
+        String name = extractJsonStringField(input, "name");
+        String shortGreeting = firstExtractedString(input, "short_greeting", "greeting");
+        if (MISSING.equals(name) || MISSING.equals(shortGreeting)) {
+            return null;
+        }
+
+        return String.join("\n",
+                "- Name: " + name,
+                "- Personality: " + extractJsonStringField(input, "personality"),
+                "- Speaking Style / Tone: " + extractJsonStringField(input, "speaking_style"),
+                "- Class: " + firstExtractedString(input, "class_name", "class"),
+                "- Skills: " + MISSING,
+                "- Likes: " + MISSING,
+                "- Dislikes: " + MISSING,
+                "- Alignment: " + extractJsonStringField(input, "alignment"),
+                "- Background: " + extractJsonStringField(input, "background"),
+                "- Short Greeting: \"" + shortGreeting + "\""
+        );
+    }
+
+    private static String firstExtractedString(String input, String... keys) {
+        for (String key : keys) {
+            String value = extractJsonStringField(input, key);
+            if (!MISSING.equals(value)) {
+                return value;
+            }
+        }
+        return MISSING;
+    }
+
+    private static String extractJsonStringField(String input, String fieldName) {
+        if (input == null || fieldName == null || fieldName.isEmpty()) {
+            return MISSING;
+        }
+
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(fieldName) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"", Pattern.DOTALL);
+        Matcher matcher = pattern.matcher(input);
+        if (!matcher.find()) {
+            return MISSING;
+        }
+
+        try {
+            String value = GSON.fromJson("\"" + matcher.group(1) + "\"", String.class);
+            return clean(value);
+        } catch (JsonSyntaxException ignored) {
+            return MISSING;
+        }
     }
 
     private static JsonObject parseFirstJsonObject(String input) {
