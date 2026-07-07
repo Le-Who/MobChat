@@ -77,6 +77,15 @@ public class StructuredResponseParserTests {
     }
 
     @Test
+    public void preambleOnlyStructuredResponseIsSuppressed() {
+        ParsedMessage parsed = MessageParser.parseMessage("Here is the JSON requested");
+
+        assertEquals("", parsed.getCleanedMessage());
+        assertEquals("", parsed.getOriginalMessage());
+        assertTrue(parsed.getBehaviors().isEmpty());
+    }
+
+    @Test
     public void legacyResponseHasNoStructuredMetadata() {
         ParsedMessage parsed = MessageParser.parseMessage("Okay, I'll follow. <FOLLOW>");
 

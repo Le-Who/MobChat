@@ -86,7 +86,29 @@ public class MessageParser {
             }
         }
 
+        if (isStructuredJsonBoilerplateOnly(trimmedInput)) {
+            return new ParsedMessage("", "", new ArrayList<>());
+        }
+
         return parseFirstStructuredJsonObject(trimmedInput);
+    }
+
+    private static boolean isStructuredJsonBoilerplateOnly(String input) {
+        if (input == null || input.contains("{")) {
+            return false;
+        }
+
+        String normalized = input.trim()
+                .toLowerCase(Locale.ENGLISH)
+                .replace("```json", "")
+                .replace("```", "")
+                .replace(":", "")
+                .replace(".", "")
+                .trim();
+        return normalized.equals("here is the json requested")
+                || normalized.equals("here's the json requested")
+                || normalized.equals("here is the requested json")
+                || normalized.equals("the requested json");
     }
 
     private static ParsedMessage parseStructuredJson(String json, String originalInput) {
