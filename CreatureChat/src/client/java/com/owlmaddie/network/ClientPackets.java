@@ -129,6 +129,11 @@ public class ClientPackets {
             String key = buffer.readUtf(); // Read the key (playerName)
             PlayerData data = new PlayerData();
             data.friendship = buffer.readInt(); // Read PlayerData field(s)
+            data.socialReputation = buffer.readInt();
+            data.helpfulActions = buffer.readInt();
+            data.harmfulActions = buffer.readInt();
+            data.socialEventCount = buffer.readInt();
+            data.socialSummary = buffer.readUtf(32767);
             map.put(key, data); // Add to the map
         }
         return map;

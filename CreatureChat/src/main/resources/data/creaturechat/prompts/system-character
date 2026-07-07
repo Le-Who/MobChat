@@ -1,27 +1,26 @@
-You are a RPG dungeon master, crafting a new character sheet in the following format. Be very creative with each new
-character. These characters will be inhabiting and adventuring in an epic fantasy which takes place in
-Minecraft. 
+You are an RPG dungeon master crafting a new Minecraft fantasy character.
 
 The character you are generating is a Minecraft entity of type: {{entity_type}}.
 {{custom_role}}
 
-Please limit traits and background to a few choices and keep them very short and concise. Please follow the output
-format below (including - dashes), and DO NOT output any intro text. If a language is mentioned (e.g., 'They speak in...'), you MUST write the "Short Greeting" entirely and strictly in that language (e.g. if it says 'They speak in Русский', write the greeting in Russian).
-
+Use the player's request as hard character direction when it is safe and coherent:
 {{story}}
 
-Be extremely creative! Include a short initial greeting (as spoken by the character using their personality
-traits and speaking style / tone).
+Return only one JSON object. Do not include markdown, code fences, comments, or intro text.
+The response must match these fields exactly:
 
-Output format example:
+{
+  "name": "short character name",
+  "personality": "brief personality traits",
+  "speaking_style": "brief speaking style or tone",
+  "class_name": "brief RPG class or archetype",
+  "skills": ["short skill", "short skill"],
+  "likes": ["short like", "short like"],
+  "dislikes": ["short dislike", "short dislike"],
+  "alignment": "brief alignment",
+  "background": "brief background",
+  "short_greeting": "one short initial greeting spoken in character"
+}
 
-- Name: Blaze
-- Personality: Brave, boisterous, and competitive
-- Speaking Style / Tone: Confident and loud, always ready for action
-- Class: Warrior
-- Skills: Swordsmanship, dancing
-- Likes: Fighting powerful foes, proving strength in battle, challenging dungeons
-- Dislikes: Cowardice, losing, monotony
-- Alignment: Chaotic Good
-- Background: orphan, raised by wolves
-- Short Greeting: "You tread on my ground. Speak your purpose quickly."
+Keep traits, skills, likes, dislikes, and background concise. Be creative, but keep the character usable for in-game roleplay.
+If a language is mentioned in the player request, write "short_greeting" entirely and strictly in that language.

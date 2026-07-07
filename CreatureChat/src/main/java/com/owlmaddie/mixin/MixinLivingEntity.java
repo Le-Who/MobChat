@@ -6,6 +6,8 @@ package com.owlmaddie.mixin;
 import com.owlmaddie.chat.ChatDataManager;
 import com.owlmaddie.chat.EntityChatData;
 import com.owlmaddie.chat.PlayerData;
+import com.owlmaddie.chat.SocialEventRecorder;
+import com.owlmaddie.chat.SocialEventType;
 import com.owlmaddie.network.ServerPackets;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,7 +43,9 @@ public class MixinLivingEntity {
         if (target instanceof Player) {
             LivingEntity thisEntity = (LivingEntity) (Object) this;
             EntityChatData entityData = getChatData(thisEntity);
-            PlayerData playerData = entityData.getPlayerData(target.getDisplayName().getString());
+            PlayerData playerData = target instanceof ServerPlayer serverPlayer
+                    ? entityData.getPlayerData(serverPlayer)
+                    : entityData.getPlayerData(target.getStringUUID(), target.getDisplayName().getString());
             if (playerData.friendship > 0) {
                 // Friendly creatures can't target a player
                 cir.setReturnValue(false);
@@ -66,9 +70,10 @@ public class MixinLivingEntity {
             // We don't want to constantly generate messages during a prolonged, multi-damage event
             ServerPlayer player = (ServerPlayer) attacker;
             EntityChatData chatData = getChatData(thisEntity);
-            PlayerData playerData = chatData.getPlayerData(player.getDisplayName().getString());
+            PlayerData playerData = chatData.getPlayerData(player);
             playerData.lastDamageFriendship = playerData.friendship;
             playerData.wordsmithDamaged = true;
+            SocialEventRecorder.record(chatData, player, SocialEventType.DAMAGE_DEALT, "Player attacked this entity.");
             if (!chatData.characterSheet.isEmpty()) {
 
                 ItemStack weapon = player.getMainHandItem();

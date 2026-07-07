@@ -30,6 +30,12 @@ public class ChatGPTRequest {
     public static String lastErrorMessage;
     public static int lastErrorCode = 0;
 
+    public enum StructuredOutputMode {
+        NONE,
+        CHAT,
+        CHARACTER
+    }
+
     static class ChatGPTRequestMessage {
         String role;
         String content;
@@ -37,6 +43,16 @@ public class ChatGPTRequest {
         public ChatGPTRequestMessage(String role, String content) {
             this.role = role;
             this.content = content;
+        }
+    }
+
+    // Keeps the legacy Boolean overload intact while letting new callers choose a specific schema.
+    private static class OutputModeMessageHistory extends ArrayList<ChatMessage> {
+        final StructuredOutputMode outputMode;
+
+        OutputModeMessageHistory(List<ChatMessage> messages, StructuredOutputMode outputMode) {
+            super(messages == null ? Collections.emptyList() : messages);
+            this.outputMode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
         }
     }
 
@@ -50,6 +66,10 @@ public class ChatGPTRequest {
         boolean stream;
 
         public ChatGPTRequestPayload(String apiUrl, String model, List<ChatGPTRequestMessage> messages, Boolean jsonMode, float temperature, int maxTokens, String thinkingLevel) {
+            this(apiUrl, model, messages, Boolean.TRUE.equals(jsonMode) ? StructuredOutputMode.CHAT : StructuredOutputMode.NONE, temperature, maxTokens, thinkingLevel);
+        }
+
+        public ChatGPTRequestPayload(String apiUrl, String model, List<ChatGPTRequestMessage> messages, StructuredOutputMode outputMode, float temperature, int maxTokens, String thinkingLevel) {
             this.model = model;
             this.messages = messages;
             this.temperature = temperature;
@@ -58,10 +78,11 @@ public class ChatGPTRequest {
             if (shouldSendReasoningEffort(apiUrl, model, thinkingLevel)) {
                 this.reasoning_effort = thinkingLevel;
             }
-            if (jsonMode) {
-                this.response_format = ResponseFormat.creatureChatSchema();
-            } else {
-                this.response_format = ResponseFormat.text();
+            StructuredOutputMode normalizedMode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
+            switch (normalizedMode) {
+                case CHAT -> this.response_format = ResponseFormat.creatureChatSchema();
+                case CHARACTER -> this.response_format = ResponseFormat.creatureChatCharacterSchema();
+                case NONE -> this.response_format = ResponseFormat.text();
             }
         }
     }
@@ -81,6 +102,12 @@ public class ChatGPTRequest {
         static ResponseFormat creatureChatSchema() {
             ResponseFormat format = new ResponseFormat("json_schema");
             format.json_schema = JsonSchema.creatureChatResponse();
+            return format;
+        }
+
+        static ResponseFormat creatureChatCharacterSchema() {
+            ResponseFormat format = new ResponseFormat("json_schema");
+            format.json_schema = JsonSchema.creatureChatCharacter();
             return format;
         }
     }
@@ -146,6 +173,44 @@ public class ChatGPTRequest {
 
             return new JsonSchema("creaturechat_response", true, rootSchema);
         }
+
+        static JsonSchema creatureChatCharacter() {
+            Map<String, Object> stringSchema = Map.of("type", "string");
+            Map<String, Object> stringArraySchema = Map.of(
+                    "type", "array",
+                    "items", stringSchema
+            );
+
+            Map<String, Object> rootSchema = new LinkedHashMap<>();
+            rootSchema.put("type", "object");
+            rootSchema.put("additionalProperties", false);
+            rootSchema.put("properties", Map.of(
+                    "name", stringSchema,
+                    "personality", stringSchema,
+                    "speaking_style", stringSchema,
+                    "class_name", stringSchema,
+                    "skills", stringArraySchema,
+                    "likes", stringArraySchema,
+                    "dislikes", stringArraySchema,
+                    "alignment", stringSchema,
+                    "background", stringSchema,
+                    "short_greeting", stringSchema
+            ));
+            rootSchema.put("required", List.of(
+                    "name",
+                    "personality",
+                    "speaking_style",
+                    "class_name",
+                    "skills",
+                    "likes",
+                    "dislikes",
+                    "alignment",
+                    "background",
+                    "short_greeting"
+            ));
+
+            return new JsonSchema("creaturechat_character", true, rootSchema);
+        }
     }
 
     public static String removeQuotes(String str) {
@@ -209,6 +274,28 @@ public class ChatGPTRequest {
         return result;
     }
 
+    public static CompletableFuture<String> fetchMessageFromChatGPT(
+            ConfigurationHandler.Config config,
+            String systemPrompt,
+            Map<String, String> contextData,
+            List<ChatMessage> messageHistory,
+            StructuredOutputMode outputMode) {
+        StructuredOutputMode normalizedMode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
+        return fetchMessageFromChatGPT(
+                config,
+                systemPrompt,
+                contextData,
+                new OutputModeMessageHistory(messageHistory, normalizedMode),
+                normalizedMode != StructuredOutputMode.NONE);
+    }
+
+    private static StructuredOutputMode outputModeFrom(List<ChatMessage> messageHistory, Boolean jsonMode) {
+        if (messageHistory instanceof OutputModeMessageHistory outputModeHistory) {
+            return outputModeHistory.outputMode;
+        }
+        return Boolean.TRUE.equals(jsonMode) ? StructuredOutputMode.CHAT : StructuredOutputMode.NONE;
+    }
+
     // Function to roughly estimate # of OpenAI tokens in String
     private static int estimateTokenSize(String text) {
         return (int) Math.round(text.length() / 3.5);
@@ -226,6 +313,7 @@ public class ChatGPTRequest {
         int maxContextTokens = config.getMaxContextTokens();
         int maxOutputTokens = config.getMaxOutputTokens();
         double percentOfContext = config.getPercentOfContext();
+        StructuredOutputMode normalizedOutputMode = outputModeFrom(messageHistory, jsonMode);
 
         return CompletableFuture.supplyAsync(() -> {
             lastErrorCode = 0;
@@ -285,7 +373,7 @@ public class ChatGPTRequest {
 
                     // Convert JSON to String
                     ChatGPTRequestPayload payload = new ChatGPTRequestPayload(
-                            apiUrl, modelName, messages, jsonMode, 1.0f, maxOutputTokens, config.getThinkingLevel());
+                            apiUrl, modelName, messages, normalizedOutputMode, 1.0f, maxOutputTokens, config.getThinkingLevel());
 
                     Gson gsonInput = new Gson();
                     String jsonInputString = gsonInput.toJson(payload);

@@ -55,6 +55,40 @@ public class ChatGPTRequestStructuredOutputTests {
     }
 
     @Test
+    public void characterModeUsesStructuredCharacterSchema() throws Exception {
+        List<String> requestBodies = new ArrayList<>();
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, exchange -> handleSuccess(exchange, requestBodies));
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        config.setUrl(url);
+        config.setApiKey("test-key");
+        config.setModel("gemini-test");
+        config.setTimeout(1);
+
+        CompletableFuture<String> future = ChatGPTRequest.fetchMessageFromChatGPT(
+                config, "Create a character.", new HashMap<>(), new ArrayList<>(),
+                ChatGPTRequest.StructuredOutputMode.CHARACTER);
+        String response = future.join();
+
+        server.stop(0);
+
+        assertEquals("{\"message\":\"ok\",\"actions\":[]}", response);
+        assertEquals(1, requestBodies.size());
+        String body = requestBodies.get(0);
+        assertTrue(body.contains("\"response_format\""));
+        assertTrue(body.contains("\"type\":\"json_schema\""));
+        assertTrue(body.contains("\"name\":\"creaturechat_character\""));
+        assertTrue(body.contains("\"short_greeting\""));
+        assertTrue(body.contains("\"speaking_style\""));
+        assertTrue(body.contains("\"class_name\""));
+        assertTrue(!body.contains("\"actions\""));
+    }
+
+    @Test
     public void systemPromptPreservesJsonExampleQuotes() throws Exception {
         List<String> requestBodies = new ArrayList<>();
 

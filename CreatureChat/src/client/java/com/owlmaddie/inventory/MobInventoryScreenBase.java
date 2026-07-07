@@ -4,6 +4,8 @@
 package com.owlmaddie.inventory;
 
 import com.owlmaddie.chat.ChatDataManager;
+import com.owlmaddie.chat.EntityChatData;
+import com.owlmaddie.chat.PlayerData;
 import com.owlmaddie.utils.TextureLoader;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -45,6 +47,7 @@ public abstract class MobInventoryScreenBase extends AbstractContainerScreen<Mob
                 }
             }
         }
+        this.renderJournalTooltip(guiGraphics, mouseX, mouseY);
         this.renderTooltip(guiGraphics, mouseX, mouseY);
     }
 
@@ -57,7 +60,7 @@ public abstract class MobInventoryScreenBase extends AbstractContainerScreen<Mob
         if (mob != null && this.minecraft.player != null) {
             int friendship = ChatDataManager.getClientInstance()
                     .getOrCreateChatData(mob.getStringUUID())
-                    .getPlayerData(this.minecraft.player.getDisplayName().getString())
+                    .getPlayerData(this.minecraft.player.getStringUUID(), this.minecraft.player.getDisplayName().getString())
                     .friendship;
             if (friendship <= 0) {
                 background = ENEMY_TEXTURE;
@@ -80,5 +83,33 @@ public abstract class MobInventoryScreenBase extends AbstractContainerScreen<Mob
     protected abstract void blitBackground(GuiGraphics guiGraphics, ResourceLocation background, int x, int y);
 
     protected abstract void renderMob(GuiGraphics guiGraphics, Mob mob, int left, int top, int right, int bottom, int scale, float yOffset);
+
+    private void renderJournalTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        Mob mob = this.menu.getMob();
+        if (mob == null || this.minecraft.player == null) {
+            return;
+        }
+
+        int boxL = this.leftPos + 13;
+        int boxT = this.topPos + 18;
+        int boxR = boxL + 52;
+        int boxB = boxT + 52;
+        if (mouseX < boxL || mouseX > boxR || mouseY < boxT || mouseY > boxB) {
+            return;
+        }
+
+        EntityChatData chatData = ChatDataManager.getClientInstance().getOrCreateChatData(mob.getStringUUID());
+        PlayerData playerData = chatData.getPlayerData(this.minecraft.player.getStringUUID(), this.minecraft.player.getDisplayName().getString());
+        java.util.List<Component> lines = new java.util.ArrayList<>();
+        lines.add(Component.literal("Mob Journal"));
+        lines.add(Component.literal("Friendship: " + playerData.friendship));
+        lines.add(Component.literal("Reputation: " + playerData.socialReputation));
+        lines.add(Component.literal("Helpful: " + playerData.helpfulActions + "  Harmful: " + playerData.harmfulActions));
+        lines.add(Component.literal("Events: " + playerData.socialEventCount));
+        if (playerData.socialSummary != null && !playerData.socialSummary.isEmpty()) {
+            lines.add(Component.literal("Note: " + playerData.socialSummary));
+        }
+        guiGraphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+    }
 }
 

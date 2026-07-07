@@ -6,6 +6,8 @@ package com.owlmaddie.mixin;
 import com.owlmaddie.chat.ChatDataManager;
 import com.owlmaddie.chat.EntityChatData;
 import com.owlmaddie.chat.PlayerData;
+import com.owlmaddie.chat.SocialEventRecorder;
+import com.owlmaddie.chat.SocialEventType;
 import com.owlmaddie.inventory.ChatInventory;
 import com.owlmaddie.inventory.MobInventoryMenu;
 import com.owlmaddie.network.ServerPackets;
@@ -201,7 +203,9 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
         // Get chat data for entity
         ChatDataManager chatDataManager = ChatDataManager.getServerInstance();
         EntityChatData entityData = chatDataManager.getOrCreateChatData(thisEntity.getStringUUID());
-        PlayerData playerData = entityData.getPlayerData(player.getDisplayName().getString());
+        PlayerData playerData = player instanceof ServerPlayer serverPlayer
+                ? entityData.getPlayerData(serverPlayer)
+                : entityData.getPlayerData(player.getStringUUID(), player.getDisplayName().getString());
 
         // Check if the player successfully interacts with an item
         if (player instanceof ServerPlayer) {
@@ -222,6 +226,9 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
                         action_verb + "you " + itemCount + " " + itemName + ">";
 
                 if (!entityData.characterSheet.isEmpty()) {
+                    if (action_verb.contains("gives")) {
+                        SocialEventRecorder.record(entityData, serverPlayer, SocialEventType.GIFT_GIVEN, "Player gave an item directly.");
+                    }
                     ServerPackets.generate_chat("N/A", entityData, serverPlayer, thisEntity, giveItemMessage, true);
                 }
 

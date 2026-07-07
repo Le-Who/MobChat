@@ -43,6 +43,8 @@ Entity Info:
 - Friendship: {{entity_friendship}}
 - Current Mood: {{entity_mood}}
 - Memories: {{entity_memories}}
+- Local Social Reputation With This Player: {{player_social_reputation}}
+- Latest Social Note: {{player_social_summary}}
 
 Player Info:
 - Name: {{player_name}}

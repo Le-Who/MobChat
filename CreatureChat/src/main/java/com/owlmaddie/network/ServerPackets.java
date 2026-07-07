@@ -245,7 +245,7 @@ public class ServerPackets {
 
             LOGGER.info("Server send compressed, chunked login message packets to player: " + player.getDisplayName().getString());
             // Get lite JSON data & compress to byte array
-            String chatDataJSON = ChatDataManager.getServerInstance().GetLightChatData(player.getDisplayName().getString());
+            String chatDataJSON = ChatDataManager.getServerInstance().GetLightChatData(player.getStringUUID());
             byte[] compressedData = Compression.compressString(chatDataJSON);
             if (compressedData == null) {
                 LOGGER.error("Failed to compress chat data.");
@@ -609,6 +609,7 @@ public class ServerPackets {
 
                 String ambientMessage = nearbyMobContext(sourceEntity, sourceMessage);
                 if (generate_ambient_chat("N/A", mobChatData, player, mob, ambientMessage, config, false)) {
+                    mobChatData.rememberRumor(sourceEntity.getDisplayName().getString() + " said nearby: " + cleanAmbientInput(sourceMessage));
                     remainingResponses--;
                     if (remainingResponses <= 0) {
                         break;
@@ -681,6 +682,11 @@ public class ServerPackets {
             buffer.writeUtf(entry.getKey()); // Write the key (playerName)
             PlayerData data = entry.getValue();
             buffer.writeInt(data.friendship); // Write PlayerData field(s)
+            buffer.writeInt(data.socialReputation);
+            buffer.writeInt(data.helpfulActions);
+            buffer.writeInt(data.harmfulActions);
+            buffer.writeInt(data.socialEventCount);
+            buffer.writeUtf(data.socialSummary == null ? "" : data.socialSummary);
         }
     }
 

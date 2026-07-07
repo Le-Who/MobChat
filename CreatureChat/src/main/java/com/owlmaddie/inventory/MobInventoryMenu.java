@@ -6,6 +6,8 @@ package com.owlmaddie.inventory;
 import com.owlmaddie.chat.ChatDataManager;
 import com.owlmaddie.chat.EntityChatData;
 import com.owlmaddie.chat.PlayerData;
+import com.owlmaddie.chat.SocialEventRecorder;
+import com.owlmaddie.chat.SocialEventType;
 import com.owlmaddie.chat.AdvancementHelper;
 import com.owlmaddie.network.ServerPackets;
 import net.minecraft.server.level.ServerLevel;
@@ -52,15 +54,13 @@ public class MobInventoryMenu extends AbstractContainerMenu {
         this.serverPlayer = player;
         ChatDataManager chatDataManager = player == null ? ChatDataManager.getClientInstance() : ChatDataManager.getServerInstance();
         EntityChatData chatData = chatDataManager.getOrCreateChatData(mob.getStringUUID());
-        String playerName;
         if (player != null) {
-            playerName = player.getDisplayName().getString();
+            this.playerData = chatData.getPlayerData(player);
         } else if (playerInventory.player != null) {
-            playerName = playerInventory.player.getDisplayName().getString();
+            this.playerData = chatData.getPlayerData(playerInventory.player.getStringUUID(), playerInventory.player.getDisplayName().getString());
         } else {
-            playerName = "";
+            this.playerData = chatData.getPlayerData("");
         }
-        this.playerData = chatData.getPlayerData(playerName);
         if (player != null && playerData.friendship > 0 && !playerData.openedInventory) {
             playerData.openedInventory = true;
             AdvancementHelper.openSesame(player);
@@ -195,19 +195,23 @@ public class MobInventoryMenu extends AbstractContainerMenu {
             if (!added.isEmpty() || !removed.isEmpty() || !disarmedToInventory.isEmpty() || !disarmedTaken.isEmpty() || swapped || handChanged) {
                 ChatDataManager chatDataManager = ChatDataManager.getServerInstance();
                 EntityChatData chatData = chatDataManager.getOrCreateChatData(mob.getStringUUID());
-                PlayerData pd = chatData.getPlayerData(player.getDisplayName().getString());
+                PlayerData pd = player instanceof ServerPlayer sp
+                        ? chatData.getPlayerData(sp)
+                        : chatData.getPlayerData(player.getStringUUID(), player.getDisplayName().getString());
                 if (pd.wordsmithActive) {
                     pd.wordsmithGaveItem = true;
                 }
                 String verbBase = pd.friendship >= 3 ? "borrowed" : pd.friendship == 2 ? "took" : "stole";
                 String verb = " " + verbBase + " ";
                 if (!removed.isEmpty()) {
+                    SocialEventRecorder.record(chatData, serverPlayer, SocialEventType.ITEM_TAKEN, "Player took items from inventory.");
                     AdvancementHelper.itemTaken(serverPlayer, pd);
                     if (removed.containsKey(Items.DIAMOND)) {
                         AdvancementHelper.theHeist(serverPlayer);
                     }
                 }
                 if (!added.isEmpty() && pd.friendship > 0) {
+                    SocialEventRecorder.record(chatData, serverPlayer, SocialEventType.GIFT_GIVEN, "Player gave items to inventory.");
                     pd.gaveItem = true;
                     AdvancementHelper.checkSharedStash(serverPlayer);
                 }

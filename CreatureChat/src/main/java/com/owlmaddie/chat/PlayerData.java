@@ -8,6 +8,8 @@ package com.owlmaddie.chat;
  * specifically tracking their friendship level.
  */
 public class PlayerData {
+    private static final int MAX_SOCIAL_SUMMARY_CHARS = 180;
+
     public int friendship;
     public int lastDamageFriendship;
     public int signFlipCount;
@@ -29,6 +31,11 @@ public class PlayerData {
     public boolean wordsmithDamaged;
     public int messageCount;
     public boolean wasInOverworld;
+    public int socialReputation;
+    public int helpfulActions;
+    public int harmfulActions;
+    public int socialEventCount;
+    public String socialSummary;
 
     public PlayerData() {
         this.friendship = 0;
@@ -52,5 +59,49 @@ public class PlayerData {
         this.wordsmithDamaged = false;
         this.messageCount = 0;
         this.wasInOverworld = false;
+        this.socialReputation = 0;
+        this.helpfulActions = 0;
+        this.harmfulActions = 0;
+        this.socialEventCount = 0;
+        this.socialSummary = "";
+    }
+
+    public void recordSocialEvent(SocialEventType type, String summary) {
+        if (type == null) {
+            return;
+        }
+        int delta = type.getReputationDelta();
+        this.socialReputation += delta;
+        if (delta > 0) {
+            this.helpfulActions++;
+        } else if (delta < 0) {
+            this.harmfulActions++;
+        }
+        this.socialEventCount++;
+        if (summary != null && !summary.trim().isEmpty()) {
+            this.socialSummary = truncate(summary.trim().replace("\n", " "));
+        }
+    }
+
+    public void recordFriendshipShift(int oldFriendship, int newFriendship) {
+        int delta = newFriendship - oldFriendship;
+        if (delta == 0) {
+            return;
+        }
+        this.socialReputation += delta;
+        if (delta > 0) {
+            this.helpfulActions++;
+            this.socialSummary = "Friendship improved from " + oldFriendship + " to " + newFriendship + ".";
+        } else {
+            this.harmfulActions++;
+            this.socialSummary = "Friendship dropped from " + oldFriendship + " to " + newFriendship + ".";
+        }
+        this.socialEventCount++;
+    }
+
+    private static String truncate(String value) {
+        return value.length() > MAX_SOCIAL_SUMMARY_CHARS
+                ? value.substring(0, MAX_SOCIAL_SUMMARY_CHARS - 3) + "..."
+                : value;
     }
 }

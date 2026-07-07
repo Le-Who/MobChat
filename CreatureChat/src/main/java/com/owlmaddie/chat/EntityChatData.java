@@ -36,6 +36,7 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -93,6 +94,7 @@ public class EntityChatData {
     public List<ChatMessage> previousMessages;
     public String mood;
     public List<String> memories;
+    public List<MemoryEntry> memoryEntries;
     public String homeDimension;
     public int homeX;
     public int homeY;
@@ -126,6 +128,7 @@ public class EntityChatData {
         this.previousMessages = new ArrayList<>();
         this.mood = "";
         this.memories = new ArrayList<>();
+        this.memoryEntries = new ArrayList<>();
         this.homeDimension = "";
         this.homeX = 0;
         this.homeY = 0;
@@ -147,6 +150,17 @@ public class EntityChatData {
         }
         if (this.memories == null) {
             this.memories = new ArrayList<>();
+        }
+        if (this.memoryEntries == null) {
+            this.memoryEntries = new ArrayList<>();
+        }
+        if (this.memoryEntries.isEmpty() && !this.memories.isEmpty()) {
+            for (String memory : this.memories) {
+                addMemoryEntry(memory);
+            }
+            syncLegacyMemories();
+        } else {
+            syncLegacyMemories();
         }
         if (this.mood == null) {
             this.mood = "";
@@ -220,12 +234,47 @@ public class EntityChatData {
                 continue;
             }
             String cleanedMemory = truncateString(memory.trim().replace("\n", " "), MAX_MEMORY_CHARS);
-            this.memories.remove(cleanedMemory);
-            this.memories.add(cleanedMemory);
+            addMemoryEntry(cleanedMemory);
         }
-        while (this.memories.size() > MAX_MEMORY_ENTRIES) {
-            this.memories.remove(0);
+        syncLegacyMemories();
+    }
+
+    private void addMemoryEntry(String memory) {
+        if (memory == null || memory.trim().isEmpty()) {
+            return;
         }
+        if (this.memoryEntries == null) {
+            this.memoryEntries = new ArrayList<>();
+        }
+        MemoryEntry newEntry = new MemoryEntry(truncateString(memory.trim().replace("\n", " "), MAX_MEMORY_CHARS));
+        this.memoryEntries.removeIf(entry -> entry != null && entry.normalizedKey().equals(newEntry.normalizedKey()));
+        this.memoryEntries.add(newEntry);
+        while (this.memoryEntries.size() > MAX_MEMORY_ENTRIES) {
+            this.memoryEntries.remove(0);
+        }
+    }
+
+    private void syncLegacyMemories() {
+        if (this.memories == null) {
+            this.memories = new ArrayList<>();
+        }
+        this.memories.clear();
+        if (this.memoryEntries == null) {
+            return;
+        }
+        for (MemoryEntry entry : this.memoryEntries) {
+            if (entry != null && entry.text != null && !entry.text.isEmpty()) {
+                this.memories.add(entry.text);
+            }
+        }
+    }
+
+    public void rememberRumor(String rumor) {
+        if (rumor == null || rumor.trim().isEmpty()) {
+            return;
+        }
+        addMemoryEntry("Rumor: " + truncateString(rumor.trim().replace("\n", " "), MAX_MEMORY_CHARS));
+        syncLegacyMemories();
     }
 
     // Migrate old data into the new structure
@@ -254,27 +303,54 @@ public class EntityChatData {
         this.legacyFriendship = null;
     }
 
+    public static String getPlayerKey(ServerPlayer player) {
+        return player == null ? "" : player.getStringUUID();
+    }
+
+    public static String describeMaturity(boolean isBaby) {
+        return isBaby ? "Baby" : "Adult";
+    }
+
+    private static String getEntityMaturity(Mob entity) {
+        return describeMaturity(entity instanceof AgeableMob ageable && ageable.isBaby());
+    }
+
+    public PlayerData getPlayerData(ServerPlayer player) {
+        return getPlayerData(getPlayerKey(player), player == null ? "" : player.getDisplayName().getString());
+    }
+
     // Get the player data (or fallback to the blank player)
     public PlayerData getPlayerData(String playerName) {
+        return getPlayerData(playerName, "");
+    }
+
+    public PlayerData getPlayerData(String playerKey, String legacyPlayerName) {
         if (this.players == null) {
-            return new PlayerData();
+            this.players = new HashMap<>();
         }
 
-        // Check if the playerId exists in the players map
+        String normalizedKey = playerKey == null ? "" : playerKey;
+        String normalizedLegacyName = legacyPlayerName == null ? "" : legacyPlayerName;
+
+        if (!normalizedKey.isEmpty() && this.players.containsKey(normalizedKey)) {
+            return this.players.get(normalizedKey);
+        }
+
+        if (!normalizedKey.isEmpty() && !normalizedLegacyName.isEmpty() && this.players.containsKey(normalizedLegacyName)) {
+            PlayerData migrated = this.players.remove(normalizedLegacyName);
+            this.players.put(normalizedKey, migrated);
+            return migrated;
+        }
+
         if (this.players.containsKey("")) {
-            // If a blank migrated legacy entity is found, always return this
+            // Legacy single-player save data uses a blank key; keep it stable until an explicit UUID entry exists.
             return this.players.get("");
-
-        } else if (this.players.containsKey(playerName)) {
-            // Return a specific player's data
-            return this.players.get(playerName);
-
-        } else {
-            // Return a blank player data
-            PlayerData newPlayerData = new PlayerData();
-            this.players.put(playerName, newPlayerData);
-            return newPlayerData;
         }
+
+        String key = !normalizedKey.isEmpty() ? normalizedKey : normalizedLegacyName;
+        PlayerData newPlayerData = new PlayerData();
+        this.players.put(key, newPlayerData);
+        return newPlayerData;
     }
 
     // Generate light version of chat data (no previous messages)
@@ -293,6 +369,32 @@ public class EntityChatData {
         }
 
         return "N/A";
+    }
+
+    public String getShortGreetingOrFallback(String fallback) {
+        String shortGreeting = firstUsableCharacterProp("Short Greeting", "Greeting");
+        if (!shortGreeting.isEmpty()) {
+            return shortGreeting.replace("\n", " ");
+        }
+        return fallback == null ? "" : fallback.replace("\n", " ");
+    }
+
+    private String firstUsableCharacterProp(String... propertyNames) {
+        for (String propertyName : propertyNames) {
+            String value = getCharacterProp(propertyName);
+            if (isUsableCharacterProp(value)) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private static boolean isUsableCharacterProp(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return !trimmed.isEmpty() && !"N/A".equalsIgnoreCase(trimmed);
     }
 
     // Get list of status effects for player (handle different Minecraft versions)
@@ -391,22 +493,25 @@ public class EntityChatData {
         contextData.put("entity_skills", getCharacterProp("Skills"));
         contextData.put("entity_background", getCharacterProp("Background"));
         contextData.put("entity_mood", this.mood == null || this.mood.isEmpty() ? "neutral" : this.mood);
-        if (this.memories == null || this.memories.isEmpty()) {
+        if (this.memoryEntries == null || this.memoryEntries.isEmpty()) {
             contextData.put("entity_memories", "none");
         } else {
-            contextData.put("entity_memories", String.join("; ", this.memories));
+            contextData.put("entity_memories", this.memoryEntries.stream()
+                    .filter(entry -> entry != null && entry.text != null && !entry.text.isEmpty())
+                    .map(MemoryEntry::toPromptString)
+                    .collect(Collectors.joining("; ")));
         }
-        if (entity.tickCount < 0) {
-            contextData.put("entity_maturity", "Baby");
-        } else {
-            contextData.put("entity_maturity", "Adult");
-        }
+        contextData.put("entity_maturity", getEntityMaturity(entity));
 
-        PlayerData playerData = this.getPlayerData(player.getDisplayName().getString());
+        PlayerData playerData = this.getPlayerData(player);
         if (playerData != null) {
             contextData.put("entity_friendship", String.valueOf(playerData.friendship));
+            contextData.put("player_social_reputation", String.valueOf(playerData.socialReputation));
+            contextData.put("player_social_summary", playerData.socialSummary == null || playerData.socialSummary.isEmpty() ? "none" : playerData.socialSummary);
         } else {
             contextData.put("entity_friendship", String.valueOf(0));
+            contextData.put("player_social_reputation", "0");
+            contextData.put("player_social_summary", "none");
         }
 
         return contextData;
@@ -434,15 +539,15 @@ public class EntityChatData {
         Map<String, String> contextData = getPlayerContext(player, userLanguage, config);
 
         // fetch HTTP response from ChatGPT
-        ChatGPTRequest.fetchMessageFromChatGPT(config, promptText, contextData, previousMessages, false).thenAccept(output_message -> {
+        ChatGPTRequest.fetchMessageFromChatGPT(config, promptText, contextData, previousMessages, ChatGPTRequest.StructuredOutputMode.CHARACTER).thenAccept(output_message -> {
             try {
                 if (output_message != null) {
                     // Character Sheet: Remove system-character message from previous messages
                     previousMessages.clear();
 
                     // Add NEW CHARACTER sheet & greeting
-                    this.characterSheet = output_message;
-                    String shortGreeting = Optional.ofNullable(getCharacterProp("short greeting")).filter(s -> !s.isEmpty()).orElse(Randomizer.getRandomNoResponse().comp().getString()).replace("\n", " ");
+                    this.characterSheet = CharacterSheetNormalizer.normalize(output_message);
+                    String shortGreeting = getShortGreetingOrFallback(Randomizer.getRandomNoResponse().comp().getString());
                     this.addMessage(shortGreeting, ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt);
 
                 } else {
@@ -523,10 +628,10 @@ public class EntityChatData {
         Map<String, String> contextData = getPlayerContext(player, userLanguage, config);
 
         // Get messages for player
-        PlayerData playerData = this.getPlayerData(player.getDisplayName().getString());
+        PlayerData playerData = this.getPlayerData(player);
         if (previousMessages.size() == 1) {
             // No messages exist yet for this player (start with normal greeting)
-            String shortGreeting = Optional.ofNullable(getCharacterProp("short greeting")).filter(s -> !s.isEmpty()).orElse(Randomizer.getRandomNoResponse().comp().getString()).replace("\n", " ");
+            String shortGreeting = getShortGreetingOrFallback(Randomizer.getRandomNoResponse().comp().getString());
             previousMessages.add(0, new ChatMessage(shortGreeting, ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
         }
 
@@ -547,7 +652,9 @@ public class EntityChatData {
                         float entitySpeedFast = Mth.clamp(entitySpeed * 1.3F, 0.5f, 1.3f);
 
                         // Apply behaviors (if any)
-                        for (Behavior behavior : result.getBehaviors()) {
+                        boolean ambientContext = isAmbientContext(userMessage);
+                        List<Behavior> allowedBehaviors = BehaviorPolicy.filterAllowed(result.getBehaviors(), playerData, ambientContext, hasHome());
+                        for (Behavior behavior : allowedBehaviors) {
                             LOGGER.info("Behavior: " + behavior.getName() + (behavior.getArgument() != null ?
                                     ", Argument: " + behavior.getArgument() : ""));
 
@@ -835,6 +942,7 @@ public class EntityChatData {
                                 }
 
                                 playerData.friendship = new_friendship;
+                                playerData.recordFriendshipShift(old_friendship, new_friendship);
                                 if (playerData.attacking) {
                                     EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
                                     AdvancementHelper.calmTheStorm(player);
@@ -920,6 +1028,14 @@ public class EntityChatData {
 
     public static String truncateString(String input, int maxLength) {
         return input.length() > maxLength ? input.substring(0, maxLength - 3) + "..." : input;
+    }
+
+    public static boolean isAmbientContext(String message) {
+        if (message == null) {
+            return false;
+        }
+        String trimmed = message.trim();
+        return trimmed.startsWith("[Nearby player chat.") || trimmed.startsWith("[Nearby mob chat.");
     }
 
     public static TR getSolutionMessage(int code) {
