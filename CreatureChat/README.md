@@ -1,123 +1,216 @@
-# CreatureChat™
+# CreatureChat(TM) - MobChat Fork
 
-## Chat with any mob in Minecraft! All creatures can talk & react using AI!
+Chat with any mob in Minecraft. Creatures can speak, remember players, react to events, and execute AI-driven behaviors through a configured LLM provider.
 
 ## Fork Notice
 
-This repository contains the MobChat fork of CreatureChat: <https://github.com/Le-Who/MobChat>. It was originally based on CreatureChat, but this codebase has diverged and should not be treated as the public upstream release. Build, install, and support this fork from the MobChat repository.
+This repository contains the MobChat fork of CreatureChat: <https://github.com/Le-Who/MobChat>. It started from CreatureChat, but this codebase has diverged and should be treated as its own project. Build, install, configure, and support this fork from the MobChat repository and local server configuration, not from upstream CreatureChat services.
 
-### Features
-- **AI-Driven Chats:** Using ChatGPT or open-source AI models, each conversation is unique and engaging!
-- **Behaviors:** Creatures can make decisions on their own and **Follow, Flee, Attack, Protect**, and more!
-- **Reactions:** Creatures automatically react to being damaged, shown items, or receiving or loosing items.
-- **Friendship:** Track your relationships from friends to foes.
-- **Multi-Player:** Share the experience; conversations sync across server & players.
-- **Memory:** Creatures remember your past interactions, making each chat more personal.
-- **Inventory:** Every mob has an inventory with random loot. Give items to your friends or take items to create enemies.
-- **Advancements:** Earn unique CreatureChat milestones as your friendships progress.
+## Features
 
-### Create meaningful conversations and enduring friendships? A betrayal perhaps?
+- **AI-driven mob conversations:** Each mob can generate contextual chat through an OpenAI-compatible LLM endpoint.
+- **Structured AI output:** Chat and character generation use strict JSON schemas to reduce malformed replies and keep behavior parsing predictable.
+- **Mob behavior actions:** Creatures can follow, flee, attack, protect, wait, return home, guard home, and react through the behavior system.
+- **Character sheets:** New mobs can receive generated names, personalities, classes, skills, likes, dislikes, alignment, background, and greeting text.
+- **Memory and relationships:** Mobs remember player interactions, social events, friendship changes, harmful actions, and recent context.
+- **Automatic reactions:** Mobs can react to damage, item showing/giving/taking, arrivals, proximity chat, and mob-to-mob chat.
+- **Cost controls:** Automatic responses have cooldowns and Gemini usage is preflight-limited before HTTP requests to avoid avoidable rate-limit freezes.
+- **Inventories and loot:** Every mob has an inventory backed by generated per-biome loot tables.
+- **Multiplayer sync:** Chat bubbles, messages, inventory UI, and entity chat state are synchronized for server players.
+- **Advancements:** Players can unlock CreatureChat milestones as relationships develop.
 
 ![CreatureChat screenshot](src/main/resources/assets/creaturechat/screenshots/video-thumbnail.jpeg)
 
-## Installation Instructions
-### Fabric (Recommended)
+## Supported Runtime
 
-1. **Install Fabric Loader & API:** Follow the instructions [here](https://fabricmc.net/use/).
-2. **Install CreatureChat Mod:** Build this fork locally, then copy `creaturechat-*.jar` and `fabric-api-*.jar` into your `.minecraft/mods` folder.
-3. **Launch Minecraft** with the Fabric profile.
-4. **Configure AI:** A LLM (large language model) is required for generating text (AI options **listed below**)
+- Minecraft target in this branch: `1.20.1`
+- Loader: Fabric Loader with Fabric API
+- Java source/target compatibility: Java 17
+- Gradle toolchain configured locally in `gradle.properties`
+- Version-specific source overrides live under `src/vs/` and are applied by the Gradle build when a newer Minecraft target needs patched source files.
 
-### Forge (with Sinytra Connector)
-*NOTE: Sintra Connector only supports Minecraft 1.20.1.*
+## Build
 
-1. **Install Forge:** Download [Forge Installer](https://files.minecraftforge.net/), run it, select "Install client".
-2. **Install Forgified Fabric API:** Download [Forgified Fabric API](https://curseforge.com/minecraft/mc-mods/forgified-fabric-api) and copy the `*.jar` into your `.minecraft/mods` folder.
-3. **Install Sinytra Connector:** Download [Sinytra Connector](https://www.curseforge.com/minecraft/mc-mods/sinytra-connector) and copy the `*.jar` into your `.minecraft/mods` folder.
-4. **Install CreatureChat Mod:** Build this fork locally, then copy `creaturechat-*.jar` into your `.minecraft/mods` folder.
-6. **Launch Minecraft** with the Forge profile.
-7. **Configure AI:** A LLM (large language model) is required for generating text (AI options **listed below**)
+From `CreatureChat/`:
 
-## AI Options
-CreatureChat™ **requires** an AI / LLM (large language model) to generate text (characters and chat). There are many different
-options for connecting an LLM. 
+```powershell
+.\gradlew.bat build
+```
 
-1. **Free & Local**: Use open-source and free-to-use LLMs without any API fees. [**Difficulty: Hard**]
-2. **Bring Your Own Key**: Use your own API key from providers like OpenAI or Groq. [**Difficulty: Medium**]
+The remapped mod jar is written to:
 
-### 1. Free & Local
-CreatureChat™ fully supports **free and open-source** LLMs. To get started:
+```text
+CreatureChat/build/libs/creaturechat-3.0.0+1.20.1.jar
+```
 
-- An HTTP endpoint compatible with the OpenAI Chat Completion JSON syntax is required. We highly recommend using:
-  - [Ollama](https://ollama.com/) & [LiteLLM](https://litellm.vercel.app/) as your HTTP proxy.
-  - **LiteLLM Features:**
-    - Supports over **100+ LLMs** (e.g., Anthropic, VertexAI, HuggingFace, Google Gemini, and Ollama).
-    - Proxies them through a local HTTP endpoint compatible with CreatureChat.
-    - **Note:** Running a local LLM on your computer requires a powerful GPU.
-  - Open the OP-only setup screen in-game with `/creaturechat setup`, select `Ollama` or `LiteLLM`, then set the endpoint, exact model id, and timeout.
-  - Check your local server logs if the endpoint cannot be reached.
+For targeted checks:
 
-### 2. Bring Your Own Key
-For those already using a third-party API (e.g., OpenAI, Google AI Studio, OpenRouter, Groq):
+```powershell
+.\gradlew.bat test
+.\gradlew.bat test --tests com.owlmaddie.tests.ChatGPTRequestUsageLimitTests
+```
 
-- Integrate your own API key for seamless connectivity.
-- Costs depend on the provider’s usage-based pricing model.
-- By default, CreatureChat™ uses the OpenAI-compatible chat completions request format.
-- Be aware that OpenAI’s developer API does not include free usage. Please review the [OpenAI pricing](https://openai.com/api/pricing/) for detailed information.
-- Start the OP-only setup screen in-game:
-  - `/creaturechat setup`
-- Select a provider preset, enter one or more API keys, enter one or more exact model ids, then use `Save` and `Test`.
-- Example Google AI Studio models: `gemini-3.5-flash,gemini-3.5-pro`. You can enter any exact model ids because provider model names change over time.
+## Installation
 
-### In-game Commands / Configuration
-- **RECOMMENDED:** `/creaturechat setup`
-  - Opens the OP-only setup screen for players. The screen saves values to the server world's `creaturechat.json` and never sends stored API keys back to the client.
-- **FALLBACK:** `/creaturechat setup provider|key|model|url|timeout|show|test ...`
-  - Text-command setup is still available for console use, scripts, or servers where opening the screen is not convenient.
-- **OPTIONAL:** `/creaturechat url set "<url>"`
-  - Sets the URL of the API used to make LLM requests. Defaults to `"https://api.openai.com/v1/chat/completions"`.
-- **OPTIONAL:** `/creaturechat model set <model>`
-  - Sets the model used for generating responses in chats. Comma-separated model lists enable fallback rotation.
-- **OPTIONAL:** `/creaturechat timeout set <seconds>`
-  - Sets the timeout (in seconds) for API HTTP requests. Defaults to `10` seconds.
-- **OPTIONAL:** `/creaturechat whitelist <entityType | all | clear>` - Show chat bubbles
-  - Shows chat bubbles for the specified entity type or all entities, or clears the whitelist.
-- **OPTIONAL:** `/creaturechat blacklist <entityType | all | clear>` - Hide chat bubbles
-  - Hides chat bubbles for the specified entity type or all entities, or clears the blacklist.
-- **OPTIONAL:** `/story set "<story-text>"`
-  - Sets a custom story (included in character creation and chat prompts).
-- **OPTIONAL:** `/story display | clear`
-  - Display or clear the current story.
+### Fabric
 
-#### Configuration Scope (default | server):
-- **OPTIONAL:** Specify the configuration scope at the end of each command to determine where settings should be applied:
-  - **Default Configuration (`--config default`):** Applies the configuration universally, unless overridden by a server-specific configuration.
-  - **Server-Specific Configuration (`--config server`):** Applies the configuration only to the server where the command is executed.
-  - If the `--config` option is not specified, the `default` configuration scope is assumed.
+1. Install Fabric Loader and Fabric API for the target Minecraft version.
+2. Build this fork locally.
+3. Copy `creaturechat-*.jar` and the matching `fabric-api-*.jar` into `.minecraft/mods`.
+4. Launch Minecraft with the Fabric profile.
+5. Configure an LLM provider in-game with `/creaturechat setup`.
 
-### Screenshots
+### Forge With Sinytra Connector
+
+Sinytra Connector support is only expected for Minecraft `1.20.1`.
+
+1. Install Forge.
+2. Install Forgified Fabric API.
+3. Install Sinytra Connector.
+4. Build this fork locally and copy `creaturechat-*.jar` into `.minecraft/mods`.
+5. Launch Minecraft with the Forge profile.
+6. Configure an LLM provider with `/creaturechat setup`.
+
+## AI Provider Setup
+
+CreatureChat requires an LLM for generated character sheets and chat replies. The mod sends OpenAI-compatible chat completions requests, so providers should expose an OpenAI-compatible endpoint.
+
+Recommended setup path:
+
+```text
+/creaturechat setup
+```
+
+The setup screen is OP-only. It saves values to the server world's `creaturechat.json` and does not send stored API keys back to the client.
+
+Provider presets currently include:
+
+- `openai`
+- `ai-studio` for Google AI Studio through the Gemini OpenAI-compatible endpoint
+- `openrouter`
+- `groq`
+- `ollama`
+- `litellm`
+
+Console/script fallback:
+
+```text
+/creaturechat setup provider ai-studio
+/creaturechat setup key <key1,key2>
+/creaturechat setup model gemini-3.1-flash-lite
+/creaturechat setup outputtokens 1024
+/creaturechat setup test
+/creaturechat setup show
+```
+
+You can enter multiple comma-separated API keys or models. The request layer rotates candidates when local quota checks or provider errors make the active candidate unavailable.
+
+## Google AI Studio / Gemini Notes
+
+The `ai-studio` preset uses:
+
+```text
+https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+```
+
+Default model:
+
+```text
+gemini-3.1-flash-lite
+```
+
+This fork preflights Gemini usage before sending HTTP requests:
+
+- Default minute limit: `14 RPM`
+- Default daily limit: `450 RPD`
+- Default scope: `per_key`
+- Daily usage state file: `creaturechat_usage.json`
+
+Commands:
+
+```text
+/creaturechat setup geminirpm 14
+/creaturechat setup geminidaily 450
+/creaturechat setup geminiscope per_key
+```
+
+Use `geminiscope shared` if several configured keys belong to the same Google project and should share one local quota bucket. The usage file stores hashed key buckets and daily counts; it is runtime state and is ignored by Git.
+
+## Output Tokens And Thinking
+
+`maxOutputTokens` limits the generated response budget, not the input context. The default is `1024`. Structured JSON modes raise the effective floor when needed so character/chat JSON is less likely to be truncated.
+
+Gemini thinking level is configurable through the setup screen. The AI Studio preset defaults to `minimal`.
+
+## Gameplay Tuning
+
+Useful runtime knobs:
+
+```text
+/creaturechat setup damagecooldown 25
+/creaturechat outputtokens set <tokens>
+/creaturechat timeout set <seconds>
+/creaturechat model set <model1,model2>
+/creaturechat url set "<url>"
+```
+
+Damage-triggered AI replies have their own cooldown. Suppressed hits are summarized into the next allowed damage reaction so long fights do not generate a request for every hit.
+
+## Entity Visibility
+
+```text
+/creaturechat whitelist <entityType|all|clear>
+/creaturechat blacklist <entityType|all|clear>
+```
+
+Whitelist and blacklist commands control which entity types show CreatureChat bubbles.
+
+## Story Prompt
+
+```text
+/story set "<story-text>"
+/story display
+/story clear
+```
+
+The story text is included in character creation and chat prompts.
+
+## Configuration Scope
+
+Most setup commands accept an optional config scope:
+
+- `--config server`: save to the current server world's `creaturechat.json`
+- `--config default`: save to the default root config
+
+If omitted, legacy commands use the default scope unless the `/creaturechat setup ...` subcommand explicitly saves to the server config.
+
+## Development References
+
+- [Build Instructions](INSTALL.md)
+- [Contribution Guide](CONTRIBUTING.md)
+- [Player & Entity Icon Tutorial](ICONS.md)
+- [Privacy](PRIVACY.md)
+- [Terms](TERMS.md)
+
+## Screenshots
+
 ![Panda Following the Player](src/main/resources/assets/creaturechat/screenshots/panda-follow.jpeg)
 ![Piglins Reacting to Player](src/main/resources/assets/creaturechat/screenshots/piglin-reactions.jpeg)
 
-### Authors
+## Authors
 
 - MobChat fork maintainers
 - Original CreatureChat authors are retained in source headers and license metadata where applicable.
 
-### Contact & Resources
-
-- [Build Instructions](INSTALL.md)
-- [Player & Entity Icon Tutorial](ICONS.md)
-- Source code is maintained at <https://github.com/Le-Who/MobChat>.
-
-### License
+## License
 
 - [![REUSE Status](https://img.shields.io/badge/REUSE-compliant-brightgreen)](https://reuse.software)
-- **Source code:** [GNU GPL v3](LICENSE.md)
-- **Non-code assets:** [CC-BY-NC-SA-4.0](LICENSE-ASSETS.md)
+- Source code: [GNU GPL v3](LICENSE.md)
+- Non-code assets: [CC-BY-NC-SA-4.0](LICENSE-ASSETS.md)
 
-### Legal Notices
+## Legal Notices
 
 - Review [Terms](TERMS.md) and [Privacy](PRIVACY.md) before operating any public server or remote AI service with this fork.
-- CreatureChat™ is an independent project and is **not** endorsed by Mojang AB, Microsoft Corp., or OpenAI. *Minecraft®* is a trademark of Mojang AB. *ChatGPT®* is a trademark of OpenAI OpCo, LLC. All trademarks appear here for identification only.
-- *CreatureChat™* is a trademark of owlmaddie LLC (registration pending). Factual nominative references such as “Fork of CreatureChat” that do **not** imply endorsement are allowed; all other uses of the name or logo require prior permission.
+- CreatureChat(TM) is an independent project and is not endorsed by Mojang AB, Microsoft Corp., OpenAI, Google, or any LLM provider.
+- Minecraft(R) is a trademark of Mojang AB. ChatGPT(R) is a trademark of OpenAI OpCo, LLC. All trademarks appear here for identification only.
+- CreatureChat(TM) is a trademark of owlmaddie LLC (registration pending). Factual nominative references such as "Fork of CreatureChat" that do not imply endorsement are allowed; all other uses of the name or logo require prior permission.
