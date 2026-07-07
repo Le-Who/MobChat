@@ -21,6 +21,14 @@ public class PromptContractTests {
     }
 
     @Test
+    public void chatPromptRequiresSpokenDirectReplies() throws IOException {
+        String prompt = normalizedPrompt("system-chat");
+
+        assertTrue(prompt.contains("direct player messages are addressed to you"));
+        assertTrue(prompt.contains("answer greetings and friendship attempts with a spoken sentence"));
+    }
+
+    @Test
     public void characterPromptMakesAnimalSoundsFlavorOnly() throws IOException {
         String prompt = normalizedPrompt("system-character");
 

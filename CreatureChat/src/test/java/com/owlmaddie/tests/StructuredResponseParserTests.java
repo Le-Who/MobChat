@@ -86,6 +86,15 @@ public class StructuredResponseParserTests {
     }
 
     @Test
+    public void shortPreambleOnlyStructuredResponseIsSuppressed() {
+        ParsedMessage parsed = MessageParser.parseMessage("Here is the JSON");
+
+        assertEquals("", parsed.getCleanedMessage());
+        assertEquals("", parsed.getOriginalMessage());
+        assertTrue(parsed.getBehaviors().isEmpty());
+    }
+
+    @Test
     public void malformedStructuredJsonResponseIsSuppressed() {
         ParsedMessage parsed = MessageParser.parseMessage("{ \"message\": \"");
 

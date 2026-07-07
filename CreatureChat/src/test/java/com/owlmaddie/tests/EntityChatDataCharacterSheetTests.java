@@ -35,6 +35,23 @@ public class EntityChatDataCharacterSheetTests {
     }
 
     @Test
+    public void shortGreetingFallsBackWhenGreetingIsOnlyNonverbalEmote() {
+        EntityChatData data = new EntityChatData("entity-id");
+        data.characterSheet = """
+                - Name: Yen
+                - Short Greeting: "<looks away>"
+                """;
+
+        assertEquals("Hello there.", data.getShortGreetingOrFallback("Hello there."));
+    }
+
+    @Test
+    public void spokenFallbackNeverUsesNoResponseEmotes() {
+        assertEquals("Я задумался на миг. Скажи еще раз?", EntityChatData.getSpokenFallbackMessage("Русский (Россия)"));
+        assertEquals("I lost my words for a moment. Say that again?", EntityChatData.getSpokenFallbackMessage("English (US)"));
+    }
+
+    @Test
     public void structuredCharacterJsonNormalizesToLegacyCharacterSheet() {
         String normalized = CharacterSheetNormalizer.normalize("""
                 {

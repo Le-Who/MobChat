@@ -116,7 +116,17 @@ public class MessageParser {
                 .trim();
         return normalized.equals("here is the json requested")
                 || normalized.equals("here's the json requested")
+                || normalized.equals("here is the json")
+                || normalized.equals("here's the json")
+                || normalized.equals("here is your json")
+                || normalized.equals("here's your json")
                 || normalized.equals("here is the requested json")
+                || normalized.equals("here is the json request")
+                || normalized.equals("here's the json request")
+                || normalized.equals("here is your requested json")
+                || normalized.equals("here's your requested json")
+                || normalized.equals("the json")
+                || normalized.equals("json")
                 || normalized.equals("the requested json");
     }
 

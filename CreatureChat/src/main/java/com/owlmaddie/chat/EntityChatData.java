@@ -394,7 +394,26 @@ public class EntityChatData {
             return false;
         }
         String trimmed = value.trim();
-        return !trimmed.isEmpty() && !"N/A".equalsIgnoreCase(trimmed);
+        return isSpokenReplyCandidate(trimmed) && !"N/A".equalsIgnoreCase(trimmed);
+    }
+
+    public static boolean isSpokenReplyCandidate(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        return !trimmed.matches("^<[^<>]{1,80}>$");
+    }
+
+    public static String getSpokenFallbackMessage(String userLanguage) {
+        String normalized = userLanguage == null ? "" : userLanguage.toLowerCase(Locale.ROOT);
+        if (normalized.contains("рус") || normalized.contains("russian")) {
+            return "Я задумался на миг. Скажи еще раз?";
+        }
+        return "I lost my words for a moment. Say that again?";
     }
 
     // Get list of status effects for player (handle different Minecraft versions)
@@ -547,7 +566,7 @@ public class EntityChatData {
 
                     // Add NEW CHARACTER sheet & greeting
                     this.characterSheet = CharacterSheetNormalizer.normalize(output_message);
-                    String shortGreeting = getShortGreetingOrFallback(Randomizer.getRandomNoResponse().comp().getString());
+                    String shortGreeting = getShortGreetingOrFallback(getSpokenFallbackMessage(userLanguage));
                     this.addMessage(shortGreeting, ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt);
 
                 } else {
@@ -631,7 +650,7 @@ public class EntityChatData {
         PlayerData playerData = this.getPlayerData(player);
         if (previousMessages.size() == 1) {
             // No messages exist yet for this player (start with normal greeting)
-            String shortGreeting = getShortGreetingOrFallback(Randomizer.getRandomNoResponse().comp().getString());
+            String shortGreeting = getShortGreetingOrFallback(getSpokenFallbackMessage(userLanguage));
             previousMessages.add(0, new ChatMessage(shortGreeting, ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
         }
 
@@ -959,18 +978,21 @@ public class EntityChatData {
 
                     // Get cleaned message (i.e. no <BEHAVIOR> strings)
                     String cleanedMessage = result.getCleanedMessage();
-                    if (cleanedMessage.isEmpty()) {
-                        cleanedMessage = Randomizer.getRandomNoResponse().comp().getString();
+                    boolean syntheticFallbackMessage = false;
+                    if (!isSpokenReplyCandidate(cleanedMessage)) {
+                        cleanedMessage = getSpokenFallbackMessage(userLanguage);
+                        syntheticFallbackMessage = true;
                     }
 
                     // Add ASSISTANT message to history
                     this.addMessage(cleanedMessage, ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt);
 
                     // Update the last entry in previousMessages to use the original message
+                    String historyMessage = syntheticFallbackMessage ? cleanedMessage : result.getOriginalMessage();
                     this.previousMessages.set(this.previousMessages.size() - 1,
-                            new ChatMessage(result.getOriginalMessage(), ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
+                            new ChatMessage(historyMessage, ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
 
-                    if (allow_mob_to_mob_reactions && entity != null) {
+                    if (allow_mob_to_mob_reactions && entity != null && !syntheticFallbackMessage) {
                         ServerPackets.handleNearbyMobChat(player, entity, cleanedMessage, config);
                     }
 
