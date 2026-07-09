@@ -1,0 +1,105 @@
+// SPDX-FileCopyrightText: 2025 lewho LLC
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © lewho LLC - unauthorized use prohibited
+package com.lewho.i18n;
+
+import java.util.List;
+
+/**
+ * Central translation buckets for CreatureChat.
+ */
+public class CCText {
+    // UI text
+    public static final TR UI_CHAT_TITLE = new TR("ui.chat_title", "CreatureChat");
+    public static final TR UI_ENTER_MESSAGE = new TR("ui.enter_message", "Enter your message:");
+    public static final TR UI_HISTORY_TITLE = new TR("ui.history_title", "History");
+    public static final TR UI_HISTORY_EMPTY = new TR("ui.history_empty", "No chat history yet.");
+    public static final TR UI_HISTORY_NPC = new TR("ui.history_npc", "NPC");
+    public static final TR UI_HISTORY_PLAYER = new TR("ui.history_player", "Player");
+    public static final List<TR> UI_TEXT = List.of(
+            UI_CHAT_TITLE,
+            UI_ENTER_MESSAGE,
+            UI_HISTORY_TITLE,
+            UI_HISTORY_EMPTY,
+            UI_HISTORY_NPC,
+            UI_HISTORY_PLAYER
+    );
+
+    // Configuration command text
+    public static final TR CONFIG_CHATBUBBLE_ENABLED = new TR("config.chatbubble.enabled", "Player chat bubbles have been enabled.");
+    public static final TR CONFIG_CHATBUBBLE_DISABLED = new TR("config.chatbubble.disabled", "Player chat bubbles have been disabled.");
+    public static final TR CONFIG_CHATBUBBLE_UPDATE_FAILED = new TR("config.chatbubble.update_failed", "Failed to update player chat bubble setting.");
+    public static final TR CONFIG_SENDTOCHAT_ENABLED = new TR("config.send_to_chat.enabled", "Sending messages to chat has been enabled.");
+    public static final TR CONFIG_SENDTOCHAT_DISABLED = new TR("config.send_to_chat.disabled", "Sending messages to chat has been disabled.");
+    public static final TR CONFIG_SENDTOCHAT_UPDATE_FAILED = new TR("config.send_to_chat.update_failed", "Failed to update send messages to chat setting.");
+    public static final TR CONFIG_OVERHEAR_ENABLED = new TR("config.overhear.enabled", "You will see NPC replies to other players.");
+    public static final TR CONFIG_OVERHEAR_DISABLED = new TR("config.overhear.disabled", "You will no longer see NPC replies to other players.");
+    public static final TR CONFIG_OVERHEAR_STATUS_ENABLED = new TR("config.overhear.status_enabled", "NPC replies to other players are visible.");
+    public static final TR CONFIG_OVERHEAR_STATUS_DISABLED = new TR("config.overhear.status_disabled", "NPC replies to other players are hidden.");
+    public static final TR CONFIG_HELP = new TR("config.help",
+            "Commands:\n" +
+            " /creaturechat key set <value> [--config default|server]\n" +
+            " /creaturechat url set <value> [--config default|server]\n" +
+            " /creaturechat model set <value> [--config default|server]\n" +
+            " /creaturechat timeout set <value> [--config default|server]\n" +
+            " /creaturechat outputtokens set <value> [--config default|server]\n" +
+            " /creaturechat setup (opens OP setup screen for players)\n" +
+            " /creaturechat setup provider <openai|ai-studio|openrouter|groq|ollama|litellm>\n" +
+            " /creaturechat setup key <key1,key2>\n" +
+            " /creaturechat setup model <model1,model2>\n" +
+            " /creaturechat setup outputtokens <value>\n" +
+            " /creaturechat setup show\n" +
+            " /creaturechat setup test\n" +
+            " /creaturechat preset <provider> [--config default|server]\n" +
+            " /creaturechat config show\n" +
+            " /creaturechat config test\n" +
+            " /creaturechat story set <value> [--config default|server]\n" +
+            " /creaturechat story clear [--config default|server]\n" +
+            " /creaturechat story show\n" +
+            " /creaturechat whitelist <entity|all|clear> [--config default|server]\n" +
+            " /creaturechat blacklist <entity|all|clear> [--config default|server]\n" +
+            " /creaturechat chatbubble set <on|off> [--config default|server]\n" +
+            " /creaturechat send_to_chat set <on|off> [--config default|server]\n" +
+            " /creaturechat overhear <on|off|status>\n" +
+            "Optional: Append [--config default | server] to any command to specify configuration scope.\n\n" +
+            "Security: setup and admin tuning commands require level 4; overhear is available to players.");
+    public static final TR CONFIG_STORY_SET_SUCCESS = new TR("config.story.set_success", "Story set successfully: %s");
+    public static final TR CONFIG_STORY_SET_FAILED = new TR("config.story.set_failed", "Failed to set story!");
+    public static final TR CONFIG_STORY_CLEARED_SUCCESS = new TR("config.story.cleared_success", "Story cleared successfully!");
+    public static final TR CONFIG_STORY_CLEARED_FAILED = new TR("config.story.cleared_failed", "Failed to clear story!");
+    public static final TR CONFIG_STORY_NOT_SET = new TR("config.story.not_set", "No story is currently set.");
+    public static final TR CONFIG_STORY_SHOW = new TR("config.story.current", "Current story: %s");
+    public static final TR CONFIG_INVALID_SETTING_TYPE = new TR("config.invalid_setting_type", "Invalid type for setting %s");
+    public static final TR CONFIG_UNKNOWN_SETTING = new TR("config.unknown_setting", "Unknown configuration setting: %s");
+    public static final TR CONFIG_TIMEOUT_INVALID_TYPE = new TR("config.timeout_invalid_type", "Invalid type for timeout, must be Integer.");
+    public static final TR CONFIG_SETTING_SET_SUCCESS = new TR("config.setting.set_success", "%s Set Successfully!");
+    public static final TR CONFIG_SETTING_SET_FAILED = new TR("config.setting.set_failed", "%s Set Failed!");
+    public static final TR CONFIG_LIST_UPDATE_SUCCESS = new TR("config.list.update_success", "Successfully updated %s with %s");
+    public static final TR CONFIG_LIST_UPDATE_FAILED = new TR("config.list.update_failed", "Failed to update %s");
+    public static final List<TR> CONFIG_TEXT = List.of(
+            CONFIG_CHATBUBBLE_ENABLED,
+            CONFIG_CHATBUBBLE_DISABLED,
+            CONFIG_CHATBUBBLE_UPDATE_FAILED,
+            CONFIG_SENDTOCHAT_ENABLED,
+            CONFIG_SENDTOCHAT_DISABLED,
+            CONFIG_SENDTOCHAT_UPDATE_FAILED,
+            CONFIG_OVERHEAR_ENABLED,
+            CONFIG_OVERHEAR_DISABLED,
+            CONFIG_OVERHEAR_STATUS_ENABLED,
+            CONFIG_OVERHEAR_STATUS_DISABLED,
+            CONFIG_HELP,
+            CONFIG_STORY_SET_SUCCESS,
+            CONFIG_STORY_SET_FAILED,
+            CONFIG_STORY_CLEARED_SUCCESS,
+            CONFIG_STORY_CLEARED_FAILED,
+            CONFIG_STORY_NOT_SET,
+            CONFIG_STORY_SHOW,
+            CONFIG_INVALID_SETTING_TYPE,
+            CONFIG_UNKNOWN_SETTING,
+            CONFIG_TIMEOUT_INVALID_TYPE,
+            CONFIG_SETTING_SET_SUCCESS,
+            CONFIG_SETTING_SET_FAILED,
+            CONFIG_LIST_UPDATE_SUCCESS,
+            CONFIG_LIST_UPDATE_FAILED
+    );
+}

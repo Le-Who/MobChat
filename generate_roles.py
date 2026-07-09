@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 roles = {
     "Sheep": "A sheep. It has wool, hooves, and eats grass. It goes 'Baa'.",
@@ -78,5 +79,7 @@ roles = {
 # entity.getType().getName().getString() gives the localized name like "Sheep", "Zombie", etc.
 # We will use exactly those localized English names as keys.
 
-with open("e:/Projects/MobChat/CreatureChat/data/creaturechat/custom_roles.json", "w", encoding="utf-8") as f:
+output_path = Path(__file__).resolve().parent / "data" / "creaturechat" / "custom_roles.json"
+output_path.parent.mkdir(parents=True, exist_ok=True)
+with output_path.open("w", encoding="utf-8") as f:
     json.dump(roles, f, indent=4, ensure_ascii=False)

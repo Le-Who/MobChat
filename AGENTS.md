@@ -1,22 +1,37 @@
 # MobChat Agent Instructions
 
-These instructions apply to the whole `E:\Projects\MobChat` workspace. The `CreatureChat/AGENTS.md` file is closer to the mod source and overrides or narrows these rules when work is inside `CreatureChat/`.
+These instructions apply to the whole `E:\Projects\MobChat` workspace.
 
-## Scope And Identity
+## Project Identity
 
-- This repository is the MobChat fork of CreatureChat at `https://github.com/Le-Who/MobChat`.
-- Treat local files and this repository as authoritative. Do not use public upstream CreatureChat pages, Modrinth/CurseForge listings, Discord links, or upstream GitHub metadata as the source of truth unless the user explicitly asks for an upstream comparison.
+- This is the MobChat fork of CreatureChat at `https://github.com/Le-Who/MobChat`.
+- Local source, local docs, and server configuration are authoritative for this fork.
+- Do not use public upstream CreatureChat websites, Modrinth/CurseForge pages, Discord links, or upstream GitHub docs as authoritative unless the user explicitly asks for an upstream comparison.
 - AI Villager development is paused. The former `ai_villager/` compiled artifact tree and `ai_villager_src/` decompiled source tree are intentionally absent.
-- The active codebase is the Fabric mod under `CreatureChat/`.
+- Keep support links and setup guidance pointed at this repository and local/server configuration.
 
-## Repository Map
+## Current Runtime Shape
 
-- `CreatureChat/`: main Fabric mod project, Gradle wrapper, Java sources, resources, tests, docs, and build scripts.
-- `CreatureChat/src/main/java/com/lewho/`: shared/server-side mod logic.
-- `CreatureChat/src/client/java/com/lewho/`: client UI, rendering, packets, and client-only helpers.
-- `CreatureChat/src/main/resources/data/creaturechat/prompts/`: system prompts for chat, character generation, and quests.
-- `CreatureChat/src/main/resources/data/creaturechat/loot_tables/`: loot tables used by mob inventories.
-- `CreatureChat/src/vs/`: version-specific Java source overrides.
+- Default Minecraft target is defined by `minecraft_version` in `gradle.properties`.
+- Build system: Gradle with Fabric Loom.
+- Java source/target compatibility: Java 17.
+- Local Gradle toolchain path is configured in `gradle.properties`.
+- Official Mojang mappings are used through `loom.officialMojangMappings()`. Search and code with Mojang names such as `ServerPlayer`, `Mob`, `LivingEntity`, and `MinecraftServer`.
+- Version-specific source overrides live under `src/vs/vX_Y_Z/` and are applied by `build.gradle` when the target Minecraft version is greater than or equal to the folder version.
+
+## Folder Map
+
+- `src/main/java/com/lewho/chat/`: chat state, prompt flow, LLM request handling, memories, social events, usage limiting, and parsing helpers.
+- `src/main/java/com/lewho/commands/`: config loading/saving, provider presets, setup commands, custom roles.
+- `src/main/java/com/lewho/goals/`: AI-driven entity goals and `EntityBehaviorManager`.
+- `src/main/java/com/lewho/mixin/`: server/common mixins into Minecraft entities and chat hooks.
+- `src/main/java/com/lewho/network/`: server packets and server/client sync entry points.
+- `src/main/java/com/lewho/inventory/`: mob inventory menu, loot, and inventory behavior.
+- `src/client/java/com/lewho/`: client UI, rendering, packet handlers, particles, and screens.
+- `src/main/resources/data/creaturechat/prompts/`: LLM prompt templates.
+- `src/main/resources/assets/creaturechat/lang/`: translations.
+- `src/main/resources/data/creaturechat/loot_tables/`: loot tables used by mob inventories.
+- `src/test/java/com/lewho/tests/`: JUnit tests for parser, request, configuration, rate limit, behavior policy, and data classes.
 - `generate_roles.py`: local tooling for role data generation.
 - `.agents/` and `skills-lock.json`: local agent tooling, not product code.
 
@@ -29,50 +44,130 @@ These instructions apply to the whole `E:\Projects\MobChat` workspace. The `Crea
 - Do not commit or push unless the user asks for it.
 - For docs, keep README files human-facing and keep `AGENTS.md` focused on durable instructions for coding agents.
 
-## Build And Validation
+## Build Commands
 
-Run commands from `CreatureChat/` unless noted otherwise.
+Use the Gradle wrapper from the repository root.
 
 ```powershell
 .\gradlew.bat test
 .\gradlew.bat build
 ```
 
-Useful targeted test form:
+Targeted tests:
 
 ```powershell
+.\gradlew.bat test --tests com.lewho.tests.ChatGPTRequestStructuredOutputTests
 .\gradlew.bat test --tests com.lewho.tests.ChatGPTRequestUsageLimitTests
+.\gradlew.bat test --tests com.lewho.tests.DamageReactionRateLimitTests
 ```
 
-The built jar is written to:
+The release jar is generated under:
 
 ```text
-CreatureChat/build/libs/creaturechat-3.0.0+1.20.1.jar
+build/libs/creaturechat-<mod_version>+<minecraft_version>.jar
 ```
 
-Before claiming a change is complete, run the smallest relevant test set and, for source changes, a full `.\gradlew.bat build` when practical.
+Read `mod_version` and `minecraft_version` from `gradle.properties`; do not copy a hardcoded version from this file.
 
-## Runtime Configuration
+`build.sh` can build multiple Minecraft versions and may temporarily edit `gradle.properties` and `fabric.mod.json`. Prefer `.\gradlew.bat build` for ordinary validation unless the user asks for multi-version packaging.
 
-- Main config file: `creaturechat.json` in the server world root or default server root.
-- Runtime usage state: `creaturechat_usage.json`; it is ignored by Git and must not be committed.
-- OP setup command: `/creaturechat setup`.
-- AI provider setup supports OpenAI-compatible endpoints, provider presets, multiple API keys, multiple model IDs, output token budget, Gemini thinking level, and Gemini usage limits.
+## LLM And JSON Contracts
 
-## Safety And Secrets
+- `ChatGPTRequest` sends OpenAI-compatible chat completions requests.
+- `ChatGPTResponse`, `MessageParser`, and `CharacterSheetNormalizer` depend on strict structured JSON contracts.
+- Do not replace schema-backed chat or character generation with free-form text parsing.
+- Preserve the output modes in `ChatGPTRequest.StructuredOutputMode`: `NONE`, `CHAT`, and `CHARACTER`.
+- Structured output needs enough `max_tokens`; do not lower floors without tests proving chat and character JSON are not truncated.
+- `ChatGPTRequest.lastErrorMessage` must not leak raw API keys.
+- When adding provider support, prefer OpenAI-compatible request/response shapes already used by `ConfigurationPresets`.
 
-- Never print, commit, or persist raw API keys outside the intended config file.
-- Setup screen data must stay sanitized: stored API keys are not sent back to the client.
-- If adding logs around LLM requests, sanitize provider keys and keep response previews short.
-- Treat provider quota/rate-limit handling as cost-control code. Preserve `ApiUsageLimiter` behavior unless deliberately changing quota semantics.
+## Provider And Quota Handling
 
-## Documentation Expectations
+- Provider presets live in `ConfigurationPresets`.
+- Google AI Studio preset uses `gemini-3.1-flash-lite` and the Gemini OpenAI-compatible endpoint.
+- `ApiUsageLimiter` preflights Gemini usage before HTTP requests:
+  - default RPM: `14`
+  - default RPD: `450`
+  - default scope: `per_key`
+  - runtime state file: `creaturechat_usage.json`
+- `creaturechat_usage.json` is runtime state and must remain ignored by Git.
+- If multiple AI Studio keys belong to one Google project, admins can use `geminiscope shared`; otherwise `per_key` preserves key rotation.
+- Keep `429` handling as a fallback even when local preflight limiting exists.
 
-When changing user-visible behavior, update the closest relevant docs:
+## Configuration Surface
 
-- `CreatureChat/README.md` for player/admin setup or feature behavior.
-- `CreatureChat/INSTALL.md` for build/install flow.
-- `CreatureChat/CONTRIBUTING.md` for contributor workflow.
-- `CreatureChat/AGENTS.md` for recurring agent mistakes, routing guidance, test commands, or project-specific implementation rules.
+Primary player/admin path:
 
-Do not make `AGENTS.md` a changelog. Put release/user history in `CHANGELOG.md` when a user-visible mod behavior change needs release notes.
+```text
+/creaturechat setup
+```
+
+Important command-backed settings:
+
+```text
+/creaturechat setup provider <openai|ai-studio|openrouter|groq|ollama|litellm>
+/creaturechat setup key <key1,key2>
+/creaturechat setup model <model1,model2>
+/creaturechat setup outputtokens <value>
+/creaturechat setup damagecooldown <seconds>
+/creaturechat setup geminirpm <requests>
+/creaturechat setup geminidaily <requests>
+/creaturechat setup geminiscope <per_key|shared>
+/creaturechat setup show
+/creaturechat setup test
+```
+
+The setup screen must not echo stored API keys back to clients. `ConfigurationScreenData` is the sanitized DTO for that boundary.
+
+## Gameplay And State Rules
+
+- Use `EntityChatData` and `PlayerData` for persisted per-entity/per-player chat state.
+- Use `SocialEventRecorder` for player social events instead of manually changing summaries in random call sites.
+- Automatic reactions must be rate-limited. Check existing `ChatDataManager`, `AutoMessageBucket`, damage cooldown, ambient response, and Gemini usage limiter patterns before adding a new automatic LLM path.
+- Dynamic behavior should go through `EntityBehaviorManager` and existing goal classes. Do not mutate goal selectors from scattered code without checking existing manager behavior.
+- Mixins are high risk. Keep guards early, casts checked, and edits surgical. Avoid broad mixin changes unless the target method and version behavior are clear.
+- Server/world/entity mutations must stay on the server thread unless the Minecraft/Fabric API explicitly allows otherwise.
+
+## Version-Specific Overrides
+
+When Minecraft API differences require source changes:
+
+- Prefer a small helper class that can be overridden under `src/vs/`.
+- Avoid copying a large class into `src/vs/` when a narrow adapter would work.
+- If adding an override, verify the folder version naming and build output from the version-selection block in `build.gradle`.
+
+## Tests And Verification
+
+Add or update targeted tests for behavior changes when practical.
+
+Common test areas:
+
+- `ChatGPTRequestStructuredOutputTests`: request payloads, JSON schema, structured output diagnostics.
+- `ChatGPTRequestUsageLimitTests` and `GeminiUsageLimiterTests`: local quota and key rotation behavior.
+- `DamageReactionRateLimitTests`: combat-triggered auto reply cooldown.
+- `AmbientRateLimitTests`: proximity and mob-to-mob auto-response throttling.
+- `StructuredResponseParserTests`: parser behavior for structured responses and salvage paths.
+- `BehaviorPolicyTests`: server-side action arbitration.
+
+Before finishing source changes, run the relevant targeted tests and then `.\gradlew.bat build` when practical. For docs-only changes, at least run `git diff --check`.
+
+## Documentation Rules
+
+- Update `README.md` for player/admin setup and behavior changes.
+- Update `INSTALL.md` only for install/build changes.
+- Update `CONTRIBUTING.md` for contributor workflow changes.
+- Update `CHANGELOG.md` under `## Unreleased` for release-note-worthy user-visible behavior changes. Docs-only cleanups may skip the changelog unless the user asks for release notes.
+- When a user-visible change is intended to ship through the built jar or updater, bump `mod_version` in `gradle.properties` according to SemVer and move the relevant changelog notes into a dated `## [version] - YYYY-MM-DD` section before claiming the build is release/update-ready.
+- Keep docs specific to the MobChat fork. Do not restore upstream CreatureChat support links.
+- Do not make `AGENTS.md` a changelog. Put release/user history in `CHANGELOG.md` when a user-visible mod behavior change needs release notes.
+
+## SPDX And Licensing
+
+New Java files should start with the project SPDX header used by nearby files:
+
+```java
+// SPDX-FileCopyrightText: 2026 lewho LLC
+// SPDX-License-Identifier: GPL-3.0-or-later
+```
+
+If a file already carries the longer asset/trademark notice, preserve that style. Do not remove license headers.
