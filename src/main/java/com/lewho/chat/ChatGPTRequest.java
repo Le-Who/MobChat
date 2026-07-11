@@ -4,6 +4,8 @@
 package com.lewho.chat;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import com.lewho.commands.ConfigurationHandler;
 import com.lewho.json.ChatGPTResponse;
@@ -239,7 +241,11 @@ public class ChatGPTRequest {
 
     public static String parseAndLogErrorResponse(String errorResponse) {
         try {
-            ErrorResponse response = GSON.fromJson(errorResponse, ErrorResponse.class);
+            JsonElement root = JsonParser.parseString(errorResponse);
+            if (root.isJsonArray() && !root.getAsJsonArray().isEmpty()) {
+                root = root.getAsJsonArray().get(0);
+            }
+            ErrorResponse response = GSON.fromJson(root, ErrorResponse.class);
 
             if (response != null && response.error != null) {
                 LOGGER.error("Error Message: " + response.error.message);
@@ -250,7 +256,7 @@ public class ChatGPTRequest {
                 // Some gateways return {"message":"Internal server error"} or similar
                 try {
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> m = GSON.fromJson(errorResponse, Map.class);
+                    Map<String, Object> m = GSON.fromJson(root, Map.class);
                     Object msg = (m != null) ? m.get("message") : null;
                     if (msg instanceof String && !((String) msg).isEmpty()) {
                         LOGGER.error("Gateway error message: " + msg);
@@ -426,17 +432,6 @@ public class ChatGPTRequest {
                         if (statusCode == 429) {
                             usageLimiter.markProviderRateLimited(config, apiUrl, activeKey, modelName);
                         }
-                        if (shouldTryNextCandidate(statusCode, attempt, maxAttempts)) {
-                            LOGGER.warn("API request returned HTTP " + statusCode + ". Trying next API key/model candidate (attempt " + attempt + " of " + maxAttempts + ").");
-                            rotateCandidate(config, attempt, keyCount, modelCount);
-                            if (connection != null) {
-                                try {
-                                    connection.disconnect();
-                                } catch (Exception ignored) {}
-                            }
-                            continue;
-                        }
-
                         lastErrorCode = statusCode;
                         final String reason = connection.getResponseMessage() != null ? connection.getResponseMessage() : "";
 
@@ -477,6 +472,14 @@ public class ChatGPTRequest {
 
                             // Try known shapes first
                             String cleanError = parseAndLogErrorResponse(errorResponse.toString());
+
+                            if (shouldTryNextCandidate(statusCode, cleanError, attempt, maxAttempts)) {
+                                LOGGER.warn("API request returned HTTP " + statusCode + ". Trying next API key/model candidate (attempt " + attempt + " of " + maxAttempts + ").");
+                                rotateCandidate(config, attempt, keyCount, modelCount);
+                                connection.disconnect();
+                                continue;
+                            }
+                            cleanError = userFacingProviderError(cleanError);
 
                             // Build a richer message (status + reason + IDs + short body preview)
                             StringBuilder sb = new StringBuilder();
@@ -567,8 +570,11 @@ public class ChatGPTRequest {
         });
     }
 
-    private static boolean shouldTryNextCandidate(int statusCode, int attempt, int maxAttempts) {
+    private static boolean shouldTryNextCandidate(int statusCode, String providerError, int attempt, int maxAttempts) {
         if (attempt >= maxAttempts) {
+            return false;
+        }
+        if (isLocationRestrictionError(providerError)) {
             return false;
         }
         return statusCode == 400
@@ -579,6 +585,21 @@ public class ChatGPTRequest {
                 || statusCode == 409
                 || statusCode == 429
                 || statusCode >= 500;
+    }
+
+    private static boolean isLocationRestrictionError(String providerError) {
+        if (providerError == null) {
+            return false;
+        }
+        String normalized = providerError.toLowerCase(Locale.ENGLISH);
+        return normalized.contains("user location is not supported for the api use");
+    }
+
+    private static String userFacingProviderError(String providerError) {
+        if (isLocationRestrictionError(providerError)) {
+            return "Google AI Studio is unavailable from this network location. Use a supported network or choose another provider.";
+        }
+        return providerError;
     }
 
     private static void rotateCandidate(ConfigurationHandler.Config config, int attempt, int keyCount, int modelCount) {

@@ -139,6 +139,38 @@ public class ChatGPTRequestErrorTests {
     }
 
     @Test
+    public void googleLocationRestrictionIsNotRetriedAndReturnsActionableMessage() throws Exception {
+        List<String> authHeadersReceived = Collections.synchronizedList(new ArrayList<>());
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext(PATH, exchange -> {
+            String authorization = exchange.getRequestHeaders().getFirst("Authorization");
+            if (authorization != null) {
+                authHeadersReceived.add(authorization);
+            }
+
+            String body = "[{\"error\":{\"code\":400,\"message\":\"User location is not supported for the API use.\",\"status\":\"FAILED_PRECONDITION\"}}]";
+            byte[] response = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(400, response.length);
+            try (OutputStream output = exchange.getResponseBody()) {
+                output.write(response);
+            }
+        });
+        server.start();
+
+        String url = "http://localhost:" + server.getAddress().getPort() + PATH;
+        ConfigurationHandler.Config config = buildConfig(url);
+        config.setApiKey("key-one,key-two");
+        config.setModel("model-one,model-two");
+
+        executeRequest(config);
+        server.stop(0);
+
+        assertEquals(List.of("Bearer key-one"), authHeadersReceived);
+        assertEquals(400, ChatGPTRequest.lastErrorCode);
+        assertEquals("HTTP 400 Bad Request: Google AI Studio is unavailable from this network location. Use a supported network or choose another provider.", ChatGPTRequest.lastErrorMessage);
+    }
+
+    @Test
     public void outOfTokens() throws Exception {
         int code = 429;
         String message = "Rate limit exceeded";

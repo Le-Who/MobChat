@@ -169,6 +169,8 @@ Commands:
 
 Use `geminiscope shared` if several configured keys belong to the same Google project and should share one local quota bucket. The usage file stores hashed key buckets and daily counts; it is runtime state and is ignored by Git.
 
+Google AI Studio also enforces its own account and public-network location eligibility. If `/creaturechat setup test` reports that AI Studio is unavailable from the current network location, changing the API key, model, output-token limit, or thinking level will not resolve it. Use a network and Google account supported by AI Studio, or select another provider preset. See Google's [available-region requirements](https://ai.google.dev/gemini-api/docs/available-regions).
+
 ## Output Tokens And Thinking
 
 `maxOutputTokens` limits the generated response budget, not the input context. The default is `1024`. Structured JSON modes raise the effective floor when needed so character/chat JSON is less likely to be truncated.

@@ -6,6 +6,11 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.0.3] - 2026-07-11
+
+### Fixed
+- Handle Google AI Studio's location-restriction response before retrying other configured keys or models, and show an actionable explanation instead of a raw JSON error body.
+
 ## [3.0.2] - 2026-07-09
 
 ### Fixed
