@@ -6,7 +6,17 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
-## [3.0.3] - 2026-07-11
+## [3.0.4] - 2026-07-28
+
+### Fixed
+- Retry the same API key/model once on a transient connection timeout before reporting an error, so single-key setups recover from momentary API hangs without user intervention.
+- When multiple keys or models are configured, a timeout on one candidate now correctly rotates to the next candidate instead of failing immediately.
+- Remove stale keep-alive connection before retrying to avoid reusing a server-closed socket.
+
+### Changed
+- Log a concise warning (without full stack trace) for intermediate timeout retries; the full stack trace is logged only when all retry attempts are exhausted.
+
+
 
 ### Fixed
 - Handle Google AI Studio's location-restriction response before retrying other configured keys or models, and show an actionable explanation instead of a raw JSON error body.

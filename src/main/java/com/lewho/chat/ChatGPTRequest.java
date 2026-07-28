@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
@@ -344,6 +345,10 @@ public class ChatGPTRequest {
             int keyCount = Math.max(1, config.getApiKeyCount());
             int modelCount = Math.max(1, config.getModelCount());
             int maxAttempts = keyCount * modelCount;
+            // How many times to retry the same key/model on a transient connection failure
+            // before giving up or rotating to the next candidate.
+            final int MAX_CONNECTION_RETRIES = 1;
+            int connectionRetries = 0;
             boolean skippedByLocalUsageLimit = false;
             boolean attemptedRequest = false;
             long shortestRetryAfterMillis = Long.MAX_VALUE;
@@ -371,7 +376,7 @@ public class ChatGPTRequest {
                     // Replace placeholders
                     String systemMessage = replacePlaceholders(systemPrompt, contextData);
 
-                    URL url = new URL(apiUrl);
+                    URL url = URI.create(apiUrl).toURL();
                     connection = (HttpURLConnection) url.openConnection();
                     connection.setRequestMethod("POST");
                     connection.setRequestProperty("Content-Type", "application/json");
@@ -546,9 +551,28 @@ public class ChatGPTRequest {
                         return null;
                     }
                 } catch (SocketException | SocketTimeoutException ce) {
-                    LOGGER.warn("Connection failed", ce);
                     lastErrorMessage = "No Internet or Blocked Request: " + ce.getMessage();
                     lastErrorCode = -1;
+                    if (connection != null) {
+                        connection.disconnect();
+                    }
+                    if (attempt < maxAttempts) {
+                        // More key/model candidates available — rotate and try next.
+                        LOGGER.warn("Connection failed on attempt {} of {}, trying next candidate: {}",
+                                attempt, maxAttempts, ce.getMessage());
+                        rotateCandidate(config, attempt, keyCount, modelCount);
+                        connectionRetries = 0; // reset retry budget for the new candidate
+                        continue;
+                    }
+                    if (connectionRetries < MAX_CONNECTION_RETRIES) {
+                        // No other candidates, but failure may be transient — retry same key.
+                        connectionRetries++;
+                        LOGGER.warn("Connection timed out, retrying same candidate ({}/{}): {}",
+                                connectionRetries, MAX_CONNECTION_RETRIES, ce.getMessage());
+                        attempt--; // undo the loop's upcoming increment so we stay on this candidate
+                        continue;
+                    }
+                    LOGGER.warn("Connection failed", ce);
                     return null;
                 } catch (Exception e) {
                     LOGGER.error("Failed to request message", e);

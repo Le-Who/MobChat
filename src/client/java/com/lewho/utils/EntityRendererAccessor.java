@@ -15,7 +15,6 @@ import net.minecraft.world.entity.Entity;
 public final class EntityRendererAccessor {
     private EntityRendererAccessor() {}
 
-    @SuppressWarnings("unchecked")
     public static EntityRenderer<?> getEntityRenderer(Entity entity) {
         Minecraft client = Minecraft.getInstance();
         EntityRenderDispatcher dispatcher = client.getEntityRenderDispatcher();

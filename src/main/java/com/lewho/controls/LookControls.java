@@ -10,7 +10,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.animal.FlyingAnimal;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Squid;
-import com.lewho.controls.LookControlsHelper;
 import net.minecraft.world.entity.monster.Vex;
 import net.minecraft.world.phys.Vec3;
 

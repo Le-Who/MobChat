@@ -60,6 +60,7 @@ public final class UpdateRuntime {
                 return Optional.of(path);
             }
         }
+        @SuppressWarnings("deprecation")
         Path root = mod.getRootPath();
         if (Files.isRegularFile(root) && root.getFileName().toString().endsWith(".jar")) {
             return Optional.of(root);

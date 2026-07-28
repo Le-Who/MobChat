@@ -61,7 +61,7 @@ public class RarityItemCollector {
         Set<String> excludedMonsters = new HashSet<>(Arrays.asList("ender_dragon", "phantom", "bat"));
 
         // Iterate through entities
-        for (EntityType entityType : BuiltInRegistries.ENTITY_TYPE) {
+        for (EntityType<?> entityType : BuiltInRegistries.ENTITY_TYPE) {
             String entityName = entityType.toShortString();
             String spawnGroup = entityType.getCategory().getSerializedName();
 

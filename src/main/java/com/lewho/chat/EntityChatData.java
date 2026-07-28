@@ -432,7 +432,9 @@ public class EntityChatData {
         if (raw instanceof MobEffect se) {     // J 17-compatible pattern match
             return se;
         }
-        return ((Holder<MobEffect>) raw).value();
+        @SuppressWarnings("unchecked")
+        Holder<MobEffect> holder = (Holder<MobEffect>) raw;
+        return holder.value();
     }
 
     // Generate context object
