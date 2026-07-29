@@ -83,7 +83,7 @@ public class ConfigurationHandler {
         private int maxContextTokens = 16385;
         private int maxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
         private double percentOfContext = 0.75;
-        private int timeout = 10;
+        private int timeout = 30;
         private boolean chatBubbles = true;
         private boolean sendToChat = true;
         private List<String> whitelist = new ArrayList<>();

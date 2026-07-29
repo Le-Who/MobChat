@@ -81,16 +81,16 @@ public class ConfigurationRotationTests {
     }
 
     @Test
-    public void testAiStudioPresetUsesOpenAiCompatibleEndpoint() {
+    public void testAiStudioPresetUsesNativeEndpoint() {
         ConfigurationHandler.Config config = new ConfigurationHandler.Config();
         config.setMaxOutputTokens(200);
         ConfigurationPresets.ProviderPreset preset = ConfigurationPresets.find("ai-studio").orElseThrow();
 
         ConfigurationPresets.applyPreset(config, preset);
 
-        assertEquals("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", config.getUrl());
+        assertEquals("https://generativelanguage.googleapis.com/v1beta", config.getUrl());
         assertEquals(preset.defaultModel(), config.getActiveModel());
-        assertEquals("gemini-3.1-flash-lite", config.getActiveModel());
+        assertEquals("gemini-3.5-flash-lite", config.getActiveModel());
         assertEquals("minimal", config.getThinkingLevel());
         assertEquals(ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS, config.getMaxOutputTokens());
 

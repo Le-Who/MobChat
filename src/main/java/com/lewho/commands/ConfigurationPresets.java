@@ -14,7 +14,7 @@ import java.util.Optional;
  */
 public final class ConfigurationPresets {
     public static final String OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-    public static final String AI_STUDIO_CHAT_COMPLETIONS_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    public static final String AI_STUDIO_NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta";
     public static final String OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
     public static final String GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions";
     public static final String OLLAMA_CHAT_COMPLETIONS_URL = "http://localhost:11434/v1/chat/completions";
@@ -22,7 +22,7 @@ public final class ConfigurationPresets {
     private static final List<ProviderPreset> PRESETS = List.of(
             new ProviderPreset("openai", "OpenAI", OPENAI_CHAT_COMPLETIONS_URL, "gpt-4o-mini",
                     List.of("chatgpt")),
-            new ProviderPreset("ai-studio", "Google AI Studio", AI_STUDIO_CHAT_COMPLETIONS_URL, "gemini-3.1-flash-lite", "minimal",
+            new ProviderPreset("ai-studio", "Google AI Studio", AI_STUDIO_NATIVE_URL, "gemini-3.5-flash-lite", "minimal",
                     List.of("aistudio", "google", "gemini")),
             new ProviderPreset("openrouter", "OpenRouter", OPENROUTER_CHAT_COMPLETIONS_URL, "openai/gpt-4o-mini",
                     List.of("router")),

@@ -112,9 +112,12 @@ public class CreatureChatConfigScreen extends Screen {
     }
 
     private void applyPreset(ConfigurationPresets.ProviderPreset preset) {
+        boolean isSwitching = !preset.id().equals(this.selectedProvider);
         this.selectedProvider = preset.id();
         urlField.setValue(preset.url());
-        modelsField.setValue(preset.defaultModel());
+        if (isSwitching || modelsField.getValue().isBlank()) {
+            modelsField.setValue(preset.defaultModel());
+        }
         if (parsePositiveInt(outputTokensField.getValue(), 0) < ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS) {
             outputTokensField.setValue(Integer.toString(ConfigurationHandler.Config.DEFAULT_MAX_OUTPUT_TOKENS));
         }

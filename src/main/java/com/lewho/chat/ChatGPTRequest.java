@@ -325,6 +325,14 @@ public class ChatGPTRequest {
         return message.replace(apiKey, "**********");
     }
 
+    public static boolean isNativeGeminiUrl(String url) {
+        if (url == null) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ENGLISH);
+        return lower.contains("generativelanguage.googleapis.com") && !lower.contains("/openai");
+    }
+
     public static CompletableFuture<String> fetchMessageFromChatGPT(ConfigurationHandler.Config config, String systemPrompt, Map<String, String> contextData, List<ChatMessage> messageHistory, Boolean jsonMode) {
         // Init API & LLM details
         String apiUrl = config.getUrl();
@@ -334,6 +342,10 @@ public class ChatGPTRequest {
         StructuredOutputMode normalizedOutputMode = outputModeFrom(messageHistory, jsonMode);
         String thinkingLevel = config.getThinkingLevel();
         int maxOutputTokens = effectiveMaxOutputTokens(config.getMaxOutputTokens(), normalizedOutputMode, thinkingLevel);
+
+        if (isNativeGeminiUrl(apiUrl)) {
+            return GeminiNativeRequest.fetchMessageFromGemini(config, systemPrompt, contextData, messageHistory, normalizedOutputMode);
+        }
 
         return CompletableFuture.supplyAsync(() -> {
             lastErrorCode = 0;
@@ -411,8 +423,14 @@ public class ChatGPTRequest {
                         usedTokens += messageTokens;
                     }
 
-                    // Add system message
-                    messages.add(new ChatGPTRequestMessage("system", systemMessage));
+                    // Some endpoints (like Google AI Studio OpenAI compat layer) reject requests
+                    // that only have a 'system' message (empty contents). If history is empty
+                    // (e.g. character generation or config test), send it as a user message.
+                    if (messages.isEmpty()) {
+                        messages.add(new ChatGPTRequestMessage("user", systemMessage));
+                    } else {
+                        messages.add(new ChatGPTRequestMessage("system", systemMessage));
+                    }
 
                     // Reverse the list to restore chronological order
                     // This is needed since we build the list in reverse order for token restricting above
@@ -649,7 +667,7 @@ public class ChatGPTRequest {
                 || normalizedModel.startsWith("gemini-");
     }
 
-    private static int effectiveMaxOutputTokens(int configuredTokens, StructuredOutputMode outputMode, String thinkingLevel) {
+    static int effectiveMaxOutputTokens(int configuredTokens, StructuredOutputMode outputMode, String thinkingLevel) {
         int configured = Math.max(ConfigurationHandler.Config.MIN_MAX_OUTPUT_TOKENS, configuredTokens);
         StructuredOutputMode mode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
         if (mode == StructuredOutputMode.NONE) {

@@ -6,20 +6,35 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.0.5] - 2026-07-29
+
+### Added
+- Native Google Gemini API support: the Google AI Studio preset now calls the Gemini `generateContent` endpoint directly instead of the OpenAI compatibility layer, enabling full support for latest models such as `gemini-3.5-flash-lite`.
+- API key authentication for native Gemini requests now uses the `x-goog-api-key` header.
+- Structured output (character generation and chat JSON) for native Gemini requests uses `responseSchema` / `responseMimeType: application/json`, matching the Gemini-native contract.
+- `gemini-3.5-flash-lite` is now the default model for the Google AI Studio preset.
+
+### Fixed
+- HTTP 400 `contents is not specified` error when testing configuration or generating a character with no prior message history: the system prompt is now sent as a `user` message when history is empty, satisfying the Gemini API requirement.
+- Provider preset buttons in the setup screen no longer overwrite a custom model value when the user clicks the same provider button again; the model field is only reset when switching to a different provider or when the field is blank.
+- `temperature` parameter is omitted for `gemini-3.5-flash-lite` requests to comply with the model's restrictions and prevent API hangs.
+- Placeholder substitution (e.g. `{{player_name}}`) now correctly applied to both `systemInstruction` and message history in native Gemini requests.
+- Minimum output-token floors for structured output modes (1 536 tokens for character generation) now also enforced on native Gemini requests.
+
+### Changed
+- Default API request timeout increased from 10 s to 30 s to accommodate variable LLM first-token latency without false timeouts.
+- Requests to `generativelanguage.googleapis.com` without the `/openai` path segment are automatically routed to the native Gemini client; the OpenAI-compatible path remains available for users who configure it manually.
+
 ## [3.0.4] - 2026-07-28
 
 ### Fixed
 - Retry the same API key/model once on a transient connection timeout before reporting an error, so single-key setups recover from momentary API hangs without user intervention.
 - When multiple keys or models are configured, a timeout on one candidate now correctly rotates to the next candidate instead of failing immediately.
 - Remove stale keep-alive connection before retrying to avoid reusing a server-closed socket.
+- Handle Google AI Studio's location-restriction response before retrying other configured keys or models, and show an actionable explanation instead of a raw JSON error body.
 
 ### Changed
 - Log a concise warning (without full stack trace) for intermediate timeout retries; the full stack trace is logged only when all retry attempts are exhausted.
-
-
-
-### Fixed
-- Handle Google AI Studio's location-restriction response before retrying other configured keys or models, and show an actionable explanation instead of a raw JSON error body.
 
 ## [3.0.2] - 2026-07-09
 
