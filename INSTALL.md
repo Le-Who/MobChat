@@ -4,9 +4,8 @@ This **guide** explains how to build the MobChat fork of CreatureChat™ from <h
 
 ## Prerequisites
 - **Git**: If you don't have Git installed, download and install it from [git-scm.com](https://git-scm.com/).
-- **Java JDK**: Fabric requires Java Development Kit (JDK) to compile and run. Download 
-  and install it from [AdoptOpenJDK](https://adoptopenjdk.net/) or your preferred JDK provider. JDK version 8 or 11 
-  is recommended.
+- **Java JDK**: Fabric requires Java Development Kit (JDK) to compile and run. This project targets **Java 17**. Download and install JDK 17 or later from [Adoptium](https://adoptium.net/) or your preferred JDK provider.
+
 - **IDE**: Any IDE that supports Java and Gradle, such as **IntelliJ IDEA**, **Eclipse**, or **VS Code**.
 
 ## Open the Project

@@ -6,7 +6,11 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
-## [3.0.6] - 2026-07-30
+## [3.0.7] - 2026-07-30
+
+### Fixed
+- Native Gemini API (`generation_config.response_schema`) no longer receives `"additionalProperties"` — a JSON Schema Draft-07 field unsupported by the Gemini OpenAPI 3.0 schema subset. The field was causing a `400 Bad Request` on every character-generation and chat request when using the Google AI Studio preset, while the `/test` command appeared green (it sends no schema). The field is now stripped recursively before the payload is sent; the OpenAI structured-output path is unaffected.
+
 
 ### Changed
 - `/creaturechat update download` now only downloads and stages the update, then instructs the admin to run `/creaturechat update apply` when ready — it no longer arms the update helper automatically.

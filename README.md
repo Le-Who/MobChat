@@ -119,7 +119,7 @@ The setup screen is OP-only. It saves values to the server world's `creaturechat
 Provider presets currently include:
 
 - `openai`
-- `ai-studio` for Google AI Studio through the Gemini OpenAI-compatible endpoint
+- `ai-studio` — Google AI Studio via the **native Gemini API** (`generateContent`)
 - `openrouter`
 - `groq`
 - `ollama`
@@ -130,7 +130,7 @@ Console/script fallback:
 ```text
 /creaturechat setup provider ai-studio
 /creaturechat setup key <key1,key2>
-/creaturechat setup model gemini-3.1-flash-lite
+/creaturechat setup model gemini-3.5-flash-lite
 /creaturechat setup outputtokens 1024
 /creaturechat setup test
 /creaturechat setup show
@@ -140,16 +140,18 @@ You can enter multiple comma-separated API keys or models. The request layer rot
 
 ## Google AI Studio / Gemini Notes
 
-The `ai-studio` preset uses:
+The `ai-studio` preset uses the **native Gemini `generateContent` API**, not the OpenAI-compatibility layer. The endpoint base URL is:
 
 ```text
-https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+https://generativelanguage.googleapis.com/v1beta
 ```
+
+Requests that target `generativelanguage.googleapis.com` without the `/openai` path segment are automatically routed to the native Gemini client. Character generation and chat use `generation_config.response_schema` with `responseMimeType: application/json` for structured output.
 
 Default model:
 
 ```text
-gemini-3.1-flash-lite
+gemini-3.5-flash-lite
 ```
 
 This fork preflights Gemini usage before sending HTTP requests:

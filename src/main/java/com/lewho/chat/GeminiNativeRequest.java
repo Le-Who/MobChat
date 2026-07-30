@@ -15,6 +15,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -180,16 +181,56 @@ public final class GeminiNativeRequest {
 
         if (outputMode == ChatGPTRequest.StructuredOutputMode.CHARACTER) {
             config.responseMimeType = "application/json";
-            config.responseSchema = ChatGPTRequest.JsonSchema.creatureChatCharacter().schema;
+            config.responseSchema = stripAdditionalProperties(ChatGPTRequest.JsonSchema.creatureChatCharacter().schema);
         } else if (outputMode == ChatGPTRequest.StructuredOutputMode.CHAT) {
             config.responseMimeType = "application/json";
-            config.responseSchema = ChatGPTRequest.JsonSchema.creatureChatResponse().schema;
+            config.responseSchema = stripAdditionalProperties(ChatGPTRequest.JsonSchema.creatureChatResponse().schema);
         }
 
         payload.generationConfig = config;
         return payload;
     }
 
+
+    /**
+     * Returns a deep copy of the given JSON schema map with all {@code additionalProperties}
+     * keys removed at every nesting level.
+     *
+     * <p>The Gemini native {@code generation_config.response_schema} field accepts a restricted
+     * OpenAPI 3.0 subset that does <em>not</em> support {@code additionalProperties}. Our schemas
+     * are built for OpenAI structured output, which requires the field. Stripping it here keeps
+     * the two serialisation paths independent.</p>
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> stripAdditionalProperties(Map<String, Object> schema) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : schema.entrySet()) {
+            if ("additionalProperties".equals(entry.getKey())) {
+                continue;
+            }
+            Object value = entry.getValue();
+            if (value instanceof Map) {
+                value = stripAdditionalProperties((Map<String, Object>) value);
+            } else if (value instanceof List) {
+                value = stripAdditionalPropertiesFromList((List<?>) value);
+            }
+            result.put(entry.getKey(), value);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> stripAdditionalPropertiesFromList(List<?> list) {
+        List<Object> result = new ArrayList<>(list.size());
+        for (Object item : list) {
+            if (item instanceof Map) {
+                result.add(stripAdditionalProperties((Map<String, Object>) item));
+            } else {
+                result.add(item);
+            }
+        }
+        return result;
+    }
 
     private static String parseSuccessResponse(String json) {
         try {
