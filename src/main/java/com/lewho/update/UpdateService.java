@@ -36,8 +36,18 @@ public final class UpdateService {
         }
 
         UpdateCandidate candidate = maybeCandidate.get();
+        return Optional.of(stageCandidate(gameDir, currentJar, candidate));
+    }
+
+    /**
+     * Downloads, verifies, and stages a specific {@link UpdateCandidate} without re-running the
+     * version check. Use this when the caller already holds the candidate from a prior
+     * {@link #check} call.
+     */
+    public PendingUpdate stageCandidate(Path gameDir, Path currentJar, UpdateCandidate candidate)
+            throws IOException, InterruptedException {
         String hash = UpdateHashes.normalizeSha512(source.downloadText(candidate.sha512Url()));
         byte[] jarBytes = source.downloadBytes(candidate.downloadUrl());
-        return Optional.of(UpdateStager.stage(gameDir, currentJar, candidate.withSha512(hash), jarBytes));
+        return UpdateStager.stage(gameDir, currentJar, candidate.withSha512(hash), jarBytes);
     }
 }

@@ -6,6 +6,12 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.0.6] - 2026-07-30
+
+### Changed
+- `/creaturechat update download` now only downloads and stages the update, then instructs the admin to run `/creaturechat update apply` when ready — it no longer arms the update helper automatically.
+- `/creaturechat update apply` performs a fresh version check, re-uses an already-staged update if it matches the latest GitHub release (no re-download), re-downloads only if a newer version is available, and then arms the update helper.
+
 ## [3.0.5] - 2026-07-29
 
 ### Added

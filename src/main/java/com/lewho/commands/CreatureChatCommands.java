@@ -21,6 +21,8 @@ import com.lewho.update.UpdateHelperLauncher;
 import com.lewho.update.UpdateRuntime;
 import com.lewho.update.UpdateService;
 import com.lewho.update.UpdateStager;
+import com.lewho.update.UpdateVersion;
+
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -251,7 +253,7 @@ public class CreatureChatCommands {
         }
 
         RuntimeModInfo info = runtime.get();
-        sendUpdateMessage(source, true, "Downloading CreatureChat update from GitHub Releases...");
+        sendUpdateMessage(source, true, "Checking GitHub Releases for CreatureChat updates...");
         CompletableFuture.runAsync(() -> {
             try {
                 Optional<PendingUpdate> pending = updateService(info).downloadAndStage(
@@ -264,18 +266,11 @@ public class CreatureChatCommands {
                 );
                 source.getServer().execute(() -> {
                     if (pending.isEmpty()) {
-                        sendUpdateMessage(source, true, "CreatureChat is already up to date for Minecraft " + info.minecraftVersion() + ".");
-                        return;
-                    }
-                    try {
-                        Path log = UpdateHelperLauncher.launch(pending.get(), info.javaExecutable(), ProcessHandle.current().pid());
+                        sendUpdateMessage(source, true, "CreatureChat is already up to date for Minecraft "
+                                + info.minecraftVersion() + " (" + info.currentVersion() + ").");
+                    } else {
                         sendUpdateMessage(source, true, "CreatureChat " + pending.get().version()
-                                + " is staged. Stop and start the server when ready; the helper will replace the jar after this JVM exits. Log: "
-                                + log);
-                    } catch (Exception e) {
-                        sendUpdateMessage(source, false, "Update staged, but helper could not be launched: " + e.getMessage()
-                                + ". Use /creaturechat update apply before stopping the server.");
-                        LOGGER.error("CreatureChat update helper launch failed", e);
+                                + " is staged. Run /creaturechat update apply when you are ready to arm the update helper.");
                     }
                 });
             } catch (Exception e) {
@@ -294,24 +289,60 @@ public class CreatureChatCommands {
         }
 
         RuntimeModInfo info = runtime.get();
-        Path pendingPath = UpdateStager.pendingFile(info.gameDir());
-        if (!Files.exists(pendingPath)) {
-            sendUpdateMessage(source, false, "No CreatureChat update is staged.");
-            return 0;
-        }
+        sendUpdateMessage(source, true, "Checking GitHub Releases for CreatureChat updates...");
+        CompletableFuture.runAsync(() -> {
+            try {
+                UpdateService service = updateService(info);
+                Optional<UpdateCandidate> maybeLatest = service.check(
+                        info.archiveBaseName(), info.currentVersion(), info.minecraftVersion(), false);
 
-        try {
-            PendingUpdate pending = PendingUpdate.load(pendingPath);
-            Path log = UpdateHelperLauncher.launch(pending, info.javaExecutable(), ProcessHandle.current().pid());
-            sendUpdateMessage(source, true, "CreatureChat " + pending.version()
-                    + " is pending. Stop and start the server when ready; the helper will replace the jar after this JVM exits. Log: "
-                    + log);
-            return 1;
-        } catch (Exception e) {
-            sendUpdateMessage(source, false, "Could not arm CreatureChat update helper: " + e.getMessage());
-            LOGGER.error("CreatureChat update helper launch failed", e);
-            return 0;
-        }
+                // Determine the pending update to launch, downloading only when necessary.
+                final PendingUpdate pending;
+                Path pendingPath = UpdateStager.pendingFile(info.gameDir());
+                if (maybeLatest.isEmpty()) {
+                    // GitHub has nothing newer than the running version.
+                    // Use the staged update if one exists, otherwise nothing to do.
+                    if (!Files.exists(pendingPath)) {
+                        source.getServer().execute(() -> sendUpdateMessage(source, true,
+                                "CreatureChat is already up to date for Minecraft "
+                                + info.minecraftVersion() + " (" + info.currentVersion() + ")."));
+                        return;
+                    }
+                    pending = PendingUpdate.load(pendingPath);
+                } else {
+                    UpdateCandidate latest = maybeLatest.get();
+                    // Reuse the staged update if it is already the latest version.
+                    if (Files.exists(pendingPath)) {
+                        PendingUpdate staged = PendingUpdate.load(pendingPath);
+                        if (!UpdateVersion.isNewer(latest.version(), staged.version())) {
+                            pending = staged;
+                        } else {
+                            // GitHub has something newer than what is staged — re-download.
+                            pending = service.stageCandidate(info.gameDir(), info.currentJar(), latest);
+                        }
+                    } else {
+                        // Nothing staged yet — download and stage now.
+                        pending = service.stageCandidate(info.gameDir(), info.currentJar(), latest);
+                    }
+                }
+
+                source.getServer().execute(() -> {
+                    try {
+                        Path log = UpdateHelperLauncher.launch(pending, info.javaExecutable(), ProcessHandle.current().pid());
+                        sendUpdateMessage(source, true, "CreatureChat " + pending.version()
+                                + " update is armed. Stop and start the server when ready; the helper will replace the jar after this JVM exits. Log: "
+                                + log);
+                    } catch (Exception e) {
+                        sendUpdateMessage(source, false, "Could not arm CreatureChat update helper: " + e.getMessage());
+                        LOGGER.error("CreatureChat update helper launch failed", e);
+                    }
+                });
+            } catch (Exception e) {
+                source.getServer().execute(() -> sendUpdateMessage(source, false, "CreatureChat apply failed: " + e.getMessage()));
+                LOGGER.error("CreatureChat update apply failed", e);
+            }
+        });
+        return 1;
     }
 
     private static int showUpdateStatus(CommandSourceStack source) {
