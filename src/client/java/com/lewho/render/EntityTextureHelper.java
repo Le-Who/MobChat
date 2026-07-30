@@ -19,6 +19,7 @@ public final class EntityTextureHelper {
      * @param entity   the entity whose skin/icon to fetch
      * @return the Identifier of the skin texture
      */
+    @SuppressWarnings({"rawtypes", "unchecked"})
     public static ResourceLocation getTexture(EntityRenderer renderer, Entity entity) {
         return renderer.getTextureLocation(entity);
     }

@@ -12,6 +12,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -68,7 +69,7 @@ public final class GeminiNativeRequest {
 
                 HttpURLConnection connection = null;
                 try {
-                    URL url = new URL(endpointUrl);
+                    URL url = URI.create(endpointUrl).toURL();
                     connection = (HttpURLConnection) url.openConnection();
                     connection.setRequestMethod("POST");
                     connection.setRequestProperty("Content-Type", "application/json");

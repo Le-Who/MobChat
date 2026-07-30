@@ -15,6 +15,7 @@ import static com.lewho.network.ServerPackets.LEAD_PARTICLE;
  * The {@code LeadParticleEffect} class allows for an 'angle' to be passed along with the Particle, to rotate it in the direction of LEAD behavior.
  */
 public class LeadParticleEffect implements ParticleOptions {
+    @SuppressWarnings("deprecation") // ParticleOptions.Deserializer is correct for 1.20.1; replacement is in src/vs/v1_20_5/
     public static final ParticleOptions.Deserializer<LeadParticleEffect> DESERIALIZER = new Deserializer<>() {
         @Override
         public LeadParticleEffect fromNetwork(ParticleType<LeadParticleEffect> particleType, FriendlyByteBuf buf) {

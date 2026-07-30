@@ -6,7 +6,16 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
-## [3.0.7] - 2026-07-30
+## [3.0.8] - 2026-07-30
+
+### Fixed
+- Character generation now strictly respects the requested language for **all** text fields (name, personality, speaking style, background, and greeting), not just the greeting. A speaking style such as "DJ" or "pirate" now describes tone, not language — a DJ who speaks Russian will greet the player in Russian.
+
+### Changed
+- `ParticleEmitter` particle-type comparisons switched from `.equals()` to identity (`==`). `SimpleParticleType` instances are registered singletons, so identity comparison is both correct and avoids IDE false-positive warnings about unrelated types.
+- Suppressed expected compiler warnings with targeted `@SuppressWarnings` annotations in `EntityTextureHelper` (cross-version raw `EntityRenderer` shim), `LeadParticleEffect` (`ParticleOptions.Deserializer` is correct for 1.20.1 base; replacement is in `src/vs/v1_20_5/`), and `BehaviorTests` (Gson raw-type `Map` fromJson, unavoidable at runtime).
+- `GeminiNativeRequest` URL construction updated to use `URI.create(...).toURL()` instead of the deprecated `new URL(String)` constructor (Java 20+).
+
 
 ### Fixed
 - Native Gemini API (`generation_config.response_schema`) no longer receives `"additionalProperties"` — a JSON Schema Draft-07 field unsupported by the Gemini OpenAPI 3.0 schema subset. The field was causing a `400 Bad Request` on every character-generation and chat request when using the Google AI Studio preset, while the `/test` command appeared green (it sends no schema). The field is now stripped recursively before the payload is sent; the OpenAI structured-output path is unaffected.

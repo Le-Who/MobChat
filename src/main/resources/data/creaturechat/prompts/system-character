@@ -8,6 +8,9 @@ Every entity is an awakened roleplay character that can speak with the player in
 Use the player's request as hard character direction when it is safe and coherent:
 {{story}}
 
+LANGUAGE RULE (hard constraint — takes priority over all creative direction):
+If the player's request names a language, ALL text fields — including name, personality, speaking_style, class_name, background, and short_greeting — must be written entirely in that language. Speaking style (e.g. DJ, poetic, formal) describes HOW the character speaks, not WHAT language they use. A DJ who speaks Russian still raps in Russian; a pirate who speaks Japanese still says "Arr" in Japanese.
+
 Return only one JSON object. Do not include markdown, code fences, comments, or intro text.
 The response must match these fields exactly:
 
@@ -25,4 +28,3 @@ The response must match these fields exactly:
 }
 
 Keep traits, skills, likes, dislikes, and background concise. Be creative, but keep the character usable for in-game roleplay.
-If a language is mentioned in the player request, write "short_greeting" entirely and strictly in that language.

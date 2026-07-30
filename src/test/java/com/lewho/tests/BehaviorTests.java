@@ -301,6 +301,7 @@ public class BehaviorTests {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static Map<String, Map<String, String>> loadExistingOutputData() {
         try {
             Path path = Paths.get(OUTPUT_JSON_PATH);

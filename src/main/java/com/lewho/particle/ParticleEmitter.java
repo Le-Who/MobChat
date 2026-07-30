@@ -51,25 +51,25 @@ public class ParticleEmitter {
                 0.1);
 
         // Play a sound effect for certain particle types
-        if (particleEffect.equals(HEART_BIG_PARTICLE) && count > 1) {
+        if (particleEffect == HEART_BIG_PARTICLE && count > 1) {
             world.playSound(entity, entity.blockPosition(),
                     SoundEvents.EXPERIENCE_ORB_PICKUP,
                     SoundSource.PLAYERS,
                     0.4F, 1.0F);
-        } else if (particleEffect.equals(FIRE_BIG_PARTICLE) && count > 1) {
+        } else if (particleEffect == FIRE_BIG_PARTICLE && count > 1) {
             world.playSound(entity, entity.blockPosition(),
                     SoundEvents.AXE_STRIP,
                     SoundSource.PLAYERS,
                     0.8F, 1.0F);
-        } else if (particleEffect.equals(FOLLOW_FRIEND_PARTICLE)
-                || particleEffect.equals(FOLLOW_ENEMY_PARTICLE)
-                || particleEffect.equals(LEAD_FRIEND_PARTICLE)
-                || particleEffect.equals(LEAD_ENEMY_PARTICLE)) {
+        } else if (particleEffect == FOLLOW_FRIEND_PARTICLE
+                || particleEffect == FOLLOW_ENEMY_PARTICLE
+                || particleEffect == LEAD_FRIEND_PARTICLE
+                || particleEffect == LEAD_ENEMY_PARTICLE) {
             world.playSound(entity, entity.blockPosition(),
                     SoundEvents.AMETHYST_BLOCK_PLACE,
                     SoundSource.PLAYERS,
                     0.8F, 1.0F);
-        } else if (particleEffect.equals(PROTECT_PARTICLE)) {
+        } else if (particleEffect == PROTECT_PARTICLE) {
             world.playSound(entity, entity.blockPosition(),
                     SoundEvents.BEACON_POWER_SELECT,
                     SoundSource.PLAYERS,
