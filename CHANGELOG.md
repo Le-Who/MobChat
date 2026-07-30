@@ -6,6 +6,11 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.0.9] - 2026-07-30
+
+### Fixed
+- Language rule in character generation (`system-character` prompt) was over-scoped in 3.0.8: it previously forced ALL text fields (personality, background, speaking style, etc.) to be written in the player's client language. Only `short_greeting` and `name` are visible to the player and require language enforcement. Internal description fields are now unrestricted, so a Russian-speaking player using an English-language Minecraft client is not prevented from receiving Russian greetings and names when their server is configured for Russian.
+
 ## [3.0.8] - 2026-07-30
 
 ### Fixed

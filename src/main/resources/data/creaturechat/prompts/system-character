@@ -9,7 +9,7 @@ Use the player's request as hard character direction when it is safe and coheren
 {{story}}
 
 LANGUAGE RULE (hard constraint — takes priority over all creative direction):
-If the player's request names a language, ALL text fields — including name, personality, speaking_style, class_name, background, and short_greeting — must be written entirely in that language. Speaking style (e.g. DJ, poetic, formal) describes HOW the character speaks, not WHAT language they use. A DJ who speaks Russian still raps in Russian; a pirate who speaks Japanese still says "Arr" in Japanese.
+If the player's request names a language, write `short_greeting` entirely and strictly in that language, and choose a `name` that fits that language's naming conventions. Other description fields (personality, background, etc.) may be written in any language. Speaking style (e.g. DJ, poetic, formal) describes HOW the character speaks, not WHAT language they use — a DJ who speaks Russian still raps in Russian.
 
 Return only one JSON object. Do not include markdown, code fences, comments, or intro text.
 The response must match these fields exactly:
