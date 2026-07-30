@@ -173,6 +173,15 @@ public class CreatureChatCommands {
                         .then(Commands.argument("scope", StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(List.of("per_key", "shared"), builder))
                                 .executes(context -> setConfig(context.getSource(), "geminiscope", StringArgumentType.getString(context, "scope"), true, "Gemini usage limit scope"))))
+                .then(Commands.literal("language")
+                        .then(Commands.argument("code", StringArgumentType.word())
+                                .suggests((context, builder) -> {
+                                    List<String> suggestions = new java.util.ArrayList<>();
+                                    suggestions.add("auto");
+                                    suggestions.addAll(MinecraftLanguages.ALL_CODES);
+                                    return SharedSuggestionProvider.suggest(suggestions, builder);
+                                })
+                                .executes(context -> setConfig(context.getSource(), "generationlanguage", StringArgumentType.getString(context, "code"), true, "Generation language"))))
                 .then(Commands.literal("show")
                         .executes(context -> showConfig(context.getSource())))
                 .then(Commands.literal("test")
@@ -398,8 +407,9 @@ public class CreatureChatCommands {
         source.sendSuccess(() -> commandHint("7. Optional Gemini daily limit:", "/creaturechat setup geminidaily 450"), false);
         source.sendSuccess(() -> commandHint("8. Optional Gemini scope:", "/creaturechat setup geminiscope per_key"), false);
         source.sendSuccess(() -> Component.literal("9. Optional Gemini thinking level is available in the setup screen.").withStyle(ChatFormatting.GRAY), false);
-        source.sendSuccess(() -> commandHint("10. Review:", "/creaturechat setup show"), false);
-        source.sendSuccess(() -> commandHint("11. Test:", "/creaturechat setup test"), false);
+        source.sendSuccess(() -> commandHint("10. Optional generation language (e.g. ru_ru, or 'auto'):", "/creaturechat setup language auto"), false);
+        source.sendSuccess(() -> commandHint("11. Review:", "/creaturechat setup show"), false);
+        source.sendSuccess(() -> commandHint("12. Test:", "/creaturechat setup test"), false);
         return 1;
     }
 
@@ -445,6 +455,7 @@ public class CreatureChatCommands {
                         + ", " + config.getGeminiRequestsPerMinute() + " RPM"
                         + ", " + config.getGeminiRequestsPerDay() + " RPD"
                         + ", scope=" + config.getGeminiUsageLimitScope() + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Generation language: " + MinecraftLanguages.describe(config.getGenerationLanguage()) + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Timeout: " + config.getTimeout() + "s").withStyle(ChatFormatting.GRAY));
         source.sendSuccess(() -> message, false);
         return 1;
@@ -710,6 +721,13 @@ public class CreatureChatCommands {
                         config.setGeminiUsageLimitScope(scope);
                     } else {
                         throw new IllegalArgumentException("Invalid type for Gemini usage limit scope, must be String.");
+                    }
+                    break;
+                case "generationlanguage":
+                    if (value instanceof String) {
+                        config.setGenerationLanguage((String) value);
+                    } else {
+                        throw new IllegalArgumentException("Invalid type for generation language, must be a locale code string.");
                     }
                     break;
                 default:

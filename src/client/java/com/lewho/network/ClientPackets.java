@@ -115,6 +115,7 @@ public class ClientPackets {
         buf.writeInt(data.timeout());
         buf.writeInt(data.maxOutputTokens());
         buf.writeUtf(data.thinkingLevel());
+        buf.writeUtf(data.generationLanguage() != null ? data.generationLanguage() : "");
 
         ClientPacketHelper.send(ServerPackets.PACKET_C2S_CONFIG_SAVE, buf);
     }
@@ -128,6 +129,7 @@ public class ClientPackets {
         buf.writeInt(data.timeout());
         buf.writeInt(data.maxOutputTokens());
         buf.writeUtf(data.thinkingLevel());
+        buf.writeUtf(data.generationLanguage() != null ? data.generationLanguage() : "");
 
         ClientPacketHelper.send(ServerPackets.PACKET_C2S_CONFIG_TEST, buf);
     }
@@ -306,6 +308,7 @@ public class ClientPackets {
                     buffer.readUtf(32767),
                     buffer.readInt(),
                     buffer.readInt(),
+                    buffer.readUtf(32767),
                     buffer.readUtf(32767)
             );
 

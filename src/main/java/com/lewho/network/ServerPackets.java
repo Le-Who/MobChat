@@ -12,6 +12,7 @@ import com.lewho.chat.PlayerData;
 import com.lewho.chat.PlayerChatPreferences;
 import com.lewho.commands.ConfigurationHandler;
 import com.lewho.commands.ConfigurationScreenData;
+import com.lewho.commands.MinecraftLanguages;
 import com.lewho.goals.EntityBehaviorManager;
 import com.lewho.goals.GoalPriority;
 import com.lewho.goals.TalkPlayerGoal;
@@ -230,6 +231,7 @@ public class ServerPackets {
                     buf.readUtf(32767),
                     buf.readInt(),
                     buf.readInt(),
+                    buf.readUtf(32767),
                     buf.readUtf(32767)
             );
 
@@ -244,6 +246,7 @@ public class ServerPackets {
                     buf.readUtf(32767),
                     buf.readInt(),
                     buf.readInt(),
+                    buf.readUtf(32767),
                     buf.readUtf(32767)
             );
 
@@ -409,6 +412,7 @@ public class ServerPackets {
         buffer.writeInt(data.timeout());
         buffer.writeInt(data.maxOutputTokens());
         buffer.writeUtf(data.thinkingLevel());
+        buffer.writeUtf(data.generationLanguage() != null ? data.generationLanguage() : "");
         PacketHelper.send(player, PACKET_S2C_CONFIG_OPEN, buffer);
     }
 
@@ -490,6 +494,10 @@ public class ServerPackets {
 
     public static void generate_character(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, boolean is_auto_message) {
         ConfigurationHandler.Config config = new ConfigurationHandler(serverInstance).loadConfig();
+        // Apply server language override if configured
+        String effectiveLanguage = config.getGenerationLanguage().isEmpty()
+                ? userLanguage
+                : MinecraftLanguages.displayName(config.getGenerationLanguage());
         ChatDataManager manager = ChatDataManager.getServerInstance();
         if (!manager.handleAutoResponse(chatData, player, is_auto_message, config)) {
             return;
@@ -518,10 +526,10 @@ public class ServerPackets {
             userMessageBuilder.append("Their name starts with the letter '").append(randomLetter)
                     .append("' and is ").append(randomSyllables).append(" syllables long. ");
         }
-        userMessageBuilder.append("They speak in '").append(userLanguage).append("' with a ").append(randomSpeakingStyle).append(" style.");
+        userMessageBuilder.append("They speak in '").append(effectiveLanguage).append("' with a ").append(randomSpeakingStyle).append(" style.");
 
         // Generate new character
-        chatData.generateCharacter(userLanguage, player, userMessageBuilder.toString(), is_auto_message);
+        chatData.generateCharacter(effectiveLanguage, player, userMessageBuilder.toString(), is_auto_message);
 
         // Populate inventory with some simple starter items if empty
         if (entity instanceof ChatInventory chatInv) {
@@ -582,6 +590,10 @@ public class ServerPackets {
 
     public static void generate_chat(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, String message, boolean is_auto_message) {
         ConfigurationHandler.Config config = new ConfigurationHandler(serverInstance).loadConfig();
+        // Apply server language override if configured
+        String effectiveLanguage = config.getGenerationLanguage().isEmpty()
+                ? userLanguage
+                : MinecraftLanguages.displayName(config.getGenerationLanguage());
         ChatDataManager manager = ChatDataManager.getServerInstance();
         if (!manager.handleAutoResponse(chatData, player, is_auto_message, config)) {
             return;
@@ -592,7 +604,7 @@ public class ServerPackets {
         EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
         // Add new message
-        chatData.generateMessage(userLanguage, player, message, is_auto_message);
+        chatData.generateMessage(effectiveLanguage, player, message, is_auto_message);
     }
 
     public static void handleNearbyPlayerChat(ServerPlayer player, String chatMessage) {
@@ -685,11 +697,15 @@ public class ServerPackets {
         if (!manager.handleAmbientResponse(chatData, player, config)) {
             return false;
         }
+        // Apply server language override if configured
+        String effectiveLanguage = config.getGenerationLanguage().isEmpty()
+                ? userLanguage
+                : MinecraftLanguages.displayName(config.getGenerationLanguage());
 
         TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
         EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
-        chatData.generateMessage(userLanguage, player, message, true, allow_mob_to_mob_reactions);
+        chatData.generateMessage(effectiveLanguage, player, message, true, allow_mob_to_mob_reactions);
         return true;
     }
 

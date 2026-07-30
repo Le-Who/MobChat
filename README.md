@@ -179,6 +179,18 @@ Google AI Studio also enforces its own account and public-network location eligi
 
 Gemini thinking level is configurable through the setup screen. The AI Studio preset defaults to `minimal`.
 
+### Generation Language
+
+By default the mob AI uses each player's Minecraft client locale for name generation and chat replies. To lock a single language server-wide:
+
+```text
+/creaturechat setup language ru_ru
+/creaturechat setup language en_us
+/creaturechat setup language auto    # restore per-player behaviour (default)
+```
+
+The GUI setup screen also exposes a **Generation language** button that opens a scrollable picker with all official Minecraft locales. The locale code (e.g. `ru_ru`) is stored in `creaturechat.json`; the mod converts it to the in-language display name (e.g. `Русский (Россия)`) before embedding it in the LLM prompt.
+
 ## Gameplay Tuning
 
 Useful runtime knobs:

@@ -6,6 +6,16 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.1.0] - 2026-07-30
+
+### Added
+- **Generation language override** — server admins can now lock the language used for all mob AI generation instead of relying on each player's client locale.
+  - Command: `/creaturechat setup language <locale_code>` (e.g. `ru_ru`, `en_us`). Use `auto` to restore the previous per-player behaviour.
+  - Available in the `/creaturechat setup` GUI screen via the **Generation language** button, which opens a scrollable language picker listing all official Minecraft locales.
+  - `setup show` now includes a `Generation language:` line.
+  - Stored as a locale code (e.g. `ru_ru`) in `creaturechat.json`; automatically converted to the in-language display name (e.g. `Русский (Россия)`) before it is sent to the LLM.
+  - Default: `auto` — no behaviour change for existing servers.
+
 ## [3.0.9] - 2026-07-30
 
 ### Fixed

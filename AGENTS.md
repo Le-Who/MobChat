@@ -113,6 +113,7 @@ Important command-backed settings:
 /creaturechat setup geminirpm <requests>
 /creaturechat setup geminidaily <requests>
 /creaturechat setup geminiscope <per_key|shared>
+/creaturechat setup language <locale_code|auto>
 /creaturechat setup show
 /creaturechat setup test
 ```

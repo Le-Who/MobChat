@@ -109,6 +109,9 @@ public class ConfigurationHandler {
         private int mobToMobChatRadius = 10;
         private int maxMobToMobResponsesPerMessage = 1;
 
+        /** Locale code override for LLM generation, e.g. "ru_ru". Empty string = auto (client locale). */
+        private String generationLanguage = "";
+
         private transient int currentKeyIndex = 0;
         private transient int currentModelIndex = 0;
         private transient Path usageDataPath = DEFAULT_USAGE_DATA_PATH;
@@ -322,5 +325,20 @@ public class ConfigurationHandler {
 
         public int getMaxMobToMobResponsesPerMessage() { return maxMobToMobResponsesPerMessage; }
         public void setMaxMobToMobResponsesPerMessage(int maxMobToMobResponsesPerMessage) { this.maxMobToMobResponsesPerMessage = maxMobToMobResponsesPerMessage; }
+
+        /** Returns the locale-code override, e.g. {@code "ru_ru"}, or {@code ""} for auto. */
+        public String getGenerationLanguage() { return generationLanguage == null ? "" : generationLanguage; }
+
+        /**
+         * Sets the locale-code override. Passing {@code null}, blank, or {@code "auto"}
+         * resets to automatic (client locale).
+         */
+        public void setGenerationLanguage(String code) {
+            if (code == null || code.isBlank() || code.equalsIgnoreCase("auto")) {
+                this.generationLanguage = "";
+            } else {
+                this.generationLanguage = code.trim().toLowerCase();
+            }
+        }
     }
 }

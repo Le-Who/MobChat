@@ -19,7 +19,7 @@ import net.minecraft.network.chat.Component;
  */
 public class CreatureChatConfigScreen extends Screen {
     private static final int PANEL_WIDTH = 560;
-    private static final int PANEL_HEIGHT = 360;
+    private static final int PANEL_HEIGHT = 394;
     private static final int ROW_HEIGHT = 34;
     private static final int BUTTON_HEIGHT = 20;
     private static final String[] THINKING_LEVELS = {"auto", "minimal", "low", "medium", "high"};
@@ -28,6 +28,7 @@ public class CreatureChatConfigScreen extends Screen {
     private String selectedProvider;
     private String maskedApiKeys;
     private String selectedThinkingLevel;
+    private String selectedLanguageCode;  // locale code, "" = auto
     private String statusMessage = "";
     private int statusColor = 0xA0A0A0;
 
@@ -37,6 +38,7 @@ public class CreatureChatConfigScreen extends Screen {
     private EditBox timeoutField;
     private EditBox outputTokensField;
     private Button thinkingButton;
+    private Button languageButton;
 
     public CreatureChatConfigScreen(ConfigurationScreenData.OpenData initialData) {
         super(Component.literal("CreatureChat Setup"));
@@ -44,6 +46,7 @@ public class CreatureChatConfigScreen extends Screen {
         this.selectedProvider = initialData.provider().isEmpty() ? "custom" : initialData.provider();
         this.maskedApiKeys = initialData.maskedApiKeys();
         this.selectedThinkingLevel = normalizeThinkingLevel(initialData.thinkingLevel());
+        this.selectedLanguageCode = initialData.generationLanguage() != null ? initialData.generationLanguage() : "";
     }
 
     @Override
@@ -95,6 +98,14 @@ public class CreatureChatConfigScreen extends Screen {
 
         thinkingButton = addRenderableWidget(Button.builder(thinkingLabel(), button -> cycleThinkingLevel())
                 .bounds(fieldX, rowY + ROW_HEIGHT * 5 + 12, 112, BUTTON_HEIGHT)
+                .build());
+
+        languageButton = addRenderableWidget(Button.builder(languageLabel(), button ->
+                this.minecraft.setScreen(new LanguageSelectorScreen(this, selectedLanguageCode, code -> {
+                    selectedLanguageCode = code;
+                    updateLanguageButtonLabel();
+                })))
+                .bounds(fieldX, rowY + ROW_HEIGHT * 6 + 12, 200, BUTTON_HEIGHT)
                 .build());
 
         int buttonY = panelY + PANEL_HEIGHT - 36;
@@ -175,7 +186,8 @@ public class CreatureChatConfigScreen extends Screen {
                 modelsField.getValue(),
                 timeout,
                 outputTokens,
-                selectedThinkingLevel
+                selectedThinkingLevel,
+                selectedLanguageCode
         );
     }
 
@@ -206,6 +218,19 @@ public class CreatureChatConfigScreen extends Screen {
 
     private Component thinkingLabel() {
         return Component.literal("Thinking: " + selectedThinkingLevel);
+    }
+
+    private void updateLanguageButtonLabel() {
+        if (languageButton != null) {
+            languageButton.setMessage(languageLabel());
+        }
+    }
+
+    private Component languageLabel() {
+        if (selectedLanguageCode == null || selectedLanguageCode.isEmpty()) {
+            return Component.literal("Language: auto (client)");
+        }
+        return Component.literal("Language: " + selectedLanguageCode);
     }
 
     private String normalizeThinkingLevel(String value) {
@@ -255,6 +280,7 @@ public class CreatureChatConfigScreen extends Screen {
         graphics.drawString(this.font, Component.literal("Timeout"), fieldX, rowY + ROW_HEIGHT * 3, 0xFFFFFF);
         graphics.drawString(this.font, Component.literal("Output tokens"), fieldX, rowY + ROW_HEIGHT * 4, 0xFFFFFF);
         graphics.drawString(this.font, Component.literal("Thinking (Gemini)"), fieldX, rowY + ROW_HEIGHT * 5, 0xFFFFFF);
+        graphics.drawString(this.font, Component.literal("Generation language"), fieldX, rowY + ROW_HEIGHT * 6, 0xFFFFFF);
 
         if (!statusMessage.isEmpty()) {
             graphics.drawString(this.font, Component.literal(statusMessage), fieldX, panelY + PANEL_HEIGHT - 56, statusColor);
