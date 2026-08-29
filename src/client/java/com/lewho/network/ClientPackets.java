@@ -37,6 +37,7 @@ import net.minecraft.world.entity.player.Player;
  */
 public class ClientPackets {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
+    private static final Gson GSON = new Gson();
     static HashMap<Integer, byte[]> receivedChunks = new HashMap<>();
 
     public static void sendGenerateGreeting(Entity entity) {
@@ -242,7 +243,6 @@ public class ClientPackets {
                     }
 
                     // Parse JSON and update client chat data
-                    Gson GSON = new Gson();
                     Type type = new TypeToken<ConcurrentHashMap<String, EntityChatData>>(){}.getType();
                     ChatDataManager.getClientInstance().entityChatDataMap = GSON.fromJson(chatDataJSON, type);
 

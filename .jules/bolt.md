@@ -1,0 +1,1 @@
+## 2024-05-18 - Avoid re-instantiating Gson in hot paths\n**Learning:** Instantiating `new Gson()` repeatedly in high-frequency methods (like API request generation) creates unnecessary object allocation and garbage collection overhead.\n**Action:** Reuse a static, immutable `Gson` instance where available.

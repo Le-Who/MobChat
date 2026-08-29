@@ -440,8 +440,7 @@ public class ChatGPTRequest {
                     ChatGPTRequestPayload payload = new ChatGPTRequestPayload(
                             apiUrl, modelName, messages, normalizedOutputMode, 1.0f, maxOutputTokens, thinkingLevel);
 
-                    Gson gsonInput = new Gson();
-                    String jsonInputString = gsonInput.toJson(payload);
+                    String jsonInputString = GSON.toJson(payload);
 
                     byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
                     connection.setFixedLengthStreamingMode(input.length);
