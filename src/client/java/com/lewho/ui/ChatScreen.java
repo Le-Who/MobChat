@@ -12,6 +12,7 @@ import com.lewho.i18n.CCText;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -126,6 +127,7 @@ public class ChatScreen extends ScreenHelper {
                 widget -> onClose(),                // onPress
                 widget -> Component.empty()            // narrationSupplier
         );
+        cancelButton.setTooltip(Tooltip.create(CCText.UI_BTN_CLOSE.comp()));
         addRenderableWidget(cancelButton);
 
         // SEND / DONE
@@ -139,6 +141,7 @@ public class ChatScreen extends ScreenHelper {
                 widget -> sendChatMessage(),                      // onPress
                 widget -> Component.empty()                            // narrationSupplier
         );
+        sendButton.setTooltip(Tooltip.create(CCText.UI_BTN_SEND.comp()));
         sendButton.active = false;
         addRenderableWidget(sendButton);
     }
