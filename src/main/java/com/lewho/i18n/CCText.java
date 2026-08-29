@@ -16,13 +16,17 @@ public class CCText {
     public static final TR UI_HISTORY_EMPTY = new TR("ui.history_empty", "No chat history yet.");
     public static final TR UI_HISTORY_NPC = new TR("ui.history_npc", "NPC");
     public static final TR UI_HISTORY_PLAYER = new TR("ui.history_player", "Player");
+    public static final TR UI_BTN_CLOSE = new TR("ui.btn_close", "Close");
+    public static final TR UI_BTN_SEND = new TR("ui.btn_send", "Send");
     public static final List<TR> UI_TEXT = List.of(
             UI_CHAT_TITLE,
             UI_ENTER_MESSAGE,
             UI_HISTORY_TITLE,
             UI_HISTORY_EMPTY,
             UI_HISTORY_NPC,
-            UI_HISTORY_PLAYER
+            UI_HISTORY_PLAYER,
+            UI_BTN_CLOSE,
+            UI_BTN_SEND
     );
 
     // Configuration command text
