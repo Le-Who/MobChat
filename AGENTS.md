@@ -15,9 +15,10 @@ These instructions apply to the whole `E:\Projects\MobChat` workspace.
 - Default Minecraft target is defined by `minecraft_version` in `gradle.properties`.
 - Build system: Gradle with Fabric Loom.
 - Java source/target compatibility: Java 17.
-- Local Gradle toolchain path is configured in `gradle.properties`.
+- The compiler toolchain is declared in `build.gradle`; its local path is configured in `gradle.properties`. Source/API release compatibility is separate from the JDK used to compile.
 - Official Mojang mappings are used through `loom.officialMojangMappings()`. Search and code with Mojang names such as `ServerPlayer`, `Mob`, `LivingEntity`, and `MinecraftServer`.
 - Version-specific source overrides live under `src/vs/vX_Y_Z/` and are applied by `build.gradle` when the target Minecraft version is greater than or equal to the folder version.
+- Before cross-module changes, read `ARCHITECTURE.md` for ownership, data boundaries, response/save lifetime and version adapters. Use `CONTRIBUTING.md` for test/release workflow and `INSTALL.md` for toolchain setup.
 
 ## Folder Map
 
@@ -28,6 +29,7 @@ These instructions apply to the whole `E:\Projects\MobChat` workspace.
 - `src/main/java/com/lewho/network/`: server packets and server/client sync entry points.
 - `src/main/java/com/lewho/inventory/`: mob inventory menu, loot, and inventory behavior.
 - `src/client/java/com/lewho/`: client UI, rendering, packet handlers, particles, and screens.
+- `src/main/java/com/lewho/update/` and `src/client/java/com/lewho/update/`: release selection, verified staging, exit-time helper installation, and client consent.
 - `src/main/resources/data/creaturechat/prompts/`: LLM prompt templates.
 - `src/main/resources/assets/creaturechat/lang/`: translations.
 - `src/main/resources/data/creaturechat/loot_tables/`: loot tables used by mob inventories.
@@ -69,28 +71,30 @@ build/libs/creaturechat-<mod_version>+<minecraft_version>.jar
 
 Read `mod_version` and `minecraft_version` from `gradle.properties`; do not copy a hardcoded version from this file.
 
-`build.sh` can build multiple Minecraft versions and may temporarily edit `gradle.properties` and `fabric.mod.json`. Prefer `.\gradlew.bat build` for ordinary validation unless the user asks for multi-version packaging.
+`build.sh` builds a historical multi-version matrix, edits `gradle.properties` and `fabric.mod.json`, and does not restore them. It skips tests/access-widener validation. Prefer `.\gradlew.bat build` for ordinary validation unless the user asks for multi-version packaging.
 
 ## LLM And JSON Contracts
 
-- `ChatGPTRequest` sends OpenAI-compatible chat completions requests.
+- `ChatGPTRequest` owns shared request orchestration. OpenAI-compatible chat completions and native Gemini payload/envelope adapters retain their separate wire formats.
+- Gameplay and setup callbacks consume their own immutable `ChatGPTRequest.RequestResult`. Legacy static `last*` fields are compatibility diagnostics, not request ownership.
 - `ChatGPTResponse`, `MessageParser`, and `CharacterSheetNormalizer` depend on strict structured JSON contracts.
 - Do not replace schema-backed chat or character generation with free-form text parsing.
 - Preserve the output modes in `ChatGPTRequest.StructuredOutputMode`: `NONE`, `CHAT`, and `CHARACTER`.
-- Structured output needs enough `max_tokens`; do not lower floors without tests proving chat and character JSON are not truncated.
-- `ChatGPTRequest.lastErrorMessage` must not leak raw API keys.
-- When adding provider support, prefer OpenAI-compatible request/response shapes already used by `ConfigurationPresets`.
+- Structured output needs enough `max_tokens` / `maxOutputTokens`; do not lower floors without tests proving chat and character JSON are not truncated.
+- Redact all configured keys before logging or reporting errors, including decoded provider JSON. Request results and legacy diagnostics must not expose raw keys.
+- Keep input snapshots, quota preflight, candidate traversal and retry policy in the shared runner when adding a provider adapter.
 
 ## Provider And Quota Handling
 
 - Provider presets live in `ConfigurationPresets`.
-- Google AI Studio preset uses `gemini-3.1-flash-lite` and the Gemini OpenAI-compatible endpoint.
-- `ApiUsageLimiter` preflights Gemini usage before HTTP requests:
+- Read the current model and URL from `ConfigurationPresets`; the Google AI Studio preset uses native `generateContent` at the Gemini `v1beta` endpoint. Google URLs with `/openai` retain the compatible shape.
+- `ApiUsageLimiter` preflights Gemini usage before every HTTP attempt, including retries and native requests:
   - default RPM: `14`
   - default RPD: `450`
   - default scope: `per_key`
   - runtime state file: `creaturechat_usage.json`
 - `creaturechat_usage.json` is runtime state and must remain ignored by Git.
+- `creaturechat.json` contains credentials and `chatdata.json` contains world conversations; keep both as ignored runtime files.
 - If multiple AI Studio keys belong to one Google project, admins can use `geminiscope shared`; otherwise `per_key` preserves key rotation.
 - Keep `429` handling as a fallback even when local preflight limiting exists.
 
@@ -123,9 +127,12 @@ The setup screen must not echo stored API keys back to clients. `ConfigurationSc
 ## Gameplay And State Rules
 
 - Use `EntityChatData` and `PlayerData` for persisted per-entity/per-player chat state.
+- Admit character/chat requests through the current `ChatSession` before changing history or automatic-message state. Apply the whole callback on the originating server executor, after checking current session, state, player, entity and world identity.
+- Create mutable chat snapshots on the server thread. Stop request/save scheduling before the final save; preserve the last good file if serialization fails.
 - Use `SocialEventRecorder` for player social events instead of manually changing summaries in random call sites.
 - Automatic reactions must be rate-limited. Check existing `ChatDataManager`, `AutoMessageBucket`, damage cooldown, ambient response, and Gemini usage limiter patterns before adding a new automatic LLM path.
 - Dynamic behavior should go through `EntityBehaviorManager` and existing goal classes. Do not mutate goal selectors from scattered code without checking existing manager behavior.
+- Inventory transfer must honor slot permission for both occupied-stack merges and empty destinations. Hand container slots must mirror equipment after in-place mutations as well as `set`/`onTake`.
 - Mixins are high risk. Keep guards early, casts checked, and edits surgical. Avoid broad mixin changes unless the target method and version behavior are clear.
 - Server/world/entity mutations must stay on the server thread unless the Minecraft/Fabric API explicitly allows otherwise.
 
@@ -135,6 +142,7 @@ When Minecraft API differences require source changes:
 
 - Prefer a small helper class that can be overridden under `src/vs/`.
 - Avoid copying a large class into `src/vs/` when a narrow adapter would work.
+- Overrides are cumulative whole-class replacements. Preserve shared `LivingEntityChatHooks` / `MobInteractionHooks` delegation and UUID-based player state when adapting Minecraft signatures.
 - If adding an override, verify the folder version naming and build output from the version-selection block in `build.gradle`.
 
 ## Tests And Verification
@@ -145,12 +153,17 @@ Common test areas:
 
 - `ChatGPTRequestStructuredOutputTests`: request payloads, JSON schema, structured output diagnostics.
 - `ChatGPTRequestUsageLimitTests` and `GeminiUsageLimiterTests`: local quota and key rotation behavior.
+- `GeminiNativePolicyTests`: shared native/compatible fallback, input snapshots, per-request diagnostics, redaction and native payload policy.
+- `ChatStateLifecycleTests`, `ChatRequestDispatchTests` and `ChatDataFileTests`: deferred callbacks, admission before quota/cooldown effects, stale/cancelled requests, pending recovery and file replacement.
+- `MobHandSlotTests`, `MobInventorySocialTests` and `com.lewho.inventory.MobInventoryAccessTests`: equipment mirroring, disarm accounting and slot access during transfers.
 - `DamageReactionRateLimitTests`: combat-triggered auto reply cooldown.
 - `AmbientRateLimitTests`: proximity and mob-to-mob auto-response throttling.
 - `StructuredResponseParserTests`: parser behavior for structured responses and salvage paths.
 - `BehaviorPolicyTests`: server-side action arbitration.
 
 Before finishing source changes, run the relevant targeted tests and then `.\gradlew.bat build` when practical. For docs-only changes, at least run `git diff --check`.
+
+Ordinary verification uses localhost provider fixtures. `BehaviorTests` needs `API_KEY`, calls a live provider and can change `src/test/BehaviorOutputs.json`; keep it separate from offline validation. `runDatagen` clears generated resources and can edit tracked locales through `LangSync`, so review its diff explicitly.
 
 ## Documentation Rules
 

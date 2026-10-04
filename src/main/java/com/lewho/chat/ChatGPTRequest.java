@@ -16,8 +16,6 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -45,6 +43,21 @@ public class ChatGPTRequest {
         CHARACTER
     }
 
+    /** Immutable diagnostics belonging to one request, including any successful retry. */
+    public record RequestResult(
+            String content,
+            int errorCode,
+            String errorMessage,
+            String finishReason,
+            Integer completionTokens,
+            String responsePreview,
+            String structuredResponseWarning,
+            int requestedMaxOutputTokens) {
+    }
+
+    record ResponseContent(String content, String finishReason, Integer completionTokens) {
+    }
+
     static class ChatGPTRequestMessage {
         String role;
         String content;
@@ -52,16 +65,6 @@ public class ChatGPTRequest {
         public ChatGPTRequestMessage(String role, String content) {
             this.role = role;
             this.content = content;
-        }
-    }
-
-    // Keeps the legacy Boolean overload intact while letting new callers choose a specific schema.
-    private static class OutputModeMessageHistory extends ArrayList<ChatMessage> {
-        final StructuredOutputMode outputMode;
-
-        OutputModeMessageHistory(List<ChatMessage> messages, StructuredOutputMode outputMode) {
-            super(messages == null ? Collections.emptyList() : messages);
-            this.outputMode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
         }
     }
 
@@ -241,6 +244,11 @@ public class ChatGPTRequest {
     }
 
     public static String parseAndLogErrorResponse(String errorResponse) {
+        return parseAndLogErrorResponse(errorResponse, List.of());
+    }
+
+    private static String parseAndLogErrorResponse(String errorResponse, List<String> secrets) {
+        errorResponse = sanitize(errorResponse, secrets);
         try {
             JsonElement root = JsonParser.parseString(errorResponse);
             if (root.isJsonArray() && !root.getAsJsonArray().isEmpty()) {
@@ -249,10 +257,11 @@ public class ChatGPTRequest {
             ErrorResponse response = GSON.fromJson(root, ErrorResponse.class);
 
             if (response != null && response.error != null) {
-                LOGGER.error("Error Message: " + response.error.message);
-                LOGGER.error("Error Type: " + response.error.type);
-                LOGGER.error("Error Code: " + response.error.code);
-                return response.error.message != null ? response.error.message : "Unknown error";
+                String message = sanitize(response.error.message, secrets);
+                LOGGER.error("Error Message: " + message);
+                LOGGER.error("Error Type: " + sanitize(response.error.type, secrets));
+                LOGGER.error("Error Code: " + sanitize(response.error.code, secrets));
+                return message != null ? message : "Unknown error";
             } else {
                 // Some gateways return {"message":"Internal server error"} or similar
                 try {
@@ -260,8 +269,9 @@ public class ChatGPTRequest {
                     Map<String, Object> m = GSON.fromJson(root, Map.class);
                     Object msg = (m != null) ? m.get("message") : null;
                     if (msg instanceof String && !((String) msg).isEmpty()) {
-                        LOGGER.error("Gateway error message: " + msg);
-                        return (String) msg;
+                        String message = sanitize((String) msg, secrets);
+                        LOGGER.error("Gateway error message: " + message);
+                        return message;
                     }
                 } catch (Exception ignore) {
                     // fall through to generic handling below
@@ -273,7 +283,7 @@ public class ChatGPTRequest {
             LOGGER.warn("Failed to parse error response as JSON, falling back to plain text");
             LOGGER.error("Error response: " + errorResponse);
         } catch (Exception e) {
-            LOGGER.error("Failed to parse error response", e);
+            LOGGER.error("Failed to parse error response: {}", sanitize(e.getMessage(), secrets));
         }
         return removeQuotes(errorResponse);
     }
@@ -293,23 +303,305 @@ public class ChatGPTRequest {
             Map<String, String> contextData,
             List<ChatMessage> messageHistory,
             StructuredOutputMode outputMode) {
-        StructuredOutputMode normalizedMode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
-        return fetchMessageFromChatGPT(
-                config,
-                systemPrompt,
-                contextData,
-                new OutputModeMessageHistory(messageHistory, normalizedMode),
-                normalizedMode != StructuredOutputMode.NONE);
+        return fetchResultFromChatGPT(config, systemPrompt, contextData, messageHistory, outputMode)
+                .thenApply(RequestResult::content);
     }
 
-    private static StructuredOutputMode outputModeFrom(List<ChatMessage> messageHistory, Boolean jsonMode) {
-        if (messageHistory instanceof OutputModeMessageHistory outputModeHistory) {
-            return outputModeHistory.outputMode;
+    public static CompletableFuture<String> fetchMessageFromChatGPT(
+            ConfigurationHandler.Config config,
+            String systemPrompt,
+            Map<String, String> contextData,
+            List<ChatMessage> messageHistory,
+            Boolean jsonMode) {
+        return fetchMessageFromChatGPT(config, systemPrompt, contextData, messageHistory,
+                Boolean.TRUE.equals(jsonMode) ? StructuredOutputMode.CHAT : StructuredOutputMode.NONE);
+    }
+
+    public static CompletableFuture<RequestResult> fetchResultFromChatGPT(
+            ConfigurationHandler.Config config,
+            String systemPrompt,
+            Map<String, String> contextData,
+            List<ChatMessage> messageHistory,
+            StructuredOutputMode outputMode) {
+        return fetchResult(config, systemPrompt, contextData, messageHistory, outputMode, false);
+    }
+
+    // The explicit native entrypoint also uses this runner, including localhost fixtures.
+    static CompletableFuture<RequestResult> fetchResult(
+            ConfigurationHandler.Config config,
+            String systemPrompt,
+            Map<String, String> contextData,
+            List<ChatMessage> messageHistory,
+            StructuredOutputMode outputMode,
+            boolean forceNative) {
+        RequestSnapshot snapshot = snapshotRequest(config, systemPrompt, contextData, messageHistory, outputMode);
+        boolean nativeGemini = forceNative || isNativeGeminiUrl(snapshot.config().getUrl());
+        return CompletableFuture.supplyAsync(() -> runRequest(snapshot, nativeGemini))
+                .thenApply(ChatGPTRequest::publishLegacyDiagnostics);
+    }
+
+    private record RequestSnapshot(
+            ConfigurationHandler.Config config,
+            ConfigurationHandler.Config sourceConfig,
+            List<ChatGPTRequestMessage> history,
+            String systemMessage,
+            StructuredOutputMode outputMode,
+            int maxOutputTokens,
+            List<String> secrets) {
+    }
+
+    private static RequestSnapshot snapshotRequest(
+            ConfigurationHandler.Config source,
+            String systemPrompt,
+            Map<String, String> contextData,
+            List<ChatMessage> messageHistory,
+            StructuredOutputMode outputMode) {
+        ConfigurationHandler.Config config = new ConfigurationHandler.Config();
+        // Copy every request/quota setting before starting asynchronous work. The copy owns its cursors.
+        synchronized (source) {
+            config.setApiKey(source.getApiKey());
+            config.setUrl(source.getUrl());
+            config.setModel(source.getModel());
+            config.setTimeout(source.getTimeout());
+            config.setMaxContextTokens(source.getMaxContextTokens());
+            config.setMaxOutputTokens(source.getMaxOutputTokens());
+            config.setPercentOfContext(source.getPercentOfContext());
+            config.setThinkingLevel(source.getThinkingLevel());
+            config.setGeminiUsageLimitsEnabled(source.getGeminiUsageLimitsEnabled());
+            config.setGeminiRequestsPerMinute(source.getGeminiRequestsPerMinute());
+            config.setGeminiRequestsPerDay(source.getGeminiRequestsPerDay());
+            config.setGeminiUsageLimitScope(source.getGeminiUsageLimitScope());
+            config.setUsageDataPath(source.getUsageDataPath());
+            selectCandidate(config, source.getActiveApiKey(), source.getActiveModel());
         }
-        return Boolean.TRUE.equals(jsonMode) ? StructuredOutputMode.CHAT : StructuredOutputMode.NONE;
+        StructuredOutputMode mode = outputMode == null ? StructuredOutputMode.NONE : outputMode;
+        int maxOutputTokens = effectiveMaxOutputTokens(config.getMaxOutputTokens(), mode, config.getThinkingLevel());
+        Map<String, String> context = contextData == null ? Map.of() : new HashMap<>(contextData);
+        String systemMessage = replacePlaceholders(systemPrompt == null ? "" : systemPrompt, context);
+        List<ChatGPTRequestMessage> history = new ArrayList<>();
+        int remainingContextTokens = (int) (Math.max(0, config.getMaxContextTokens() - maxOutputTokens)
+                * config.getPercentOfContext());
+        int usedTokens = estimateTokenSize("system: " + systemMessage);
+        if (messageHistory != null) {
+            // Resolve the mutable ChatMessage fields now, before the caller can change them during a retry.
+            List<ChatGPTRequestMessage> copiedHistory = new ArrayList<>();
+            for (ChatMessage message : messageHistory) {
+                copiedHistory.add(new ChatGPTRequestMessage(
+                        message.sender.toString().toLowerCase(Locale.ENGLISH),
+                        replacePlaceholders(message.message, context)));
+            }
+            for (int i = copiedHistory.size() - 1; i >= 0; i--) {
+                ChatGPTRequestMessage message = copiedHistory.get(i);
+                int messageTokens = estimateTokenSize(message.role + ": " + message.content);
+                if (usedTokens + messageTokens > remainingContextTokens) {
+                    break;
+                }
+                history.add(message);
+                usedTokens += messageTokens;
+            }
+            Collections.reverse(history);
+        }
+        List<String> secrets = new ArrayList<>();
+        if (config.getApiKey() != null) {
+            for (String key : config.getApiKey().split(",")) {
+                if (!key.isBlank()) secrets.add(key.trim());
+            }
+        }
+        // Redact a longer overlapping key before a shorter key can hide part of it.
+        secrets.sort(Comparator.comparingInt(String::length).reversed());
+        return new RequestSnapshot(config, source, List.copyOf(history), systemMessage, mode,
+                maxOutputTokens, List.copyOf(secrets));
     }
 
-    // Function to roughly estimate # of OpenAI tokens in String
+    private static RequestResult runRequest(RequestSnapshot snapshot, boolean nativeGemini) {
+        ConfigurationHandler.Config config = snapshot.config();
+        ApiUsageLimiter limiter = usageLimiter;
+        String apiUrl = config.getUrl();
+        int timeout = config.getTimeout() * 1000;
+        int keyCount = Math.max(1, config.getApiKeyCount());
+        int modelCount = Math.max(1, config.getModelCount());
+        int maxAttempts = keyCount * modelCount;
+        RequestResult failure = null;
+        long shortestRetryAfterMillis = Long.MAX_VALUE;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            String activeKey = config.getActiveApiKey();
+            String modelName = config.getActiveModel();
+            publishCandidatePreference(snapshot, activeKey, modelName);
+            // Match the established compatible policy: prefer another candidate on connection failure,
+            // with one transient retry after the final candidate. Every real attempt reserves quota.
+            for (int connectionAttempt = 0; connectionAttempt < 2; connectionAttempt++) {
+                HttpURLConnection connection = null;
+                try {
+                    ApiUsageLimiter.Reservation reservation = limiter.tryReserve(config, apiUrl, activeKey, modelName);
+                    if (!reservation.allowed()) {
+                        if (reservation.retryAfterMillis() > 0) {
+                            shortestRetryAfterMillis = Math.min(shortestRetryAfterMillis, reservation.retryAfterMillis());
+                        }
+                        LOGGER.warn("Skipping AI request candidate due to local usage limit: model={}, reason={}, retry_after_ms={}",
+                                sanitize(modelName, snapshot.secrets()), reservation.reason(), reservation.retryAfterMillis());
+                        break;
+                    }
+
+                    String endpoint = nativeGemini ? GeminiNativeRequest.endpoint(apiUrl, modelName) : apiUrl;
+                    URL url = URI.create(endpoint).toURL();
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("POST");
+                    connection.setRequestProperty("Content-Type", "application/json");
+                    connection.setRequestProperty(nativeGemini ? "x-goog-api-key" : "Authorization",
+                            nativeGemini ? activeKey : "Bearer " + activeKey);
+                    connection.setRequestProperty("Connection", "keep-alive");
+                    connection.setRequestProperty("Accept", "application/json");
+                    connection.setRequestProperty("Accept-Encoding", "gzip");
+                    connection.setDoOutput(true);
+                    connection.setConnectTimeout(timeout);
+                    connection.setReadTimeout(timeout);
+                    Object payload = nativeGemini
+                            ? GeminiNativeRequest.buildPayload(snapshot.systemMessage(), snapshot.history(),
+                                    snapshot.outputMode(), modelName, snapshot.maxOutputTokens(), config.getThinkingLevel())
+                            : compatiblePayload(snapshot, modelName);
+                    byte[] input = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
+                    connection.setFixedLengthStreamingMode(input.length);
+                    try (OutputStream stream = connection.getOutputStream()) {
+                        stream.write(input);
+                    }
+                    int statusCode = connection.getResponseCode();
+                    if (statusCode >= HttpURLConnection.HTTP_BAD_REQUEST) {
+                        if (statusCode == 429) {
+                            limiter.markProviderRateLimited(config, apiUrl, activeKey, modelName);
+                        }
+                        // Provider-controlled bodies and headers are sanitized before parsing or logging.
+                        String reason = sanitize(connection.getResponseMessage(), snapshot.secrets());
+                        String body = sanitize(readResponse(connection.getErrorStream(), connection.getContentEncoding()), snapshot.secrets());
+                        String cleanError = body.isEmpty() ? "Unknown error" : parseAndLogErrorResponse(body, snapshot.secrets());
+                        boolean tryNextCandidate = shouldTryNextCandidate(statusCode, cleanError, attempt, maxAttempts);
+                        String message = "HTTP " + statusCode + (reason == null || reason.isEmpty() ? "" : " " + reason);
+                        cleanError = userFacingProviderError(cleanError);
+                        if (cleanError != null && !cleanError.isEmpty() && !"Unknown error".equals(cleanError)) {
+                            message += ": " + cleanError;
+                        } else if (!body.isEmpty()) {
+                            message += ": " + (body.length() > 300 ? body.substring(0, 300) + "..." : body);
+                        }
+                        failure = failedResult(snapshot, statusCode, message);
+                        LOGGER.error(failure.errorMessage());
+                        if (!tryNextCandidate) {
+                            return failure;
+                        }
+                        LOGGER.warn("API request returned HTTP {}. Trying next API key/model candidate (attempt {} of {}).",
+                                statusCode, attempt, maxAttempts);
+                        break;
+                    }
+                    String body = readResponse(connection.getInputStream(), connection.getContentEncoding());
+                    ResponseContent response = nativeGemini
+                            ? GeminiNativeRequest.parseSuccessResponse(body) : parseCompatibleResponse(body);
+                    if (response == null) {
+                        return failedResult(snapshot, 0, "Failed to parse response");
+                    }
+                    String safeContent = sanitize(response.content(), snapshot.secrets());
+                    String safeFinishReason = sanitize(response.finishReason(), snapshot.secrets());
+                    String warning = structuredResponseWarning(snapshot.outputMode(), safeContent,
+                            safeFinishReason, sanitize(modelName, snapshot.secrets()), snapshot.maxOutputTokens(), response.completionTokens());
+                    if (warning != null) LOGGER.warn(warning);
+                    // A successful retry constructs fresh diagnostics and drops all earlier failure fields.
+                    return new RequestResult(safeContent, 0, null,
+                            safeFinishReason, response.completionTokens(), preview(safeContent), warning, snapshot.maxOutputTokens());
+                } catch (IOException connectionFailure) {
+                    String message = sanitize(connectionFailure.getMessage(), snapshot.secrets());
+                    failure = failedResult(snapshot, -1, "No Internet or Blocked Request: " + message);
+                    if (attempt < maxAttempts) {
+                        LOGGER.warn("Connection failed on attempt {} of {}, trying next candidate: {}", attempt, maxAttempts, message);
+                        break;
+                    }
+                    if (connectionAttempt == 0) {
+                        LOGGER.warn("Connection failed, retrying same candidate (1/1): {}", message);
+                    } else {
+                        LOGGER.warn(failure.errorMessage());
+                        return failure;
+                    }
+                } catch (Exception requestFailure) {
+                    failure = failedResult(snapshot, 0, "Failed to request message: " + requestFailure.getMessage());
+                    LOGGER.error(failure.errorMessage());
+                    return failure;
+                } finally {
+                    if (connection != null) connection.disconnect();
+                }
+            }
+            rotateCandidate(config, attempt, keyCount, modelCount);
+        }
+        if (failure != null) return failure;
+        long retrySeconds = shortestRetryAfterMillis == Long.MAX_VALUE ? 0L
+                : Math.max(1L, (shortestRetryAfterMillis + 999L) / 1000L);
+        return failedResult(snapshot, 429, retrySeconds > 0
+                ? "Local AI usage limit reached for all configured candidates. Try again in about " + retrySeconds + " seconds."
+                : "Local AI usage limit reached for all configured candidates.");
+    }
+
+    private static ChatGPTRequestPayload compatiblePayload(RequestSnapshot snapshot, String modelName) {
+        List<ChatGPTRequestMessage> messages = new ArrayList<>();
+        // Gemini compatible endpoints require user content even for an empty history/config test.
+        messages.add(new ChatGPTRequestMessage(snapshot.history().isEmpty() ? "user" : "system", snapshot.systemMessage()));
+        messages.addAll(snapshot.history());
+        return new ChatGPTRequestPayload(snapshot.config().getUrl(), modelName, messages, snapshot.outputMode(),
+                1.0f, snapshot.maxOutputTokens(), snapshot.config().getThinkingLevel());
+    }
+
+    private static ResponseContent parseCompatibleResponse(String body) {
+        ChatGPTResponse response = GSON.fromJson(body, ChatGPTResponse.class);
+        if (response == null || response.choices == null || response.choices.isEmpty()) return null;
+        ChatGPTResponse.ChatGPTChoice choice = response.choices.get(0);
+        String content = "";
+        if (choice.message != null) {
+            content = choice.message.content != null ? choice.message.content : choice.message.refusal;
+        }
+        return new ResponseContent(content, choice.finish_reason,
+                response.usage == null ? null : response.usage.completion_tokens);
+    }
+
+    private static String readResponse(InputStream stream, String encoding) throws IOException {
+        if (stream == null) return "";
+        try (InputStream raw = stream;
+             InputStream decoded = "gzip".equalsIgnoreCase(encoding) ? new GZIPInputStream(raw) : raw) {
+            return new String(decoded.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static RequestResult failedResult(RequestSnapshot snapshot, int code, String message) {
+        return new RequestResult(null, code, sanitize(message, snapshot.secrets()), null, null, null, null,
+                snapshot.maxOutputTokens());
+    }
+
+    private static synchronized RequestResult publishLegacyDiagnostics(RequestResult result) {
+        lastErrorCode = result.errorCode();
+        lastErrorMessage = result.errorMessage();
+        lastFinishReason = result.finishReason();
+        lastCompletionTokens = result.completionTokens();
+        lastResponsePreview = result.responsePreview();
+        lastStructuredResponseWarning = result.structuredResponseWarning();
+        lastRequestedMaxOutputTokens = result.requestedMaxOutputTokens();
+        return result;
+    }
+
+    private static void publishCandidatePreference(RequestSnapshot snapshot, String key, String model) {
+        ConfigurationHandler.Config source = snapshot.sourceConfig();
+        synchronized (source) {
+            // A retry must not overwrite an administrator's newer configuration.
+            if (Objects.equals(source.getApiKey(), snapshot.config().getApiKey())
+                    && Objects.equals(source.getModel(), snapshot.config().getModel())
+                    && Objects.equals(source.getUrl(), snapshot.config().getUrl())) {
+                selectCandidate(source, key, model);
+            }
+        }
+    }
+
+    private static void selectCandidate(ConfigurationHandler.Config config, String key, String model) {
+        for (int i = 0; i < config.getApiKeyCount() && !Objects.equals(config.getActiveApiKey(), key); i++) {
+            config.rotateApiKey();
+        }
+        for (int i = 0; i < config.getModelCount() && !Objects.equals(config.getActiveModel(), model); i++) {
+            config.rotateModel();
+        }
+    }
+
     private static int estimateTokenSize(String text) {
         return (int) Math.round(text.length() / 3.5);
     }
@@ -318,298 +610,56 @@ public class ChatGPTRequest {
         usageLimiter = new ApiUsageLimiter();
     }
 
-    private static String sanitizeApiKey(String message, String apiKey) {
-        if (message == null || apiKey == null || apiKey.isEmpty()) {
-            return message;
+    private static String sanitize(String message, List<String> secrets) {
+        if (message == null || secrets.isEmpty()) return message;
+        StringBuilder safe = new StringBuilder();
+        int cursor = 0;
+        while (cursor < message.length()) {
+            int start = message.indexOf('"', cursor);
+            if (start < 0) break;
+            int end = -1;
+            boolean escaped = false;
+            for (int index = start + 1; index < message.length(); index++) {
+                char current = message.charAt(index);
+                if (escaped) {
+                    escaped = false;
+                } else if (current == '\\') {
+                    escaped = true;
+                } else if (current == '"') {
+                    end = index;
+                    break;
+                }
+            }
+            if (end < 0) break;
+            safe.append(redactLiteral(message.substring(cursor, start), secrets));
+            String token = message.substring(start, end + 1);
+            try {
+                // Decode complete string tokens before redaction: a JSON escape can hide part of a key.
+                // Only changed strings are reserialized; action numbers, structure, fences and incomplete
+                // tails keep their original representation, including the parser's salvage paths.
+                String decoded = JsonParser.parseString(token).getAsString();
+                String redacted = redactLiteral(decoded, secrets);
+                safe.append(decoded.equals(redacted) ? token : GSON.toJson(redacted));
+            } catch (RuntimeException malformedToken) {
+                safe.append(redactLiteral(token, secrets));
+            }
+            cursor = end + 1;
         }
-        return message.replace(apiKey, "**********");
+        safe.append(redactLiteral(message.substring(cursor), secrets));
+        return safe.toString();
+    }
+
+    private static String redactLiteral(String message, List<String> secrets) {
+        for (String secret : secrets) {
+            message = message.replace(secret, "**********");
+        }
+        return message;
     }
 
     public static boolean isNativeGeminiUrl(String url) {
-        if (url == null) {
-            return false;
-        }
+        if (url == null) return false;
         String lower = url.toLowerCase(Locale.ENGLISH);
         return lower.contains("generativelanguage.googleapis.com") && !lower.contains("/openai");
-    }
-
-    public static CompletableFuture<String> fetchMessageFromChatGPT(ConfigurationHandler.Config config, String systemPrompt, Map<String, String> contextData, List<ChatMessage> messageHistory, Boolean jsonMode) {
-        // Init API & LLM details
-        String apiUrl = config.getUrl();
-        Integer timeout = config.getTimeout() * 1000;
-        int maxContextTokens = config.getMaxContextTokens();
-        double percentOfContext = config.getPercentOfContext();
-        StructuredOutputMode normalizedOutputMode = outputModeFrom(messageHistory, jsonMode);
-        String thinkingLevel = config.getThinkingLevel();
-        int maxOutputTokens = effectiveMaxOutputTokens(config.getMaxOutputTokens(), normalizedOutputMode, thinkingLevel);
-
-        if (isNativeGeminiUrl(apiUrl)) {
-            return GeminiNativeRequest.fetchMessageFromGemini(config, systemPrompt, contextData, messageHistory, normalizedOutputMode);
-        }
-
-        return CompletableFuture.supplyAsync(() -> {
-            lastErrorCode = 0;
-            lastFinishReason = null;
-            lastCompletionTokens = null;
-            lastResponsePreview = null;
-            lastStructuredResponseWarning = null;
-            lastRequestedMaxOutputTokens = maxOutputTokens;
-            int keyCount = Math.max(1, config.getApiKeyCount());
-            int modelCount = Math.max(1, config.getModelCount());
-            int maxAttempts = keyCount * modelCount;
-            // How many times to retry the same key/model on a transient connection failure
-            // before giving up or rotating to the next candidate.
-            final int MAX_CONNECTION_RETRIES = 1;
-            int connectionRetries = 0;
-            boolean skippedByLocalUsageLimit = false;
-            boolean attemptedRequest = false;
-            long shortestRetryAfterMillis = Long.MAX_VALUE;
-
-            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-                String activeKey = config.getActiveApiKey();
-                String modelName = config.getActiveModel();
-                HttpURLConnection connection = null;
-                try {
-                    ApiUsageLimiter.Reservation reservation = usageLimiter.tryReserve(config, apiUrl, activeKey, modelName);
-                    if (!reservation.allowed()) {
-                        skippedByLocalUsageLimit = true;
-                        if (reservation.retryAfterMillis() > 0) {
-                            shortestRetryAfterMillis = Math.min(shortestRetryAfterMillis, reservation.retryAfterMillis());
-                        }
-                        LOGGER.warn("Skipping AI request candidate due to local usage limit: model={}, reason={}, retry_after_ms={}",
-                                modelName,
-                                reservation.reason(),
-                                reservation.retryAfterMillis());
-                        rotateCandidate(config, attempt, keyCount, modelCount);
-                        continue;
-                    }
-                    attemptedRequest = true;
-
-                    // Replace placeholders
-                    String systemMessage = replacePlaceholders(systemPrompt, contextData);
-
-                    URL url = URI.create(apiUrl).toURL();
-                    connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod("POST");
-                    connection.setRequestProperty("Content-Type", "application/json");
-                    connection.setRequestProperty("Authorization", "Bearer " + activeKey);
-                    connection.setRequestProperty("Connection", "keep-alive");
-                    connection.setRequestProperty("Accept", "application/json");
-                    connection.setRequestProperty("Accept-Encoding", "gzip");
-                    connection.setDoOutput(true);
-                    connection.setConnectTimeout(timeout);
-                    connection.setReadTimeout(timeout);
-
-                    // Create messages list (for chat history)
-                    List<ChatGPTRequestMessage> messages = new ArrayList<>();
-
-                    // Don't exceed a specific % of total context window (to limit message history in request)
-                    int remainingContextTokens = (int) (Math.max(0, maxContextTokens - maxOutputTokens) * percentOfContext);
-                    int usedTokens = estimateTokenSize("system: " + systemMessage);
-
-                    // Iterate backwards through the message history
-                    for (int i = messageHistory.size() - 1; i >= 0; i--) {
-                        ChatMessage chatMessage = messageHistory.get(i);
-                        String senderName = chatMessage.sender.toString().toLowerCase(Locale.ENGLISH);
-                        String messageText = replacePlaceholders(chatMessage.message, contextData);
-                        int messageTokens = estimateTokenSize(senderName + ": " + messageText);
-
-                        if (usedTokens + messageTokens > remainingContextTokens) {
-                            break;  // If adding this message would exceed the token limit, stop adding more messages
-                        }
-
-                        // Add the message to the temporary list
-                        messages.add(new ChatGPTRequestMessage(senderName, messageText));
-                        usedTokens += messageTokens;
-                    }
-
-                    // Some endpoints (like Google AI Studio OpenAI compat layer) reject requests
-                    // that only have a 'system' message (empty contents). If history is empty
-                    // (e.g. character generation or config test), send it as a user message.
-                    if (messages.isEmpty()) {
-                        messages.add(new ChatGPTRequestMessage("user", systemMessage));
-                    } else {
-                        messages.add(new ChatGPTRequestMessage("system", systemMessage));
-                    }
-
-                    // Reverse the list to restore chronological order
-                    // This is needed since we build the list in reverse order for token restricting above
-                    Collections.reverse(messages);
-
-                    // Convert JSON to String
-                    ChatGPTRequestPayload payload = new ChatGPTRequestPayload(
-                            apiUrl, modelName, messages, normalizedOutputMode, 1.0f, maxOutputTokens, thinkingLevel);
-
-                    Gson gsonInput = new Gson();
-                    String jsonInputString = gsonInput.toJson(payload);
-
-                    byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
-                    connection.setFixedLengthStreamingMode(input.length);
-                    try (OutputStream os = connection.getOutputStream()) {
-                        os.write(input);
-                    }
-
-                    // Check for error message in response
-                    int statusCode = connection.getResponseCode();
-                    if (statusCode >= HttpURLConnection.HTTP_BAD_REQUEST) {
-                        if (statusCode == 429) {
-                            usageLimiter.markProviderRateLimited(config, apiUrl, activeKey, modelName);
-                        }
-                        lastErrorCode = statusCode;
-                        final String reason = connection.getResponseMessage() != null ? connection.getResponseMessage() : "";
-
-                        // Try to capture helpful IDs for tracing through AWS and OpenAI
-                        final String awsRequestId    = connection.getHeaderField("x-amzn-RequestId");
-                        final String awsErrorType    = connection.getHeaderField("x-amzn-ErrorType");
-                        final String openaiRequestId = connection.getHeaderField("x-request-id");
-
-                        // Log AWS headers only for debugging so they don't bloat user-facing messages
-                        if (awsRequestId != null) LOGGER.debug("AWS Request ID: {}", awsRequestId);
-                        if (awsErrorType != null) LOGGER.debug("AWS Error Type: {}", awsErrorType);
-                        if (openaiRequestId != null) LOGGER.debug("OpenAI Request ID: {}", openaiRequestId);
-
-                        InputStream errStream = connection.getErrorStream();
-                        if (errStream == null) {
-                            try {
-                                errStream = connection.getInputStream();
-                            } catch (Exception ex) {
-                                LOGGER.error("Failed to obtain error stream", ex);
-                                String msg = reason != null ? reason : ("HTTP error " + statusCode);
-                                StringBuilder base = new StringBuilder();
-                                base.append("HTTP ").append(statusCode);
-                                if (msg != null && !msg.isEmpty()) base.append(" ").append(msg);
-
-                                lastErrorMessage = sanitizeApiKey(base + ": " + ex.getMessage(), activeKey);
-                                return null;
-                            }
-                        }
-                        if ("gzip".equalsIgnoreCase(connection.getContentEncoding())) {
-                            errStream = new GZIPInputStream(errStream);
-                        }
-                        try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(errStream, StandardCharsets.UTF_8))) {
-                            String line;
-                            StringBuilder errorResponse = new StringBuilder();
-                            while ((line = errorReader.readLine()) != null) {
-                                errorResponse.append(line.trim());
-                            }
-
-                            // Try known shapes first
-                            String cleanError = parseAndLogErrorResponse(errorResponse.toString());
-
-                            if (shouldTryNextCandidate(statusCode, cleanError, attempt, maxAttempts)) {
-                                LOGGER.warn("API request returned HTTP " + statusCode + ". Trying next API key/model candidate (attempt " + attempt + " of " + maxAttempts + ").");
-                                rotateCandidate(config, attempt, keyCount, modelCount);
-                                connection.disconnect();
-                                continue;
-                            }
-                            cleanError = userFacingProviderError(cleanError);
-
-                            // Build a richer message (status + reason + IDs + short body preview)
-                            StringBuilder sb = new StringBuilder();
-                            sb.append("HTTP ").append(statusCode);
-                            if (!reason.isEmpty()) sb.append(" ").append(reason);
-
-                            if (cleanError != null && !cleanError.isEmpty() && !"Unknown error".equals(cleanError)) {
-                                sb.append(": ").append(cleanError);
-                            } else if (errorResponse.length() > 0) {
-                                String bodyPreview = errorResponse.length() > 300
-                                        ? errorResponse.substring(0, 300) + "..."
-                                        : errorResponse.toString();
-                                sb.append(": ").append(bodyPreview);
-                            }
-
-                            String finalMsg = sb.toString();
-                            LOGGER.error(finalMsg);
-                            lastErrorMessage = sanitizeApiKey(finalMsg, activeKey);
-                        } catch (Exception e) {
-                            LOGGER.error("Failed to read error response", e);
-                            lastErrorMessage = sanitizeApiKey("Failed to read error response: " + e.getMessage(), activeKey);
-                        }
-                        return null;
-                    } else {
-                        lastErrorMessage = null;
-                        lastErrorCode = 0;
-                    }
-
-                    InputStream inStream = connection.getInputStream();
-                    if ("gzip".equalsIgnoreCase(connection.getContentEncoding())) {
-                        inStream = new GZIPInputStream(inStream);
-                    }
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(inStream, StandardCharsets.UTF_8))) {
-                        StringBuilder response = new StringBuilder();
-                        String responseLine;
-                        while ((responseLine = br.readLine()) != null) {
-                            response.append(responseLine.trim());
-                        }
-
-                        ChatGPTResponse chatGPTResponse = GSON.fromJson(response.toString(), ChatGPTResponse.class);
-                        if (chatGPTResponse != null && chatGPTResponse.choices != null && !chatGPTResponse.choices.isEmpty()) {
-                            ChatGPTResponse.ChatGPTChoice choice = chatGPTResponse.choices.get(0);
-                            lastFinishReason = choice.finish_reason;
-                            lastCompletionTokens = chatGPTResponse.usage == null ? null : chatGPTResponse.usage.completion_tokens;
-
-                            String content = "";
-                            if (choice.message != null) {
-                                content = choice.message.content != null ? choice.message.content : choice.message.refusal;
-                            }
-                            lastResponsePreview = preview(content);
-                            lastStructuredResponseWarning = structuredResponseWarning(
-                                    normalizedOutputMode,
-                                    content,
-                                    lastFinishReason,
-                                    modelName,
-                                    maxOutputTokens,
-                                    lastCompletionTokens);
-                            if (lastStructuredResponseWarning != null) {
-                                LOGGER.warn(lastStructuredResponseWarning);
-                            }
-                            return content;
-                        }
-                        lastErrorMessage = "Failed to parse response";
-                        return null;
-                    }
-                } catch (SocketException | SocketTimeoutException ce) {
-                    lastErrorMessage = "No Internet or Blocked Request: " + ce.getMessage();
-                    lastErrorCode = -1;
-                    if (connection != null) {
-                        connection.disconnect();
-                    }
-                    if (attempt < maxAttempts) {
-                        // More key/model candidates available — rotate and try next.
-                        LOGGER.warn("Connection failed on attempt {} of {}, trying next candidate: {}",
-                                attempt, maxAttempts, ce.getMessage());
-                        rotateCandidate(config, attempt, keyCount, modelCount);
-                        connectionRetries = 0; // reset retry budget for the new candidate
-                        continue;
-                    }
-                    if (connectionRetries < MAX_CONNECTION_RETRIES) {
-                        // No other candidates, but failure may be transient — retry same key.
-                        connectionRetries++;
-                        LOGGER.warn("Connection timed out, retrying same candidate ({}/{}): {}",
-                                connectionRetries, MAX_CONNECTION_RETRIES, ce.getMessage());
-                        attempt--; // undo the loop's upcoming increment so we stay on this candidate
-                        continue;
-                    }
-                    LOGGER.warn("Connection failed", ce);
-                    return null;
-                } catch (Exception e) {
-                    LOGGER.error("Failed to request message", e);
-                    lastErrorMessage = sanitizeApiKey("Failed to request message: " + e.getMessage(), activeKey);
-                    lastErrorCode = 0;
-                    return null;
-                }
-            }
-            if (skippedByLocalUsageLimit && !attemptedRequest) {
-                lastErrorCode = 429;
-                long retrySeconds = shortestRetryAfterMillis == Long.MAX_VALUE
-                        ? 0L
-                        : Math.max(1L, (shortestRetryAfterMillis + 999L) / 1000L);
-                lastErrorMessage = retrySeconds > 0
-                        ? "Local AI usage limit reached for all configured candidates. Try again in about " + retrySeconds + " seconds."
-                        : "Local AI usage limit reached for all configured candidates.";
-            }
-            return null;
-        });
     }
 
     private static boolean shouldTryNextCandidate(int statusCode, String providerError, int attempt, int maxAttempts) {
@@ -696,7 +746,7 @@ public class ChatGPTRequest {
         }
 
         String preview = preview(content);
-        if ("length".equalsIgnoreCase(finishReason)) {
+        if ("length".equalsIgnoreCase(finishReason) || "MAX_TOKENS".equalsIgnoreCase(finishReason)) {
             return "Structured AI response was truncated: mode=" + outputMode
                     + ", model=" + modelName
                     + ", finish_reason=" + finishReason

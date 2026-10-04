@@ -7,6 +7,7 @@ import com.lewho.chat.ChatDataManager;
 import com.lewho.chat.ChatDataSaverScheduler;
 import com.lewho.chat.ChatGPTRequest;
 import com.lewho.chat.ChatHistoryEntry;
+import com.lewho.chat.ChatSession;
 import com.lewho.chat.EntityChatData;
 import com.lewho.chat.PlayerData;
 import com.lewho.chat.PlayerChatPreferences;
@@ -45,6 +46,7 @@ import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
 import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -293,6 +295,9 @@ public class ServerPackets {
         ServerWorldEvents.LOAD.register((server, world) -> {
             String world_name = world.dimension().location().getPath();
             if (world_name.equals("overworld")) {
+                if (scheduler != null) {
+                    scheduler.stopAutoSaveTask();
+                }
                 serverInstance = server;
                 ChatDataManager.getServerInstance().loadChatData(server);
                 playerPreferences = PlayerChatPreferences.load(playerPreferencesPath(server));
@@ -304,19 +309,28 @@ public class ServerPackets {
         });
         ServerWorldEvents.UNLOAD.register((server, world) -> {
             String world_name = world.dimension().location().getPath();
-            if (world_name.equals("overworld")) {
+            if (world_name.equals("overworld") && serverInstance == server) {
                 ChatDataManager manager = ChatDataManager.getServerInstance();
+                // Stop producers and invalidate queued callbacks before the final snapshot.
+                if (scheduler != null) {
+                    scheduler.stopAutoSaveTask();
+                    scheduler = null;
+                }
+                manager.closeSession(server);
                 manager.saveChatData(server);
                 playerPreferences.save(playerPreferencesPath(server));
                 manager.clearData();
                 serverInstance = null;
 
-                // Shutdown auto scheduler
-                scheduler.stopAutoSaveTask();
             }
         });
         ServerEntityEvents.ENTITY_UNLOAD.register((entity, world) -> {
+            if (world.getServer() != serverInstance) {
+                return;
+            }
             String entityUUID = entity.getStringUUID();
+            ChatDataManager.getServerInstance().cancelRequest(
+                    ChatDataManager.getServerInstance().entityChatDataMap.get(entityUUID));
             if (entity.getRemovalReason() == Entity.RemovalReason.KILLED && ChatDataManager.getServerInstance().entityChatDataMap.containsKey(entityUUID)) {
                 LOGGER.debug("Entity killed (" + entityUUID + "), updating death time stamp.");
                 ChatDataManager.getServerInstance().entityChatDataMap.get(entityUUID).death = System.currentTimeMillis();
@@ -461,13 +475,22 @@ public class ServerPackets {
             return;
         }
 
+        ChatSession session = ChatDataManager.getServerInstance().getSession(server);
+        Level playerLevel = player.level();
+        if (session == null || !session.isOpen() || !(playerLevel instanceof ServerLevel world)) {
+            return;
+        }
         sendConfigStatus(player, true, "Testing CreatureChat AI configuration...");
-        ChatGPTRequest.fetchMessageFromChatGPT(config, "Reply with exactly: OK", new HashMap<>(), new ArrayList<>(), false)
-                .thenAccept(response -> server.execute(() -> {
-                    if (response != null && !response.isBlank()) {
+        ChatGPTRequest.fetchResultFromChatGPT(config, "Reply with exactly: OK", new HashMap<>(), new ArrayList<>(),
+                        ChatGPTRequest.StructuredOutputMode.NONE)
+                .whenComplete((result, failure) -> session.execute(() -> {
+                    if (!isCurrentPlayerContext(server, player, world) || !isConfigOperator(player)) {
+                        return;
+                    }
+                    if (failure == null && result != null && result.content() != null && !result.content().isBlank()) {
                         sendConfigStatus(player, true, "CreatureChat AI test succeeded using model: " + config.getActiveModel());
                     } else {
-                        String message = ChatGPTRequest.lastErrorMessage != null ? ChatGPTRequest.lastErrorMessage : "No response";
+                        String message = result != null && result.errorMessage() != null ? result.errorMessage() : "No response";
                         sendConfigStatus(player, false, "CreatureChat AI test failed: " + message);
                     }
                 }));
@@ -494,14 +517,22 @@ public class ServerPackets {
 
     public static void generate_character(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, boolean is_auto_message) {
         ConfigurationHandler.Config config = new ConfigurationHandler(serverInstance).loadConfig();
+        ChatDataManager manager = ChatDataManager.getServerInstance();
+        manager.dispatchRequest(chatData, player,
+                () -> manager.handleAutoResponse(chatData, player, is_auto_message, config),
+                request -> generate_character(request, userLanguage, chatData, player, entity, is_auto_message, config));
+    }
+
+    private static void generate_character(ChatSession.Request request, String userLanguage, EntityChatData chatData,
+                                           ServerPlayer player, Mob entity, boolean is_auto_message,
+                                           ConfigurationHandler.Config config) {
+        if (!request.isCurrent(chatData)) {
+            return;
+        }
         // Apply server language override if configured
         String effectiveLanguage = config.getGenerationLanguage().isEmpty()
                 ? userLanguage
                 : MinecraftLanguages.displayName(config.getGenerationLanguage());
-        ChatDataManager manager = ChatDataManager.getServerInstance();
-        if (!manager.handleAutoResponse(chatData, player, is_auto_message, config)) {
-            return;
-        }
         // Set talk to player goal (prevent entity from walking off)
         TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
         EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
@@ -529,7 +560,7 @@ public class ServerPackets {
         userMessageBuilder.append("They speak in '").append(effectiveLanguage).append("' with a ").append(randomSpeakingStyle).append(" style.");
 
         // Generate new character
-        chatData.generateCharacter(effectiveLanguage, player, userMessageBuilder.toString(), is_auto_message);
+        chatData.generateCharacter(request, effectiveLanguage, player, userMessageBuilder.toString(), is_auto_message);
 
         // Populate inventory with some simple starter items if empty
         if (entity instanceof ChatInventory chatInv) {
@@ -590,21 +621,30 @@ public class ServerPackets {
 
     public static void generate_chat(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, String message, boolean is_auto_message) {
         ConfigurationHandler.Config config = new ConfigurationHandler(serverInstance).loadConfig();
+        ChatDataManager manager = ChatDataManager.getServerInstance();
+        manager.dispatchRequest(chatData, player,
+                () -> manager.handleAutoResponse(chatData, player, is_auto_message, config),
+                request -> generate_chat(request, userLanguage, chatData, player, entity, message, is_auto_message, config));
+    }
+
+    /** Shared preparation for reactive callers that already admitted and rate-limited their request. */
+    public static void generate_chat(ChatSession.Request request, String userLanguage, EntityChatData chatData,
+                                    ServerPlayer player, Mob entity, String message, boolean is_auto_message,
+                                    ConfigurationHandler.Config config) {
+        if (request == null || !request.isCurrent(chatData)) {
+            return;
+        }
         // Apply server language override if configured
         String effectiveLanguage = config.getGenerationLanguage().isEmpty()
                 ? userLanguage
                 : MinecraftLanguages.displayName(config.getGenerationLanguage());
-        ChatDataManager manager = ChatDataManager.getServerInstance();
-        if (!manager.handleAutoResponse(chatData, player, is_auto_message, config)) {
-            return;
-        }
 
         // Set talk to player goal (prevent entity from walking off)
         TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
         EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
         // Add new message
-        chatData.generateMessage(effectiveLanguage, player, message, is_auto_message);
+        chatData.generateMessage(request, effectiveLanguage, player, message, is_auto_message, !is_auto_message);
     }
 
     public static void handleNearbyPlayerChat(ServerPlayer player, String chatMessage) {
@@ -612,8 +652,17 @@ public class ServerPackets {
             return;
         }
 
-        serverInstance.execute(() -> {
-            ConfigurationHandler.Config config = new ConfigurationHandler(serverInstance).loadConfig();
+        MinecraftServer server = player.getServer();
+        ChatSession session = ChatDataManager.getServerInstance().getSession(server);
+        Level playerLevel = player.level();
+        if (session == null || !(playerLevel instanceof ServerLevel world)) {
+            return;
+        }
+        session.execute(() -> {
+            if (!isCurrentPlayerContext(server, player, world)) {
+                return;
+            }
+            ConfigurationHandler.Config config = new ConfigurationHandler(server).loadConfig();
             if (!config.getProximityChatEnabled()) {
                 return;
             }
@@ -652,7 +701,18 @@ public class ServerPackets {
             return;
         }
 
-        serverInstance.execute(() -> {
+        MinecraftServer server = player.getServer();
+        ChatSession session = ChatDataManager.getServerInstance().getSession(server);
+        if (session == null || !(sourceEntity.level() instanceof ServerLevel world)) {
+            return;
+        }
+        EntityChatData sourceState = ChatDataManager.getServerInstance().entityChatDataMap.get(sourceEntity.getStringUUID());
+        session.execute(() -> {
+            if (!isCurrentPlayerContext(server, player, world) || !sourceEntity.isAlive() || sourceEntity.isRemoved()
+                    || sourceEntity.level() != world || world.getEntity(sourceEntity.getUUID()) != sourceEntity
+                    || ChatDataManager.getServerInstance().entityChatDataMap.get(sourceEntity.getStringUUID()) != sourceState) {
+                return;
+            }
             if (!config.getMobToMobChatEnabled()) {
                 return;
             }
@@ -691,22 +751,27 @@ public class ServerPackets {
         });
     }
 
+    private static boolean isCurrentPlayerContext(MinecraftServer server, ServerPlayer player, ServerLevel world) {
+        return server != null && serverInstance == server && server.getLevel(world.dimension()) == world
+                && player.level() == world && player.isAlive() && !player.isRemoved()
+                && server.getPlayerList().getPlayer(player.getUUID()) == player;
+    }
+
     public static boolean generate_ambient_chat(String userLanguage, EntityChatData chatData, ServerPlayer player, Mob entity, String message,
                                                 ConfigurationHandler.Config config, boolean allow_mob_to_mob_reactions) {
         ChatDataManager manager = ChatDataManager.getServerInstance();
-        if (!manager.handleAmbientResponse(chatData, player, config)) {
-            return false;
-        }
-        // Apply server language override if configured
-        String effectiveLanguage = config.getGenerationLanguage().isEmpty()
-                ? userLanguage
-                : MinecraftLanguages.displayName(config.getGenerationLanguage());
+        return manager.dispatchRequest(chatData, player,
+                () -> manager.handleAmbientResponse(chatData, player, config), request -> {
+                    // Apply server language override if configured
+                    String effectiveLanguage = config.getGenerationLanguage().isEmpty()
+                            ? userLanguage
+                            : MinecraftLanguages.displayName(config.getGenerationLanguage());
 
-        TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
-        EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
+                    TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
+                    EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
-        chatData.generateMessage(effectiveLanguage, player, message, true, allow_mob_to_mob_reactions);
-        return true;
+                    chatData.generateMessage(request, effectiveLanguage, player, message, true, allow_mob_to_mob_reactions);
+                });
     }
 
     private static int perMessageLimit(int configuredLimit) {

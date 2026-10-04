@@ -2,34 +2,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package com.lewho.chat;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.lewho.commands.ConfigurationHandler;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.zip.GZIPInputStream;
 
 /**
  * Native Google Gemini API client executing generateContent requests.
  */
 public final class GeminiNativeRequest {
-    private static final Logger LOGGER = LogManager.getLogger();
-    private static final Gson GSON = new Gson();
-
     private GeminiNativeRequest() {
     }
 
@@ -39,165 +27,68 @@ public final class GeminiNativeRequest {
             Map<String, String> contextData,
             List<ChatMessage> messageHistory,
             ChatGPTRequest.StructuredOutputMode outputMode) {
-
-        String baseUrl = config.getUrl().replaceAll("/+$", "");
-        int timeout = config.getTimeout() * 1000;
-        String thinkingLevel = config.getThinkingLevel();
-        int maxOutputTokens = ChatGPTRequest.effectiveMaxOutputTokens(config.getMaxOutputTokens(), outputMode, thinkingLevel);
-        int candidateCount = Math.max(1, config.getApiKeyCount());
-
-
-        return CompletableFuture.supplyAsync(() -> {
-            ChatGPTRequest.lastErrorCode = 0;
-            ChatGPTRequest.lastFinishReason = null;
-            ChatGPTRequest.lastErrorMessage = null;
-
-            int attemptsPerCandidate = 2; // 1 attempt + 1 retry
-            int maxAttempts = candidateCount * attemptsPerCandidate;
-
-            for (int attempt = 0; attempt < maxAttempts; attempt++) {
-                String currentKey = config.getActiveApiKey();
-                String currentModel = config.getActiveModel();
-
-                // Build request URL: {baseUrl}/models/{model}:generateContent
-                String endpointUrl = baseUrl;
-                if (!endpointUrl.contains("/models/")) {
-                    endpointUrl += "/models/" + currentModel + ":generateContent";
-                } else if (!endpointUrl.endsWith(":generateContent")) {
-                    endpointUrl += ":generateContent";
-                }
-
-                HttpURLConnection connection = null;
-                try {
-                    URL url = URI.create(endpointUrl).toURL();
-                    connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod("POST");
-                    connection.setRequestProperty("Content-Type", "application/json");
-                    connection.setRequestProperty("x-goog-api-key", currentKey);
-                    connection.setRequestProperty("Accept", "application/json");
-                    connection.setRequestProperty("Accept-Encoding", "gzip");
-                    connection.setDoOutput(true);
-                    connection.setConnectTimeout(timeout);
-                    connection.setReadTimeout(timeout);
-
-                    GeminiPayload payload = buildPayload(systemPrompt, contextData, messageHistory, outputMode, currentModel, maxOutputTokens);
-                    String jsonInput = GSON.toJson(payload);
-                    byte[] input = jsonInput.getBytes(StandardCharsets.UTF_8);
-
-                    connection.setFixedLengthStreamingMode(input.length);
-                    try (OutputStream os = connection.getOutputStream()) {
-                        os.write(input);
-                        os.flush();
-                    }
-
-                    int responseCode = connection.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        String encoding = connection.getHeaderField("Content-Encoding");
-                        InputStream responseStream = connection.getInputStream();
-                        if ("gzip".equalsIgnoreCase(encoding)) {
-                            responseStream = new GZIPInputStream(responseStream);
-                        }
-
-                        String responseBody = new String(responseStream.readAllBytes(), StandardCharsets.UTF_8);
-                        String text = parseSuccessResponse(responseBody);
-                        if (text != null) {
-                            return text;
-                        }
-                    } else {
-                        ChatGPTRequest.lastErrorCode = responseCode;
-                        InputStream errorStream = connection.getErrorStream();
-                        if (errorStream != null) {
-                            String encoding = connection.getHeaderField("Content-Encoding");
-                            if ("gzip".equalsIgnoreCase(encoding)) {
-                                errorStream = new GZIPInputStream(errorStream);
-                            }
-                            String errorBody = new String(errorStream.readAllBytes(), StandardCharsets.UTF_8);
-                            ChatGPTRequest.lastErrorMessage = parseErrorResponse(errorBody);
-                        } else {
-                            ChatGPTRequest.lastErrorMessage = "HTTP " + responseCode;
-                        }
-
-                        LOGGER.warn("Native Gemini API returned code: " + responseCode + " Error: " + ChatGPTRequest.lastErrorMessage);
-                    }
-
-                } catch (Exception e) {
-                    LOGGER.warn("Native Gemini API connection failed (attempt " + (attempt + 1) + "/" + maxAttempts + "): " + e.getMessage());
-                    ChatGPTRequest.lastErrorMessage = e.getMessage();
-                } finally {
-                    if (connection != null) {
-                        connection.disconnect();
-                    }
-                }
-
-                // If candidate exhausted, rotate
-                if ((attempt + 1) % attemptsPerCandidate == 0 && candidateCount > 1) {
-                    config.rotateApiKey();
-                }
-            }
-
-            return null;
-        });
+        return ChatGPTRequest.fetchResult(config, systemPrompt, contextData, messageHistory, outputMode, true)
+                .thenApply(ChatGPTRequest.RequestResult::content);
     }
 
-    private static GeminiPayload buildPayload(
-            String systemPrompt,
-            Map<String, String> contextData,
-            List<ChatMessage> messageHistory,
+    static String endpoint(String baseUrl, String modelName) throws java.net.URISyntaxException {
+        URI base = URI.create(baseUrl);
+        String path = base.getPath() == null ? "" : base.getPath().replaceAll("/+$", "");
+        int modelPath = path.indexOf("/models/");
+        // Explicit generateContent URLs must still follow the selected fallback model.
+        if (modelPath >= 0) path = path.substring(0, modelPath);
+        path += "/models/" + modelName + ":generateContent";
+        return new URI(base.getScheme(), base.getAuthority(), path, base.getQuery(), base.getFragment()).toString();
+    }
+
+    static GeminiPayload buildPayload(
+            String systemMessage,
+            List<ChatGPTRequest.ChatGPTRequestMessage> messageHistory,
             ChatGPTRequest.StructuredOutputMode outputMode,
             String modelName,
-            int maxOutputTokens) {
-
+            int maxOutputTokens,
+            String thinkingLevel) {
         GeminiPayload payload = new GeminiPayload();
-
-        // System Instruction — Gemini native API: no 'role' field, only 'parts'
-        if (systemPrompt != null && !systemPrompt.isBlank()) {
-            String resolvedPrompt = ChatGPTRequest.replacePlaceholders(systemPrompt, contextData);
-            payload.systemInstruction = new GeminiPayload.ContentParts(List.of(new GeminiPayload.Part(resolvedPrompt)));
+        if (!systemMessage.isBlank()) {
+            payload.systemInstruction = new GeminiPayload.ContentParts(List.of(new GeminiPayload.Part(systemMessage)));
         }
 
-        // Contents
         List<GeminiPayload.Content> contents = new ArrayList<>();
-        if (messageHistory != null) {
-            for (ChatMessage msg : messageHistory) {
-                String role = msg.sender == ChatDataManager.ChatSender.USER ? "user" : "model";
-                String text = ChatGPTRequest.replacePlaceholders(msg.message, contextData);
-                contents.add(new GeminiPayload.Content(role, List.of(new GeminiPayload.Part(text))));
-            }
+        for (ChatGPTRequest.ChatGPTRequestMessage message : messageHistory) {
+            String role = "user".equals(message.role) ? "user" : "model";
+            contents.add(new GeminiPayload.Content(role, List.of(new GeminiPayload.Part(message.content))));
         }
-
         if (contents.isEmpty()) {
             contents.add(new GeminiPayload.Content("user", List.of(new GeminiPayload.Part("Proceed."))));
         }
-
         payload.contents = contents;
 
-        // Generation Config
-        GeminiPayload.GenerationConfig config = new GeminiPayload.GenerationConfig();
-        config.maxOutputTokens = maxOutputTokens;
-
-        // gemini-3.5-flash-lite deprecates temperature customization
-        if (!modelName.toLowerCase(Locale.ENGLISH).contains("3.5-flash-lite")) {
-            config.temperature = 1.0f;
+        GeminiPayload.GenerationConfig generation = new GeminiPayload.GenerationConfig();
+        generation.maxOutputTokens = maxOutputTokens;
+        String normalizedModel = modelName.toLowerCase(Locale.ENGLISH);
+        // Keep the existing Flash-Lite temperature exception.
+        if (!normalizedModel.contains("3.5-flash-lite")) {
+            generation.temperature = 1.0f;
         }
-
+        if (normalizedModel.startsWith("gemini-3") && !"auto".equals(thinkingLevel)) {
+            generation.thinkingConfig = new GeminiPayload.ThinkingConfig(thinkingLevel);
+        }
         if (outputMode == ChatGPTRequest.StructuredOutputMode.CHARACTER) {
-            config.responseMimeType = "application/json";
-            config.responseSchema = stripAdditionalProperties(ChatGPTRequest.JsonSchema.creatureChatCharacter().schema);
+            generation.responseMimeType = "application/json";
+            generation.responseSchema = stripAdditionalProperties(ChatGPTRequest.JsonSchema.creatureChatCharacter().schema);
         } else if (outputMode == ChatGPTRequest.StructuredOutputMode.CHAT) {
-            config.responseMimeType = "application/json";
-            config.responseSchema = stripAdditionalProperties(ChatGPTRequest.JsonSchema.creatureChatResponse().schema);
+            generation.responseMimeType = "application/json";
+            generation.responseSchema = stripAdditionalProperties(ChatGPTRequest.JsonSchema.creatureChatResponse().schema);
         }
-
-        payload.generationConfig = config;
+        payload.generationConfig = generation;
         return payload;
     }
-
 
     /**
      * Returns a deep copy of the given JSON schema map with all {@code additionalProperties}
      * keys removed at every nesting level.
      *
-     * <p>The Gemini native {@code generation_config.response_schema} field accepts a restricted
+     * <p>The Gemini native {@code generationConfig.responseSchema} field accepts a restricted
      * OpenAPI 3.0 subset that does <em>not</em> support {@code additionalProperties}. Our schemas
      * are built for OpenAI structured output, which requires the field. Stripping it here keeps
      * the two serialisation paths independent.</p>
@@ -233,43 +124,27 @@ public final class GeminiNativeRequest {
         return result;
     }
 
-    private static String parseSuccessResponse(String json) {
-        try {
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            if (root.has("candidates") && root.getAsJsonArray("candidates").size() > 0) {
-                JsonObject candidate = root.getAsJsonArray("candidates").get(0).getAsJsonObject();
-                if (candidate.has("finishReason")) {
-                    ChatGPTRequest.lastFinishReason = candidate.get("finishReason").getAsString();
-                }
-                if (candidate.has("content")) {
-                    JsonObject content = candidate.getAsJsonObject("content");
-                    if (content.has("parts") && content.getAsJsonArray("parts").size() > 0) {
-                        JsonObject part = content.getAsJsonArray("parts").get(0).getAsJsonObject();
-                        if (part.has("text")) {
-                            return part.get("text").getAsString();
-                        }
-                    }
+    static ChatGPTRequest.ResponseContent parseSuccessResponse(String json) {
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        if (!root.has("candidates") || root.getAsJsonArray("candidates").isEmpty()) return null;
+        JsonObject candidate = root.getAsJsonArray("candidates").get(0).getAsJsonObject();
+        String finishReason = candidate.has("finishReason") ? candidate.get("finishReason").getAsString() : null;
+        Integer completionTokens = null;
+        if (root.has("usageMetadata")) {
+            JsonObject usage = root.getAsJsonObject("usageMetadata");
+            if (usage.has("candidatesTokenCount")) completionTokens = usage.get("candidatesTokenCount").getAsInt();
+        }
+        if (candidate.has("content")) {
+            JsonObject content = candidate.getAsJsonObject("content");
+            if (content.has("parts") && !content.getAsJsonArray("parts").isEmpty()) {
+                JsonObject part = content.getAsJsonArray("parts").get(0).getAsJsonObject();
+                if (part.has("text")) {
+                    return new ChatGPTRequest.ResponseContent(part.get("text").getAsString(), finishReason, completionTokens);
                 }
             }
-        } catch (Exception e) {
-            LOGGER.error("Failed to parse native Gemini response", e);
         }
-        return null;
-    }
-
-    private static String parseErrorResponse(String json) {
-        try {
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            if (root.has("error")) {
-                JsonObject error = root.getAsJsonObject("error");
-                if (error.has("message")) {
-                    return error.get("message").getAsString();
-                }
-            }
-        } catch (Exception e) {
-            // Ignore JSON parse errors for non-JSON error pages
-        }
-        return json;
+        // A valid candidate can stop at MAX_TOKENS before producing text. Keep its diagnostics.
+        return new ChatGPTRequest.ResponseContent(null, finishReason, completionTokens);
     }
 
     static class GeminiPayload {
@@ -307,6 +182,15 @@ public final class GeminiNativeRequest {
             Float temperature;
             String responseMimeType;
             Map<String, Object> responseSchema;
+            ThinkingConfig thinkingConfig;
+        }
+
+        static class ThinkingConfig {
+            String thinkingLevel;
+
+            ThinkingConfig(String thinkingLevel) {
+                this.thinkingLevel = thinkingLevel;
+            }
         }
     }
 }

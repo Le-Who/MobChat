@@ -9,6 +9,10 @@ import com.lewho.commands.ConfigurationHandler;
 import com.lewho.network.ServerPackets;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +23,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 /**
  * The {@code ChatDataManager} class manages chat data for all entities. This class also helps
@@ -51,8 +57,15 @@ public class ChatDataManager {
     public ConcurrentHashMap<String, EntityChatData> entityChatDataMap;
     public ConcurrentHashMap<UUID, AutoMessageBucket> autoResponseBuckets;
     public ConcurrentHashMap<UUID, AutoMessageBucket> ambientResponseBuckets;
+    private MinecraftServer sessionServer;
+    private ChatSession responseSession;
 
     public void clearData() {
+        if (responseSession != null) {
+            responseSession.close();
+        }
+        responseSession = null;
+        sessionServer = null;
         // Clear the chat data for the previous session
         entityChatDataMap.clear();
         autoResponseBuckets.clear();
@@ -85,6 +98,69 @@ public class ChatDataManager {
     // Retrieve chat data for a specific entity, or create it if it doesn't exist
     public EntityChatData getOrCreateChatData(String entityId) {
         return entityChatDataMap.computeIfAbsent(entityId, k -> new EntityChatData(entityId));
+    }
+
+    public ChatSession getSession(MinecraftServer server) {
+        return sessionServer == server ? responseSession : null;
+    }
+
+    public void closeSession(MinecraftServer server) {
+        ChatSession session = getSession(server);
+        if (session != null) {
+            session.close();
+        }
+    }
+
+    public void cancelRequest(EntityChatData data) {
+        if (responseSession != null && data != null) {
+            responseSession.cancel(data);
+        }
+    }
+
+    /** Admit before consuming rate allowance, resetting cooldowns or preparing gameplay effects. */
+    public boolean dispatchRequest(EntityChatData data, ServerPlayer player, BooleanSupplier policy,
+                                   Consumer<ChatSession.Request> action) {
+        return ChatSession.dispatch(() -> beginRequest(data, player), policy, action);
+    }
+
+    /** Capture world, entity and player identities before dispatching an HTTP request. */
+    public ChatSession.Request beginRequest(EntityChatData data, ServerPlayer player) {
+        MinecraftServer server = player == null ? null : player.getServer();
+        ChatSession session = getSession(server);
+        Level playerLevel = player == null ? null : player.level();
+        if (server == null || session == null || data == null || !server.isSameThread()
+                || !(playerLevel instanceof ServerLevel world)) {
+            return null;
+        }
+        String entityId = data.entityId;
+        if (entityId == null) {
+            return null;
+        }
+        UUID entityUuid;
+        try {
+            entityUuid = UUID.fromString(entityId);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        Entity found = world.getEntity(entityUuid);
+        if (!(found instanceof Mob entity)) {
+            return null;
+        }
+        return session.tryBegin(data,
+                () -> getSession(server) == session && entityChatDataMap.get(entityId) == data
+                        && entityId.equals(data.entityId),
+                () -> ServerPackets.serverInstance == server && server.getLevel(world.dimension()) == world
+                        && player.level() == world && player.isAlive() && !player.isRemoved()
+                        && server.getPlayerList().getPlayer(player.getUUID()) == player
+                        && entity.level() == world && entity.isAlive() && !entity.isRemoved()
+                        && world.getEntity(entityUuid) == entity,
+                () -> {
+                    boolean pending = data.status == ChatStatus.PENDING;
+                    data.recoverPendingResponse();
+                    if (pending && session.isOpen() && ServerPackets.serverInstance == server) {
+                        ServerPackets.BroadcastEntityMessage(data);
+                    }
+                });
     }
 
     private AutoMessageBucket getPlayerBucket(UUID playerId, ConfigurationHandler.Config config) {
@@ -205,8 +281,10 @@ public class ChatDataManager {
 
     // Update the UUID in the map (i.e. bucketed entity and then released, changes their UUID)
     public void updateUUID(String oldUUID, String newUUID) {
-        EntityChatData data = entityChatDataMap.remove(oldUUID);
+        EntityChatData data = entityChatDataMap.get(oldUUID);
         if (data != null) {
+            cancelRequest(data);
+            entityChatDataMap.remove(oldUUID, data);
             data.entityId = newUUID;
             entityChatDataMap.put(newUUID, data);
             LOGGER.info("Updated chat data from UUID (" + oldUUID + ") to UUID (" + newUUID + ")");
@@ -255,14 +333,24 @@ public class ChatDataManager {
 
     // Save chat data to file
     public void saveChatData(MinecraftServer server) {
+        if (sessionServer != server) {
+            return;
+        }
+        if (!server.isSameThread()) {
+            ChatSession session = getSession(server);
+            if (session != null) {
+                session.execute(() -> saveChatData(server));
+            }
+            return;
+        }
         File saveFile = new File(server.getWorldPath(LevelResource.ROOT).toFile(), "chatdata.json");
         LOGGER.info("Saving chat data to " + saveFile.getAbsolutePath());
 
         // Clean up blank, temp entities in data
         entityChatDataMap.values().removeIf(entityChatData -> entityChatData.status == ChatStatus.NONE);
 
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(saveFile), StandardCharsets.UTF_8)) {
-            GSON.toJson(this.entityChatDataMap, writer);
+        try {
+            ChatDataFile.save(saveFile.toPath(), this.entityChatDataMap);
         } catch (Exception e) {
             String errorMessage = "Error saving `chatdata.json`. No CreatureChat chat history was saved! " + e.getMessage();
             LOGGER.error(errorMessage, e);
@@ -272,6 +360,9 @@ public class ChatDataManager {
 
     // Load chat data from file
     public void loadChatData(MinecraftServer server) {
+        clearData();
+        sessionServer = server;
+        responseSession = new ChatSession(server);
         File loadFile = new File(server.getWorldPath(LevelResource.ROOT).toFile(), "chatdata.json");
         LOGGER.info("Loading chat data from " + loadFile.getAbsolutePath());
 
@@ -279,6 +370,9 @@ public class ChatDataManager {
             try (InputStreamReader reader = new InputStreamReader(new FileInputStream(loadFile), StandardCharsets.UTF_8)) {
                 Type type = new TypeToken<ConcurrentHashMap<String, EntityChatData>>(){}.getType();
                 this.entityChatDataMap = GSON.fromJson(reader, type);
+                if (this.entityChatDataMap == null) {
+                    this.entityChatDataMap = new ConcurrentHashMap<>();
+                }
 
                 // Clean up blank, temp entities in data
                 entityChatDataMap.values().removeIf(entityChatData -> entityChatData.status == ChatStatus.NONE);

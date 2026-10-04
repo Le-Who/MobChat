@@ -8,26 +8,35 @@ import net.minecraft.server.MinecraftServer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The {@code ChatDataSaverScheduler} class is used to start the auto save Runnable task and schedule it.
  */
 public class ChatDataSaverScheduler {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private MinecraftServer server = null;
+    private ChatSession session;
 
     public void startAutoSaveTask(MinecraftServer server, long interval, TimeUnit timeUnit) {
-        this.server = server;
+        this.session = ChatDataManager.getServerInstance().getSession(server);
         ChatDataAutoSaver saverTask = new ChatDataAutoSaver(server);
         scheduler.scheduleAtFixedRate(saverTask, 1, interval, timeUnit);
     }
 
     public void stopAutoSaveTask() {
-        scheduler.shutdown();
+        scheduler.shutdownNow();
     }
 
     // Schedule a task to run after 1 tick (basically immediately)
     public void scheduleTask(Runnable task) {
-        scheduler.schedule(() -> server.execute(task), 50, TimeUnit.MILLISECONDS);
+        ChatSession originatingSession = session;
+        if (originatingSession == null || !originatingSession.isOpen()) {
+            return;
+        }
+        try {
+            scheduler.schedule(() -> originatingSession.execute(task), 50, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            // Server shutdown already cancelled this scheduler's remaining work.
+        }
     }
 }

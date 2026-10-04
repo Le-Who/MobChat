@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -257,8 +258,12 @@ public class ChatGPTRequestErrorTests {
     }
 
     @Test
-    public void noInternetConnection() {
-        ConfigurationHandler.Config config = buildConfig("http://10.255.255.1" + PATH);
+    public void noInternetConnection() throws IOException {
+        int unavailablePort;
+        try (ServerSocket listener = new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+            unavailablePort = listener.getLocalPort();
+        }
+        ConfigurationHandler.Config config = buildConfig("http://localhost:" + unavailablePort + PATH);
         executeRequest(config);
 
         TR tr = Randomizer.getRandomError(errorTypeFor(-1));

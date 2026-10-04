@@ -5,18 +5,14 @@ package com.lewho.mixin;
 
 import com.lewho.chat.ChatDataManager;
 import com.lewho.chat.EntityChatData;
-import com.lewho.chat.PlayerData;
+import com.lewho.chat.LivingEntityChatHooks;
 import com.lewho.network.ServerPackets;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -42,14 +38,8 @@ public class MixinLivingEntity {
             cancellable = true
     )
     private void modifyCanAttack(LivingEntity target, CallbackInfoReturnable<Boolean> cir) {
-        if (target instanceof Player) {
-            LivingEntity thisEntity = (LivingEntity) (Object) this;
-            EntityChatData entityData = getChatData(thisEntity);
-            PlayerData playerData = entityData.getPlayerData(target.getDisplayName().getString());
-            if (playerData.friendship > 0) {
-                // Friendly creatures can't target a player
-                cir.setReturnValue(false);
-            }
+        if (LivingEntityChatHooks.preventsFriendlyAttack((LivingEntity) (Object) this, target)) {
+            cir.setReturnValue(false);
         }
     }
 
@@ -61,44 +51,7 @@ public class MixinLivingEntity {
                         DamageSource source,
                         float amount,
                         CallbackInfoReturnable<Boolean> cir) {
-        this.handleOnDamage(source, amount, cir);
-    }
-
-    /**
-     * Shared logic for post-damage chat generation.
-     */
-    private void handleOnDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        if (!cir.getReturnValue()) return;
-
-        Entity attacker = source.getEntity();
-        LivingEntity self = (LivingEntity)(Object)this;
-
-        if (attacker instanceof Player player
-                && self instanceof Mob mob
-                && !mob.isDeadOrDying()) {
-            ServerPlayer serverPlayer = (ServerPlayer) player;
-            EntityChatData data = ChatDataManager
-                    .getServerInstance()
-                    .getOrCreateChatData(mob.getStringUUID());
-
-            PlayerData pd = data.getPlayerData(serverPlayer.getDisplayName().getString());
-            pd.lastDamageFriendship = pd.friendship;
-            pd.wordsmithDamaged = true;
-            if (!data.characterSheet.isEmpty()) {
-                ItemStack weapon = serverPlayer.getMainHandItem();
-                String weaponName = weapon.isEmpty()
-                        ? "with fists"
-                        : "with " + weapon.getItem().toString();
-
-                boolean indirect = source.getDirectEntity() != attacker;
-                String directness = indirect ? "indirectly" : "directly";
-
-                String msg = "<" + player.getDisplayName().getString()
-                        + " attacked you " + directness
-                        + " " + weaponName + ">";
-                ServerPackets.generate_chat("N/A", data, serverPlayer, mob, msg, true);
-            }
-        }
+        LivingEntityChatHooks.onDamage((LivingEntity) (Object) this, source, cir.getReturnValue());
     }
 
     @Inject(

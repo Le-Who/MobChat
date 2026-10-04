@@ -11,14 +11,17 @@ import net.minecraft.server.MinecraftServer;
  */
 public class ChatDataAutoSaver implements Runnable {
     private final MinecraftServer server;
+    private final ChatSession session;
 
     public ChatDataAutoSaver(MinecraftServer server) {
         this.server = server;
+        this.session = ChatDataManager.getServerInstance().getSession(server);
     }
 
     @Override
     public void run() {
-        // Your method to save chat data
-        ChatDataManager.getServerInstance().saveChatData(server);
+        if (session != null) {
+            session.execute(() -> ChatDataManager.getServerInstance().saveChatData(server));
+        }
     }
 }

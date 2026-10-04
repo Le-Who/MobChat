@@ -11,6 +11,8 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.lewho.chat.ChatGPTRequest;
+import com.lewho.chat.ChatDataManager;
+import com.lewho.chat.ChatSession;
 import com.lewho.network.ServerPackets;
 import com.lewho.i18n.CCText;
 import com.lewho.update.GitHubReleaseClient;
@@ -30,12 +32,11 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import org.slf4j.Logger;
@@ -400,7 +401,8 @@ public class CreatureChatCommands {
         source.sendSuccess(() -> commandHint("1. Choose provider preset:", "/creaturechat setup provider ai-studio"), false);
         source.sendSuccess(() -> Component.literal("   Providers: " + String.join(", ", ConfigurationPresets.providerIds())).withStyle(ChatFormatting.GRAY), false);
         source.sendSuccess(() -> commandHint("2. Add one or more API keys:", "/creaturechat setup key <key1,key2>"), false);
-        source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model gemini-3.1-flash-lite"), false);
+        String setupModel = ConfigurationPresets.find("ai-studio").orElseThrow().defaultModel();
+        source.sendSuccess(() -> commandHint("3. Add one or more exact model ids:", "/creaturechat setup model " + setupModel), false);
         source.sendSuccess(() -> commandHint("4. Optional output budget:", "/creaturechat setup outputtokens 1024"), false);
         source.sendSuccess(() -> commandHint("5. Optional damage reaction cooldown:", "/creaturechat setup damagecooldown 25"), false);
         source.sendSuccess(() -> commandHint("6. Optional Gemini RPM/RPD:", "/creaturechat setup geminirpm 14"), false);
@@ -414,12 +416,7 @@ public class CreatureChatCommands {
     }
 
     private static MutableComponent commandHint(String label, String command) {
-        return Component.literal(label + " ")
-                .withStyle(ChatFormatting.AQUA)
-                .append(Component.literal(command).withStyle(style -> style
-                        .withColor(ChatFormatting.YELLOW)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, command))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Click to paste this command")))));
+        return CommandHintHelper.hint(label, command);
     }
 
     private static int applyPreset(CommandSourceStack source, String provider, boolean useServerConfig) {
@@ -476,13 +473,26 @@ public class CreatureChatCommands {
             return 0;
         }
 
+        MinecraftServer server = source.getServer();
+        ChatSession session = ChatDataManager.getServerInstance().getSession(server);
+        if (session == null || !session.isOpen()) {
+            source.sendFailure(Component.literal("Cannot test: the server chat session is not active."));
+            return 0;
+        }
+        ServerPlayer requestingPlayer = source.getEntity() instanceof ServerPlayer player ? player : null;
         source.sendSuccess(() -> Component.literal("Testing CreatureChat AI configuration...").withStyle(ChatFormatting.YELLOW), false);
-        ChatGPTRequest.fetchMessageFromChatGPT(config, "Reply with exactly: OK", new HashMap<>(), new ArrayList<>(), false)
-                .thenAccept(response -> source.getServer().execute(() -> {
-                    if (response != null && !response.isBlank()) {
+        ChatGPTRequest.fetchResultFromChatGPT(config, "Reply with exactly: OK", new HashMap<>(), new ArrayList<>(),
+                        ChatGPTRequest.StructuredOutputMode.NONE)
+                .whenComplete((result, failure) -> session.execute(() -> {
+                    if (ServerPackets.serverInstance != server || !source.hasPermission(4)
+                            || (requestingPlayer != null
+                            && server.getPlayerList().getPlayer(requestingPlayer.getUUID()) != requestingPlayer)) {
+                        return;
+                    }
+                    if (failure == null && result != null && result.content() != null && !result.content().isBlank()) {
                         source.sendSuccess(() -> Component.literal("CreatureChat AI test succeeded using model: " + config.getActiveModel()).withStyle(ChatFormatting.GREEN), false);
                     } else {
-                        String message = ChatGPTRequest.lastErrorMessage != null ? ChatGPTRequest.lastErrorMessage : "No response";
+                        String message = result != null && result.errorMessage() != null ? result.errorMessage() : "No response";
                         source.sendSuccess(() -> Component.literal("CreatureChat AI test failed: " + message).withStyle(ChatFormatting.RED), false);
                     }
                 }));

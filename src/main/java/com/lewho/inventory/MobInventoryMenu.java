@@ -18,7 +18,6 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -34,7 +33,7 @@ import java.util.Set;
 /**
  * Menu for mob inventories.
  */
-public class MobInventoryMenu extends AbstractContainerMenu {
+public class MobInventoryMenu extends MobInventoryTransferMenu {
     private final Container inventory;
     private final Mob mob;
     private final ServerPlayer serverPlayer;
@@ -95,10 +94,12 @@ public class MobInventoryMenu extends AbstractContainerMenu {
                 int x = 75 + col * 18;
                 int y = 18 + row * 18;
                 if (slot == mainHandSlot) {
-                    this.addSlot(canAccessHands ? new HandSlot(inventory, slot++, x, y, mob, EquipmentSlot.MAINHAND)
+                    this.addSlot(canAccessHands ? new MobHandSlot(inventory, slot++, x, y, mob::canHoldItem,
+                                                               stack -> mob.setItemSlot(EquipmentSlot.MAINHAND, stack))
                                                : new LockedSlot(inventory, slot++, x, y));
                 } else if (slot == offHandSlot) {
-                    this.addSlot(canAccessHands ? new HandSlot(inventory, slot++, x, y, mob, EquipmentSlot.OFFHAND)
+                    this.addSlot(canAccessHands ? new MobHandSlot(inventory, slot++, x, y, mob::canHoldItem,
+                                                               stack -> mob.setItemSlot(EquipmentSlot.OFFHAND, stack))
                                                : new LockedSlot(inventory, slot++, x, y));
                 } else {
                     this.addSlot(canAccessInventory ? new Slot(inventory, slot++, x, y)
@@ -150,6 +151,7 @@ public class MobInventoryMenu extends AbstractContainerMenu {
             } else {
                 slot.setChanged();
             }
+            slot.onTake(player, stackInSlot);
         }
         return itemStack;
     }
@@ -185,6 +187,7 @@ public class MobInventoryMenu extends AbstractContainerMenu {
             }
             List<String> disarmedToInventory = new ArrayList<>();
             List<String> disarmedTaken = new ArrayList<>();
+            boolean diamondsTaken = removed.containsKey(Items.DIAMOND);
             ItemStack finalMain = mob.getMainHandItem();
             ItemStack finalOff = mob.getOffhandItem();
             collectDisarmed(initialMainHand, finalMain, finalOff, disarmedToInventory, disarmedTaken, removed);
@@ -203,10 +206,10 @@ public class MobInventoryMenu extends AbstractContainerMenu {
                 }
                 String verbBase = pd.friendship >= 3 ? "borrowed" : pd.friendship == 2 ? "took" : "stole";
                 String verb = " " + verbBase + " ";
-                if (!removed.isEmpty()) {
-                    SocialEventRecorder.record(chatData, serverPlayer, SocialEventType.ITEM_TAKEN, "Player took items from inventory.");
+                if (recordTakenItems(chatData, serverPlayer.getStringUUID(), player.getDisplayName().getString(),
+                        removed, disarmedTaken)) {
                     AdvancementHelper.itemTaken(serverPlayer, pd);
-                    if (removed.containsKey(Items.DIAMOND)) {
+                    if (diamondsTaken) {
                         AdvancementHelper.theHeist(serverPlayer);
                     }
                 }
@@ -373,35 +376,18 @@ public class MobInventoryMenu extends AbstractContainerMenu {
                !(sameItem(initMain, finalMain) && sameItem(initOff, finalOff));
     }
 
-    private static class HandSlot extends Slot {
-        private final Mob mob;
-        private final EquipmentSlot equipmentSlot;
-
-        HandSlot(Container container, int index, int x, int y, Mob mob, EquipmentSlot equipmentSlot) {
-            super(container, index, x, y);
-            this.mob = mob;
-            this.equipmentSlot = equipmentSlot;
+    /** Item text accounting removes disarmed items from the ordinary removal counts. */
+    public static boolean recordTakenItems(EntityChatData data, String playerId, String playerName,
+                                           Map<Item, Integer> removed, List<String> disarmedTaken) {
+        if (removed.isEmpty() && disarmedTaken.isEmpty()) {
+            return false;
         }
-
-        @Override
-        public boolean mayPlace(ItemStack stack) {
-            return stack.isEmpty() || mob.canHoldItem(stack);
-        }
-
-        @Override
-        public void set(ItemStack stack) {
-            super.set(stack);
-            mob.setItemSlot(equipmentSlot, stack.copy());
-        }
-
-        @Override
-        public void onTake(Player player, ItemStack stack) {
-            super.onTake(player, stack);
-            mob.setItemSlot(equipmentSlot, this.getItem().copy());
-        }
+        SocialEventRecorder.record(data, playerId, playerName, SocialEventType.ITEM_TAKEN,
+                "Player took items from inventory.");
+        return true;
     }
 
-    private static class LockedSlot extends Slot {
+    static class LockedSlot extends Slot {
         LockedSlot(Container container, int index, int x, int y) {
             super(container, index, x, y);
         }

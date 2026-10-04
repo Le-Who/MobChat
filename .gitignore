@@ -20,6 +20,8 @@ run/
 # ─── Runtime logs and local state ─────────────────────────────────────────────
 logs/
 .creaturechat-updates/
+creaturechat.json
+chatdata.json
 creaturechat_usage.json
 creaturechat_player_prefs.json
 

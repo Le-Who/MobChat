@@ -8,14 +8,14 @@ This repository contains the MobChat fork of CreatureChat: <https://github.com/L
 
 ## Features
 
-- **AI-driven mob conversations:** Each mob can generate contextual chat through an OpenAI-compatible LLM endpoint.
+- **AI-driven mob conversations:** Each mob can generate contextual chat through an OpenAI-compatible endpoint or the native Gemini API.
 - **Structured AI output:** Chat and character generation use strict JSON schemas to reduce malformed replies and keep behavior parsing predictable.
 - **Mob behavior actions:** Creatures can follow, flee, attack, protect, wait, return home, guard home, and react through the behavior system.
 - **Character sheets:** New mobs can receive generated names, personalities, classes, skills, likes, dislikes, alignment, background, and greeting text.
 - **Memory and relationships:** Mobs remember player interactions, social events, friendship changes, harmful actions, and recent context.
 - **Automatic reactions:** Mobs can react to damage, item showing/giving/taking, arrivals, proximity chat, and mob-to-mob chat.
 - **Cost controls:** Automatic responses have cooldowns and Gemini usage is preflight-limited before HTTP requests to avoid avoidable rate-limit freezes.
-- **Inventories and loot:** Every mob has an inventory backed by generated per-biome loot tables.
+- **Inventories and loot:** Supported mobs have relationship-gated inventories with generated per-biome loot and synchronized hand equipment.
 - **Multiplayer sync:** Chat bubbles, messages, inventory UI, and entity chat state are synchronized for server players.
 - **Advancements:** Players can unlock CreatureChat milestones as relationships develop.
 
@@ -25,8 +25,8 @@ This repository contains the MobChat fork of CreatureChat: <https://github.com/L
 
 - Default Minecraft target: read `minecraft_version` in `gradle.properties`
 - Loader: Fabric Loader with Fabric API
-- Java source/target compatibility: Java 17
-- Gradle toolchain configured locally in `gradle.properties`
+- Java source/target/API compatibility: Java 17; the compiler toolchain is JDK 26
+- Local compiler path configured in `gradle.properties`; see [INSTALL.md](INSTALL.md) before building on another machine
 - Version-specific source overrides live under `src/vs/` and are applied by the Gradle build when a newer Minecraft target needs patched source files.
 
 ## Build
@@ -69,6 +69,8 @@ For targeted checks:
 4. Launch Minecraft with the Fabric profile.
 5. Configure an LLM provider in-game with `/creaturechat setup`.
 
+For multiplayer, install the mod on both the client and dedicated server. Provider keys belong in the server configuration. See [INSTALL.md](INSTALL.md) for the toolchain and development launch instructions.
+
 ### Forge With Sinytra Connector
 
 Sinytra Connector support is only expected for Minecraft `1.20.1`.
@@ -100,13 +102,15 @@ Server OP commands:
 /creaturechat update apply
 ```
 
-`download` stages the jar under `.creaturechat-updates/` and starts a small helper process. The helper waits for the current JVM to exit, moves the old jar from `mods/` to a backup folder, and places the verified new jar at `mods/creaturechat.jar`. It does not stop or restart the server; the admin decides when to restart. If a helper process was not started or was killed by the host panel, use `/creaturechat update apply` before stopping the server.
+`check` looks for a newer release matching the running Minecraft target. `download` verifies and stages the jar under `.creaturechat-updates/`. `status` reports the running and staged versions. `apply` stages or reuses a compatible update and starts the helper process that installs it after the current JVM exits.
+
+The helper moves the old jar from `mods/` to a backup folder and places the verified new jar at `mods/creaturechat.jar`. It does not stop or restart the server; the admin decides when to restart. Run `apply` before stopping the server. If a host panel kills the helper too, replacement cannot finish through that helper; install the built/released jar manually or allow the helper to survive the stop.
 
 On clients, CreatureChat checks once shortly after the Minecraft main menu starts, and can also show the prompt while idle in-game. When a newer compatible release is found, it shows a consent screen. The jar is downloaded only after the player clicks `Download`, then the helper installs it after Minecraft exits.
 
 ## AI Provider Setup
 
-CreatureChat requires an LLM for generated character sheets and chat replies. The mod sends OpenAI-compatible chat completions requests, so providers should expose an OpenAI-compatible endpoint.
+CreatureChat requires an LLM for generated character sheets and chat replies. Google AI Studio uses native Gemini `generateContent`; the other presets use OpenAI-compatible chat completions. The endpoint, credentials and model are chosen by the server administrator.
 
 Recommended setup path:
 
@@ -138,6 +142,8 @@ Console/script fallback:
 
 You can enter multiple comma-separated API keys or models. The request layer rotates candidates when local quota checks or provider errors make the active candidate unavailable.
 
+The same quota, retry and key/model fallback policy applies to native and compatible requests. Permanent errors stop unnecessary retries; successful recovery clears the request's earlier error. Local Ollama/LiteLLM deployments still need a nonempty key value for the setup test; use the value required by that deployment, or a placeholder when it ignores authentication.
+
 ## Google AI Studio / Gemini Notes
 
 The `ai-studio` preset uses the **native Gemini `generateContent` API**, not the OpenAI-compatibility layer. The endpoint base URL is:
@@ -146,7 +152,7 @@ The `ai-studio` preset uses the **native Gemini `generateContent` API**, not the
 https://generativelanguage.googleapis.com/v1beta
 ```
 
-Requests that target `generativelanguage.googleapis.com` without the `/openai` path segment are automatically routed to the native Gemini client. Character generation and chat use `generation_config.response_schema` with `responseMimeType: application/json` for structured output.
+Requests that target `generativelanguage.googleapis.com` without the `/openai` path segment are automatically routed to the native Gemini adapter. Character generation and chat use `generationConfig.responseSchema` and `generationConfig.responseMimeType: application/json` for structured output.
 
 Default model:
 
@@ -169,7 +175,7 @@ Commands:
 /creaturechat setup geminiscope per_key
 ```
 
-Use `geminiscope shared` if several configured keys belong to the same Google project and should share one local quota bucket. The usage file stores hashed key buckets and daily counts; it is runtime state and is ignored by Git.
+Use `geminiscope shared` if several configured keys belong to the same Google project and should share a local quota bucket for each model. With `per_key`, each key/model pair has its own bucket. Different models have separate local buckets in both modes. The usage file stores hashed buckets and daily counts; it is runtime state and is ignored by Git.
 
 Google AI Studio also enforces its own account and public-network location eligibility. If `/creaturechat setup test` reports that AI Studio is unavailable from the current network location, changing the API key, model, output-token limit, or thinking level will not resolve it. Use a network and Google account supported by AI Studio, or select another provider preset. See Google's [available-region requirements](https://ai.google.dev/gemini-api/docs/available-regions).
 
@@ -177,7 +183,7 @@ Google AI Studio also enforces its own account and public-network location eligi
 
 `maxOutputTokens` limits the generated response budget, not the input context. The default is `1024`. Structured JSON modes raise the effective floor when needed so character/chat JSON is less likely to be truncated.
 
-Gemini thinking level is configurable through the setup screen. The AI Studio preset defaults to `minimal`.
+Gemini thinking level is configurable through the setup screen. The AI Studio preset defaults to `minimal`. Native Gemini 3 requests include the chosen explicit thinking level; `auto` leaves the provider default. The native adapter omits that level field for Gemini 2.5 models. Token floors remain in effect for structured output.
 
 ### Generation Language
 
@@ -207,6 +213,10 @@ Damage-triggered AI replies have their own cooldown. Suppressed hits are summari
 
 ## Player Chat Controls
 
+Look at a mob and right-click its chat bubble to start a greeting. Use the bubble controls to change pages, hide/redisplay the bubble, or open the chat input on the last page. The chat screen shows recent messages; sending a message closes it. Initial contact with an unconfigured mob creates its character before normal conversation.
+
+Shift-right-click an eligible mob to open its inventory. Ordinary inventory slots require positive friendship, and the mob's hand slots require friendship level 3. Villager and tameable interactions retain their own restrictions. For eligible mounts, the inventory key can open the mob menu while riding. Giving, showing or taking items can affect the relationship and trigger a rate-limited reaction.
+
 Players can choose whether NPC replies to other players are shown in their own CreatureChat bubble sync and normal chat feed:
 
 ```text
@@ -217,7 +227,7 @@ Players can choose whether NPC replies to other players are shown in their own C
 
 The preference is saved per player in the server world's `creaturechat_player_prefs.json`. Your own NPC conversations remain visible even when overhearing is off. If `/creaturechat send_to_chat` is enabled, NPC replies are sent to the normal chat only for players allowed by this preference.
 
-When you open the mob chat input screen, it now requests and shows the recent message history for that mob. The full history is not sent during login; clients request only the selected mob's recent entries.
+When you open the mob chat input screen, it requests and shows the recent message history for that mob. The full history is not sent during login; clients request only the selected mob's recent entries. Each mob's history, character and memories are shared across players, while friendship is per player. Overhearing is a display preference; it does not create separate private conversation histories.
 
 ## Entity Visibility
 
@@ -231,24 +241,30 @@ Whitelist and blacklist commands control which entity types show CreatureChat bu
 ## Story Prompt
 
 ```text
-/story set "<story-text>"
-/story display
-/story clear
+/creaturechat story set "<story-text>"
+/creaturechat story display
+/creaturechat story clear
 ```
 
 The story text is included in character creation and chat prompts.
 
 ## Configuration Scope
 
-Most setup commands accept an optional config scope:
+The setup screen and `/creaturechat setup ...` commands save to the current server world's `creaturechat.json`. Many legacy commands such as `/creaturechat model set` accept an optional scope after the value:
 
 - `--config server`: save to the current server world's `creaturechat.json`
 - `--config default`: save to the default root config
 
-If omitted, legacy commands use the default scope unless the `/creaturechat setup ...` subcommand explicitly saves to the server config.
+If omitted, these legacy commands save to the process-root default configuration. A world configuration takes precedence when loading, so changing the default may have no effect in a world that already has its own file.
+
+The world's `chatdata.json` stores mob characters, shared histories, memories and relationships. `creaturechat_player_prefs.json` stores player display preferences. `creaturechat_usage.json` beside the effective configuration stores daily Gemini usage. Back up the world and its runtime files together; these files are not source files to add to Git.
+
+Additional role definitions are loaded from world-root `custom_roles.json`, with a process-root fallback. The local `generate_roles.py` tool writes to `data/creaturechat/custom_roles.json`; move that output to the runtime location to use it. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 
 ## Development References
 
+- [Architecture and Mental Map](ARCHITECTURE.md)
+- [Release History](CHANGELOG.md)
 - [Build Instructions](INSTALL.md)
 - [Contribution Guide](CONTRIBUTING.md)
 - [Player & Entity Icon Tutorial](ICONS.md)

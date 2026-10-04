@@ -149,6 +149,16 @@ public class EntityChatData {
 
     // Post-deserialization initialization
     public void postDeserializeInitialization() {
+        recoverPendingResponse();
+        if (this.previousMessages == null) {
+            this.previousMessages = new ArrayList<>();
+        }
+        if (this.currentMessage == null) {
+            this.currentMessage = "";
+        }
+        if (this.characterSheet == null) {
+            this.characterSheet = "";
+        }
         if (this.players == null) {
             this.players = new HashMap<>(); // Ensure players map is initialized
         }
@@ -183,6 +193,14 @@ public class EntityChatData {
         }
     }
 
+    /** A pending HTTP request cannot survive cancellation or reloading a world. */
+    public void recoverPendingResponse() {
+        if (this.status == ChatDataManager.ChatStatus.PENDING) {
+            this.status = ChatDataManager.ChatStatus.HIDDEN;
+            this.auto_generated = 0;
+        }
+    }
+
     public boolean hasHome() {
         return this.homeDimension != null && !this.homeDimension.isEmpty();
     }
@@ -213,8 +231,8 @@ public class EntityChatData {
                 return false;
             }
 
-            BlockPos spawnPos = player.getRespawnPosition();
-            ResourceKey<Level> spawnDimension = player.getRespawnDimension();
+            BlockPos spawnPos = PlayerRespawnHelper.position(player);
+            ResourceKey<Level> spawnDimension = PlayerRespawnHelper.dimension(player);
             if (spawnPos == null || spawnDimension == null) {
                 spawnPos = serverInstance.overworld().getSharedSpawnPos();
                 spawnDimension = Level.OVERWORLD;
@@ -550,6 +568,15 @@ public class EntityChatData {
 
     // Generate a new character
     public void generateCharacter(String userLanguage, ServerPlayer player, String userMessage, boolean is_auto_message) {
+        ChatDataManager.getServerInstance().dispatchRequest(this, player, () -> true,
+                request -> generateCharacter(request, userLanguage, player, userMessage, is_auto_message));
+    }
+
+    public void generateCharacter(ChatSession.Request request, String userLanguage, ServerPlayer player,
+                                  String userMessage, boolean is_auto_message) {
+        if (request == null || !request.isCurrent(this)) {
+            return;
+        }
         String systemPrompt = "system-character";
         if (is_auto_message) {
             // Increment an auto-generated message
@@ -563,15 +590,20 @@ public class EntityChatData {
         this.addMessage(userMessage, ChatDataManager.ChatSender.USER, player, systemPrompt);
 
         // Get config (api key, url, settings)
-        ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
-        String promptText = ChatPrompt.loadPromptFromResource(ServerPackets.serverInstance.getResourceManager(), systemPrompt);
+        ConfigurationHandler.Config config = new ConfigurationHandler(player.getServer()).loadConfig();
+        String promptText = ChatPrompt.loadPromptFromResource(player.getServer().getResourceManager(), systemPrompt);
 
         // Add PLAYER context information
         Map<String, String> contextData = getPlayerContext(player, userLanguage, config);
 
         // fetch HTTP response from ChatGPT
-        ChatGPTRequest.fetchMessageFromChatGPT(config, promptText, contextData, previousMessages, ChatGPTRequest.StructuredOutputMode.CHARACTER).thenAccept(output_message -> {
+        request.whenComplete(ChatGPTRequest.fetchResultFromChatGPT(config, promptText, contextData, previousMessages,
+                ChatGPTRequest.StructuredOutputMode.CHARACTER), (requestResult, failure) -> {
             try {
+                if (failure != null) {
+                    throw new IllegalStateException("AI request failed unexpectedly.");
+                }
+                String output_message = requestResult == null ? null : requestResult.content();
                 if (output_message != null) {
                     // Character Sheet: Remove system-character message from previous messages
                     previousMessages.clear();
@@ -583,7 +615,8 @@ public class EntityChatData {
 
                 } else {
                     // No valid LLM response
-                    throw new RuntimeException(ChatGPTRequest.lastErrorMessage);
+                    throw new RuntimeException(requestResult == null || requestResult.errorMessage() == null
+                            ? "No response from the AI provider." : requestResult.errorMessage());
                 }
 
             } catch (Exception e) {
@@ -591,7 +624,7 @@ public class EntityChatData {
                 LOGGER.error("Error processing LLM response", e);
 
                 Randomizer.ErrorType type = Randomizer.ErrorType.GENERAL;
-                int code = ChatGPTRequest.lastErrorCode;
+                int code = requestResult == null ? -1 : requestResult.errorCode();
                 if (code == -1) {
                     type = Randomizer.ErrorType.CONNECTION;
                 } else if (code == 401 || (config.getApiKey() == null || config.getApiKey().isEmpty())) {
@@ -639,6 +672,15 @@ public class EntityChatData {
     }
 
     public void generateMessage(String userLanguage, ServerPlayer player, String userMessage, boolean is_auto_message, boolean allow_mob_to_mob_reactions) {
+        ChatDataManager.getServerInstance().dispatchRequest(this, player, () -> true,
+                request -> generateMessage(request, userLanguage, player, userMessage, is_auto_message, allow_mob_to_mob_reactions));
+    }
+
+    public void generateMessage(ChatSession.Request request, String userLanguage, ServerPlayer player,
+                                String userMessage, boolean is_auto_message, boolean allow_mob_to_mob_reactions) {
+        if (request == null || !request.isCurrent(this)) {
+            return;
+        }
         String systemPrompt = "system-chat";
         if (is_auto_message) {
             // Increment an auto-generated message
@@ -652,8 +694,8 @@ public class EntityChatData {
         this.addMessage(userMessage, ChatDataManager.ChatSender.USER, player, systemPrompt);
 
         // Get config (api key, url, settings)
-        ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
-        String promptText = ChatPrompt.loadPromptFromResource(ServerPackets.serverInstance.getResourceManager(), systemPrompt);
+        ConfigurationHandler.Config config = new ConfigurationHandler(player.getServer()).loadConfig();
+        String promptText = ChatPrompt.loadPromptFromResource(player.getServer().getResourceManager(), systemPrompt);
 
         // Add PLAYER context information
         Map<String, String> contextData = getPlayerContext(player, userLanguage, config);
@@ -667,8 +709,13 @@ public class EntityChatData {
         }
 
         // fetch HTTP response from ChatGPT
-        ChatGPTRequest.fetchMessageFromChatGPT(config, promptText, contextData, previousMessages, true).thenAccept(output_message -> {
+        request.whenComplete(ChatGPTRequest.fetchResultFromChatGPT(config, promptText, contextData, previousMessages,
+                ChatGPTRequest.StructuredOutputMode.CHAT), (requestResult, failure) -> {
             try {
+                if (failure != null) {
+                    throw new IllegalStateException("AI request failed unexpectedly.");
+                }
+                String output_message = requestResult == null ? null : requestResult.content();
                 if (output_message != null) {
                     // Chat Message: Parse message for behaviors
                     ParsedMessage result = MessageParser.parseMessage(output_message.replace("\n", " "));
@@ -1010,7 +1057,8 @@ public class EntityChatData {
 
                 } else {
                     // No valid LLM response
-                    throw new RuntimeException(ChatGPTRequest.lastErrorMessage);
+                    throw new RuntimeException(requestResult == null || requestResult.errorMessage() == null
+                            ? "No response from the AI provider." : requestResult.errorMessage());
                 }
 
             } catch (Exception e) {
@@ -1018,7 +1066,7 @@ public class EntityChatData {
                 LOGGER.error("Error processing LLM response", e);
 
                 Randomizer.ErrorType type = Randomizer.ErrorType.GENERAL;
-                int code = ChatGPTRequest.lastErrorCode;
+                int code = requestResult == null ? -1 : requestResult.errorCode();
                 if (code == -1) {
                     type = Randomizer.ErrorType.CONNECTION;
                 } else if (code == 401 || (config.getApiKey() == null || config.getApiKey().isEmpty())) {

@@ -12,10 +12,10 @@
 ### Folder Structure:
 To add custom icons for entities, place the icon files in the following path:
 ```
-/main/resources/assets/creaturechat/textures/entity/pig/pig.png
-/main/resources/assets/creaturechat/textures/entity/cat/black.png
-/main/resources/assets/creaturechat/textures/entity/alligator.png
-/main/resources/assets/creaturechat/textures/entity/YOUR-ENTITY.png
+src/main/resources/assets/creaturechat/textures/entity/pig/pig.png
+src/main/resources/assets/creaturechat/textures/entity/cat/black.png
+src/main/resources/assets/creaturechat/textures/entity/alligator.png
+src/main/resources/assets/creaturechat/textures/entity/YOUR-ENTITY.png
 ...
 ```
 
@@ -23,13 +23,15 @@ To add custom icons for entities, place the icon files in the following path:
 - The icon file path should match the **renderer texture path** of the entity.
 - This supports all entities, including those from other mods.
 
+These are source-tree paths. In a resource pack, use `assets/creaturechat/textures/entity/...` relative to the pack root, with the same renderer texture path. Rebuild the mod only when changing its bundled resources.
+
 ---
 
 ## **Custom Player Icons**
 
 ### Step 1: Draw your character on top of the rainbow template
 Player icons should be `24x24` pixels, and PNG format.
-- Download [rainbow-icon-template.png](src/main/resources/assets/creaturechat/screenshots/rainbow-icon-template.jpeg)
+- Open the [rainbow layout reference (JPEG)](src/main/resources/assets/creaturechat/screenshots/rainbow-icon-template.jpeg). This screenshot is a guide; create the final icon as a PNG so its pixels remain exact.
 
 <img src="src/main/resources/assets/creaturechat/screenshots/example-player-icon1.jpeg" width="256" style="image-rendering: pixelated;">
 &nbsp; <img src="src/main/resources/assets/creaturechat/screenshots/example-player-icon2.jpeg" width="256" style="image-rendering: pixelated;">
@@ -37,7 +39,7 @@ Player icons should be `24x24` pixels, and PNG format.
 
 
 ### Step 2: Position your icon on your skin
-- Download [skin-template.png](src/main/resources/assets/creaturechat/screenshots/skin-template.jpeg)
+- Open the [skin layout reference (JPEG)](src/main/resources/assets/creaturechat/screenshots/skin-template.jpeg). Save the final Minecraft skin as a 64×64 PNG.
 
 <img src="src/main/resources/assets/creaturechat/screenshots/example-player-skin1.jpeg" width="256" style="image-rendering: pixelated;">
 &nbsp; <img src="src/main/resources/assets/creaturechat/screenshots/example-player-skin2.jpeg" width="256" style="image-rendering: pixelated;">
@@ -50,10 +52,10 @@ To activate a custom player icon, include a **black and white key** in your skin
 &nbsp; <img src="src/main/resources/assets/creaturechat/screenshots/example-skin2.jpeg" width="256" style="image-rendering: pixelated;">
 &nbsp; <img src="src/main/resources/assets/creaturechat/screenshots/example-player-skin4.jpeg" width="256" style="image-rendering: pixelated;">
 
-1. Add a **black square** at: `(28, 48)`
-2. Add a **white square** at: `(32, 48)`
+1. Ensure pixel `(31, 48)` is opaque black (`#000000`). A black block beginning at `(28, 48)` must include this pixel.
+2. Ensure pixel `(32, 48)` is opaque white (`#FFFFFF`).
 
-CreatureChat™ will detect this key and enable your custom icon.
+Coordinates are zero-based. CreatureChat™ checks these two exact pixels; JPEG compression or transparency can prevent detection. It then assembles the icon from the UV regions below.
 
 ### Step 4: Upload Skin in the Minecraft Launcher
 

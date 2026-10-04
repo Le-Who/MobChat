@@ -5,20 +5,13 @@ package com.lewho.mixin;
 
 import com.lewho.chat.ChatDataManager;
 import com.lewho.chat.EntityChatData;
-import com.lewho.chat.PlayerData;
-import com.lewho.chat.SocialEventRecorder;
-import com.lewho.chat.SocialEventType;
-import com.lewho.commands.ConfigurationHandler;
+import com.lewho.chat.LivingEntityChatHooks;
 import com.lewho.network.ServerPackets;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -41,61 +34,14 @@ public class MixinLivingEntity {
 
     @Inject(method = "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z", at = @At("HEAD"), cancellable = true)
     private void modifyCanTarget(LivingEntity target, CallbackInfoReturnable<Boolean> cir) {
-        if (target instanceof Player) {
-            LivingEntity thisEntity = (LivingEntity) (Object) this;
-            EntityChatData entityData = getChatData(thisEntity);
-            PlayerData playerData = target instanceof ServerPlayer serverPlayer
-                    ? entityData.getPlayerData(serverPlayer)
-                    : entityData.getPlayerData(target.getStringUUID(), target.getDisplayName().getString());
-            if (playerData.friendship > 0) {
-                // Friendly creatures can't target a player
-                cir.setReturnValue(false);
-            }
+        if (LivingEntityChatHooks.preventsFriendlyAttack((LivingEntity) (Object) this, target)) {
+            cir.setReturnValue(false);
         }
     }
 
     @Inject(method = "hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z", at = @At("RETURN"))
     private void onDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        if (!cir.getReturnValue()) {
-            // If damage method returned false, it means the damage was not applied (possibly due to invulnerability).
-            return;
-        }
-
-        // Get attacker and entity objects
-        Entity attacker = source.getEntity();
-        LivingEntity thisEntity = (LivingEntity) (Object) this;
-
-        // If PLAYER attacks MOB then
-        if (attacker instanceof Player && thisEntity instanceof Mob && !thisEntity.isDeadOrDying()) {
-            // Generate attacked message (only if the previous user message was not an attacked message)
-            // We don't want to constantly generate messages during a prolonged, multi-damage event
-            ServerPlayer player = (ServerPlayer) attacker;
-            EntityChatData chatData = getChatData(thisEntity);
-            PlayerData playerData = chatData.getPlayerData(player);
-            playerData.lastDamageFriendship = playerData.friendship;
-            playerData.wordsmithDamaged = true;
-            SocialEventRecorder.record(chatData, player, SocialEventType.DAMAGE_DEALT, "Player attacked this entity.");
-            if (!chatData.characterSheet.isEmpty()) {
-                ConfigurationHandler.Config config = new ConfigurationHandler(player.getServer()).loadConfig();
-                if (!ChatDataManager.getServerInstance().handleDamageReaction(chatData, playerData, player.getDisplayName().getString(), config)) {
-                    return;
-                }
-
-                ItemStack weapon = player.getMainHandItem();
-                String weaponName = weapon.isEmpty() ? "with fists" : "with " + weapon.getItem().toString();
-
-                // Determine if the damage was indirect
-                boolean isIndirect = attacker != null && attacker != source.getDirectEntity();
-                String directness = isIndirect ? "indirectly" : "directly";
-
-                String attackedMessage = "<" + player.getDisplayName().getString() + " attacked you " + directness + " with " + weaponName + ">";
-                String suppressedDamageSummary = playerData.consumeSuppressedDamageReactionSummary();
-                if (!suppressedDamageSummary.isEmpty()) {
-                    attackedMessage += " " + suppressedDamageSummary;
-                }
-                ServerPackets.generate_chat("N/A", chatData, player, (Mob) thisEntity, attackedMessage, true);
-            }
-        }
+        LivingEntityChatHooks.onDamage((LivingEntity) (Object) this, source, cir.getReturnValue());
     }
 
     @Inject(method = "die(Lnet/minecraft/world/damagesource/DamageSource;)V", at = @At("HEAD"))

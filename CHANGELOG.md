@@ -6,6 +6,27 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.1.1] - 2026-10-04
+
+### Fixed
+
+- Native Gemini requests now share local quota preflight, key/model fallback, bounded connection retry and error handling with compatible requests. Retries reserve usage before sending, and model fallback updates explicit `generateContent` URLs.
+- Provider requests snapshot configuration, prompt context and history before asynchronous work. Chat, character and setup results carry their own diagnostics, so concurrent requests cannot overwrite another response's error. Successful retries clear earlier errors; configured keys are redacted before provider diagnostics are logged or displayed.
+- Character and chat replies now apply through the originating server session, with current player/world/entity checks and one active request per NPC. Late responses after unload, identity changes, disconnect or shutdown cannot mutate replacement state; interrupted pending conversations recover on load.
+- Busy or invalid NPC requests are rejected before spending automatic quota, resetting damage cooldowns or installing conversation goals. Ambient generation reports successful admission instead of counting a rejected request as a reply.
+- Autosave snapshots run on the server thread. Shutdown stops producers before the final save, and complete UTF-8 snapshots replace chat JSON without truncating the previous good file when serialization fails.
+- Partial hand extraction and occupied hand-stack merges synchronize the resulting equipment count. Shift-click transfers respect locked-slot permissions for both occupied and empty destinations.
+- Taking only a mob's disarmed item records the theft social event after item-count normalization.
+- Applicable version adapters retain UUID-based relationship lookup, damage cooldown/social-event accounting, public proximity chat and chat advancement events through common policy.
+- Narrow respawn-point and command-hint adapters handle the newer Minecraft APIs without copying the chat or command classes into version overrides.
+- The console setup example uses the provider preset's current default model.
+
+### Changed
+
+- Native Gemini 3 requests honor the explicit thinking level selected in setup; `auto` leaves the provider default and the level field is omitted for Gemini 2.5.
+- Added an architecture map with domain/state/request/client/update flows, source ownership, version adapters, verification boundaries and remaining engineering work. Updated setup, updater staging/apply, build toolchain, contributor, icon and privacy documentation for this fork.
+- Ignore runtime provider configuration and chat history alongside quota/preferences state, keeping credentials and world conversations out of ordinary source changes.
+
 ## [3.1.0] - 2026-07-30
 
 ### Added
