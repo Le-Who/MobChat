@@ -4,30 +4,9 @@ Contributions target the [MobChat repository](https://github.com/Le-Who/MobChat)
 
 ## Find the owner before changing behavior
 
-Common/server code lives under `src/main/java/com/lewho/`; client-only screens, rendering, skins, and packet handling live under `src/client/java/com/lewho/`. The build uses official Mojang names such as `ServerPlayer`, `ServerLevel`, `Mob`, and `MinecraftServer`.
+Before changing code, configuration, or resources, find the module in [ARCHITECTURE: Source ownership](ARCHITECTURE.md#2-source-ownership) and apply [CODING_STANDARDS: Source ownership](CODING_STANDARDS.md#source-ownership).
 
-Use the existing owner for a change:
-
-- Conversation state, prompt context, provider requests, memories, social events, and quotas: `chat/`.
-- Configuration, provider presets, setup commands, and custom roles: `commands/`.
-- Action arbitration: `chat/BehaviorPolicy`; dynamic goal installation: `goals/EntityBehaviorManager`.
-- Entity hooks and saved inventory/identity adapters: `mixin/`; menus and item accounting: `inventory/`.
-- Client/server synchronization: `network/`; client interaction and bubbles: client `ui/` and `render/`.
-- Download, staging, hash checks, and post-exit installation: `update/`.
-
-Prefer an existing pattern over a new abstraction. A narrow helper is useful when it centralizes policy repeated across version adapters or exposes a meaningful behavior for tests. Avoid copying large classes into `src/vs/` for small API differences.
-
-## Contracts to preserve
-
-Minecraft mutations and traversal of mutable server state belong on the server thread. HTTP runs asynchronously; applying its result must return through the current server session and validate entity/player/world ownership. A concurrent outer map does not make mutable histories, memories, inventories, or player records thread-safe.
-
-Chat and character generation use structured JSON contracts. Preserve `NONE`, `CHAT`, and `CHARACTER`, the required schemas, and output-token floors. Add parser/request regressions before changing response salvage or schema behavior. Provider routing must keep native Gemini and OpenAI-compatible payloads distinct while sharing quota/retry/error policy.
-
-Record player social events through `SocialEventRecorder`. Automatic LLM triggers need the existing player/entity buckets, dedicated damage or ambient cooldowns, and provider preflight. Keep provider `429` handling even with local limits. Use UUID-scoped player lookup and preserve migration of older save data.
-
-Configuration packets use `ConfigurationScreenData`; full stored API keys remain on the server. Provider diagnostics must redact configured keys before logging or displaying them. Client display preferences filter current reply feeds; shared entity conversation history is a separate data contract.
-
-Hand slots mirror mob equipment. Both partial extraction and merging into an occupied hand must synchronize the resulting stack. Persisted chat/player/home data is distinct from live goal instances; saving metadata does not recreate a goal after restart.
+Read every matching standards branch: [Requests, JSON, and quotas](CODING_STANDARDS.md#requests-json-and-quotas), [Credentials and client boundaries](CODING_STANDARDS.md#credentials-and-client-boundaries), [Server state and persistence](CODING_STANDARDS.md#server-state-and-persistence), [Social events, automatic reactions, and goals](CODING_STANDARDS.md#social-events-automatic-reactions-and-goals), or [Inventory transfers](CODING_STANDARDS.md#inventory-transfers).
 
 ## Tests
 
@@ -52,9 +31,9 @@ Write behavioral regressions that catch the original defect. Real `ItemStack`/co
 
 ## Version adapters and resources
 
-For a Minecraft API change, inspect the base class and every later applicable override of the same path. Overrides replace whole classes, so a gameplay fix in base can disappear on newer targets. Keep common gameplay policy in shared hooks and leave target signatures, serialization, and platform API calls in the adapters.
+Before changing Minecraft signatures, mixins, or source overrides, read [CODING_STANDARDS: Mixins and version adapters](CODING_STANDARDS.md#mixins-and-version-adapters).
 
-Verify the build's printed override selection. Check target-specific dependencies and metadata before packaging another Minecraft version. The current default-target build and static inspection of newer adapters are different forms of evidence; report each accurately.
+Check target-specific dependencies and metadata before packaging another Minecraft version. The current default-target build and static inspection of newer adapters are different forms of evidence; report each accurately.
 
 Prompt templates live in `src/main/resources/data/creaturechat/prompts/`. Resource-manager loading permits data-pack overrides. `system-quest` is presently unused. Loot tables and advancements have checked-in data plus datagen providers. Translations use fallback text in code; new keys need a matching datagen update. `runDatagen` can change tracked locale files, as described in [INSTALL.md](INSTALL.md).
 
@@ -62,20 +41,15 @@ Prompt templates live in `src/main/resources/data/creaturechat/prompts/`. Resour
 
 ## Documentation and releases
 
-Update `README.md` for player/admin behavior, `INSTALL.md` for installation/build changes, and this guide for contributor workflow. Update the architecture map when ownership, data flow, state lifecycle, or public contracts change. Keep `AGENTS.md` for durable coding instructions and release history in `CHANGELOG.md`.
+Update `README.md` for player/admin behavior, `INSTALL.md` for installation/build changes, and this guide for contributor workflow. Update the architecture map when ownership, data flow, state lifecycle, or public contracts change. Keep `AGENTS.md` for repository scope and document routing, `CODING_STANDARDS.md` for change constraints, and release history in `CHANGELOG.md`.
 
-Add release-worthy notes under `## Unreleased` while developing. Before declaring a user-visible jar ready for distribution, bump `mod_version` according to SemVer and move its notes into a dated version section. Build the remapped distribution, verify metadata and SHA-512, and include each target's jar/hash pair in a GitHub release for the updater.
+Add release-worthy user-visible notes under `## Unreleased` while developing; documentation-only cleanup may skip the changelog unless release notes are requested. Before declaring a user-visible jar or updater release ready for distribution, bump `mod_version` in `gradle.properties` according to SemVer and move its notes into a dated `## [version] - YYYY-MM-DD` section. Build the remapped distribution, verify metadata and SHA-512, and include each target's jar/hash pair in a GitHub release for the updater.
 
 Use a descriptive branch for contributions. Keep changes focused, preserve unrelated work, and include a concrete problem/result and validation in a PR or patch. Commits, pushes, external publication, and merging remain explicit repository/user actions.
 
 ## Licensing and reports
 
-Preserve existing license headers. New Java files use the project SPDX header:
-
-```java
-// SPDX-FileCopyrightText: 2026 lewho LLC
-// SPDX-License-Identifier: GPL-3.0-or-later
-```
+Before adding Java files or changing license headers, read [CODING_STANDARDS: Java licensing](CODING_STANDARDS.md#java-licensing).
 
 Source code is under [GPL-3.0-or-later](LICENSE.md); non-code assets have the separate [CC-BY-NC-SA-4.0 terms](LICENSE-ASSETS.md). Preserve attribution, ShareAlike, and non-commercial asset conditions. The original CreatureChat trademark and branding terms remain separate; use the licensing documents for their complete conditions.
 
