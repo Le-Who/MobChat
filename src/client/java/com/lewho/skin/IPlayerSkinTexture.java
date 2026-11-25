@@ -6,9 +6,6 @@ package com.lewho.skin;
 import com.mojang.blaze3d.platform.NativeImage;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * The {@code IPlayerSkinTexture} interface adds a new getLoadedImage method to PlayerSkinTexture instances
- */
 public interface IPlayerSkinTexture {
     @Nullable
     NativeImage getLoadedImage();

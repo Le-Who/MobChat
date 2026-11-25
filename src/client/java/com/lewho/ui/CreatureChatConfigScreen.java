@@ -13,9 +13,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
-/**
- * Client-side OP configuration screen. The server remains authoritative.
- */
 public class CreatureChatConfigScreen extends VersionedScreen {
     private static final int MAX_PANEL_WIDTH = 560;
     private static final int PANEL_HEIGHT = 254;
@@ -27,7 +24,7 @@ public class CreatureChatConfigScreen extends VersionedScreen {
     private String selectedProvider;
     private String maskedApiKeys;
     private String selectedThinkingLevel;
-    private String selectedLanguageCode;  // locale code, "" = auto
+    private String selectedLanguageCode;
     private String statusMessage = "";
     private int statusColor = 0xFFA0A0A0;
 

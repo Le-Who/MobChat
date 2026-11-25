@@ -5,9 +5,6 @@ package com.lewho.utils;
 
 import net.minecraft.world.damagesource.DamageSource;
 
-/**
- * Accessor interface for WitherEntity to allow calling dropEquipment externally.
- */
 public interface WitherEntityAccessor {
     void callDropEquipment(DamageSource source, int lootingMultiplier, boolean allowDrops);
 }

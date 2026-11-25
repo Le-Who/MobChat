@@ -15,7 +15,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
-/** Shared post-interaction policy; inventory/NBT adapters stay in version mixins. */
 public final class MobInteractionHooks {
     private MobInteractionHooks() {
     }

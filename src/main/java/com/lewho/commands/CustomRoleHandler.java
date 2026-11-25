@@ -45,7 +45,6 @@ public class CustomRoleHandler {
                     StandardOpenOption.WRITE)) {
                 gson.toJson(roles, writer);
             } catch (FileAlreadyExistsException ignored) {
-                // Existing role files may be intentionally empty or need repair.
             } catch (IOException e) {
                 LOGGER.error("Error creating default custom_roles.json", e);
             }

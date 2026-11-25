@@ -60,10 +60,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-/**
- * The {@code ServerPackets} class provides methods to send packets to/from the client for generating greetings,
- * updating message details, and sending user messages.
- */
 public class ServerPackets {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final int AMBIENT_CONTEXT_MAX_CHARS = 240;
@@ -103,7 +99,6 @@ public class ServerPackets {
     public static final ParticleType<?> LEAD_PARTICLE = Particles.LEAD_PARTICLE;
 
     public static void register() {
-        // Register custom particles
         Registry.register(BuiltInRegistries.PARTICLE_TYPE, new ResourceLocation("creaturechat", "heart_small"), HEART_SMALL_PARTICLE);
         Registry.register(BuiltInRegistries.PARTICLE_TYPE, new ResourceLocation("creaturechat", "heart_big"), HEART_BIG_PARTICLE);
         Registry.register(BuiltInRegistries.PARTICLE_TYPE, new ResourceLocation("creaturechat", "fire_small"), FIRE_SMALL_PARTICLE);
@@ -117,12 +112,10 @@ public class ServerPackets {
         Registry.register(BuiltInRegistries.PARTICLE_TYPE, new ResourceLocation("creaturechat", "lead_friend"), LEAD_FRIEND_PARTICLE);
         Registry.register(BuiltInRegistries.PARTICLE_TYPE, new ResourceLocation("creaturechat", "lead"), LEAD_PARTICLE);
 
-        // Handle packet for Greeting
         PacketHelper.registerReceiver(PACKET_C2S_GREETING, (server, player, buf) -> {
             UUID entityId = UUID.fromString(buf.readUtf());
             String userLanguage = buf.readUtf(32767);
 
-            // Ensure that the task is synced with the server thread
             server.execute(() -> {
                 Mob entity = (Mob)ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), entityId);
                 if (entity != null) {
@@ -134,16 +127,13 @@ public class ServerPackets {
             });
         });
 
-        // Handle packet for reading lines of message
         PacketHelper.registerReceiver(PACKET_C2S_READ_NEXT, (server, player, buf) -> {
             UUID entityId = UUID.fromString(buf.readUtf());
             int lineNumber = buf.readInt();
 
-            // Ensure that the task is synced with the server thread
             server.execute(() -> {
                 Mob entity = (Mob)ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), entityId);
                 if (entity != null) {
-                    // Set talk to player goal (prevent entity from walking off)
                     TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
                     EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
@@ -154,16 +144,13 @@ public class ServerPackets {
             });
         });
 
-        // Handle packet for setting status of chat bubbles
         PacketHelper.registerReceiver(PACKET_C2S_SET_STATUS, (server, player, buf) -> {
             UUID entityId = UUID.fromString(buf.readUtf());
             String status_name = buf.readUtf(32767);
 
-            // Ensure that the task is synced with the server thread
             server.execute(() -> {
                 Mob entity = (Mob)ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), entityId);
                 if (entity != null) {
-                    // Set talk to player goal (prevent entity from walking off)
                     TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
                     EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
@@ -174,40 +161,32 @@ public class ServerPackets {
             });
         });
 
-        // Handle packet for Open Chat
         PacketHelper.registerReceiver(PACKET_C2S_OPEN_CHAT, (server, player, buf) -> {
             UUID entityId = UUID.fromString(buf.readUtf());
 
-            // Ensure that the task is synced with the server thread
             server.execute(() -> {
                 Mob entity = (Mob)ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), entityId);
                 if (entity != null) {
-                    // Set talk to player goal (prevent entity from walking off)
                     TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 7F);
                     EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
                 }
 
-                // Sync player UI status to all clients
                 BroadcastPlayerStatus(player, true);
             });
         });
 
-        // Handle packet for Close Chat
         PacketHelper.registerReceiver(PACKET_C2S_CLOSE_CHAT, (server, player, buf) -> {
 
             server.execute(() -> {
-                // Sync player UI status to all clients
                 BroadcastPlayerStatus(player, false);
             });
         });
 
-        // Handle packet for new chat message
         PacketHelper.registerReceiver(PACKET_C2S_SEND_CHAT, (server, player, buf) -> {
             UUID entityId = UUID.fromString(buf.readUtf());
             String message = buf.readUtf(32767);
             String userLanguage = buf.readUtf(32767);
 
-            // Ensure that the task is synced with the server thread
             server.execute(() -> {
                 Mob entity = (Mob)ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), entityId);
                 if (entity != null) {
@@ -256,16 +235,12 @@ public class ServerPackets {
             server.execute(() -> testConfigFromScreen(server, player, data));
         });
 
-        // Send lite chat data JSON to new player (to populate client data)
-        // Data is sent in chunks, to prevent exceeding the 32767 limit per String.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayer player = handler.player;
 
-            // Send entire whitelist / blacklist to logged in player
             send_whitelist_blacklist(player);
 
             LOGGER.info("Server send compressed, chunked login message packets to player: " + player.getDisplayName().getString());
-            // Get lite JSON data & compress to byte array
             String chatDataJSON = ChatDataManager.getServerInstance().GetLightChatData(
                     player.getStringUUID(), player.getDisplayName().getString(), playerPreferences);
             byte[] compressedData = Compression.compressString(chatDataJSON);
@@ -274,19 +249,17 @@ public class ServerPackets {
                 return;
             }
 
-            final int chunkSize = 32000; // Define chunk size
+            final int chunkSize = 32000;
             int totalPackets = (int) Math.ceil((double) compressedData.length / chunkSize);
 
-            // Loop through each chunk of bytes, and send bytes to player
             for (int i = 0; i < totalPackets; i++) {
                 int start = i * chunkSize;
                 int end = Math.min(compressedData.length, start + chunkSize);
 
                 FriendlyByteBuf buffer = BufferHelper.create();
-                buffer.writeInt(i); // Packet sequence number
-                buffer.writeInt(totalPackets); // Total number of packets
+                buffer.writeInt(i);
+                buffer.writeInt(totalPackets);
 
-                // Write chunk as byte array
                 byte[] chunk = Arrays.copyOfRange(compressedData, start, end);
                 buffer.writeByteArray(chunk);
 
@@ -318,7 +291,6 @@ public class ServerPackets {
                 ChatDataManager.getServerInstance().loadChatData(server);
                 playerPreferences = PlayerChatPreferences.load(playerPreferencesPath(server));
 
-                // Start the auto-save task to save every X minutes
                 scheduler = new ChatDataSaverScheduler();
                 scheduler.startAutoSaveTask(server, 15, TimeUnit.MINUTES);
             }
@@ -326,7 +298,6 @@ public class ServerPackets {
         ServerWorldEvents.UNLOAD.register((server, world) -> {
             if (Level.OVERWORLD.equals(world.dimension()) && serverInstance == server) {
                 ChatDataManager manager = ChatDataManager.getServerInstance();
-                // Stop producers and invalidate queued callbacks before the final snapshot.
                 if (scheduler != null) {
                     scheduler.stopAutoSaveTask();
                     scheduler = null;
@@ -357,14 +328,12 @@ public class ServerPackets {
         ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
         FriendlyByteBuf buffer = BufferHelper.create();
 
-        // Write the whitelist data to the buffer
         List<String> whitelist = config.getWhitelist();
         buffer.writeInt(whitelist.size());
         for (String entry : whitelist) {
             buffer.writeUtf(entry);
         }
 
-        // Write the blacklist data to the buffer
         List<String> blacklist = config.getBlacklist();
         buffer.writeInt(blacklist.size());
         for (String entry : blacklist) {
@@ -372,11 +341,9 @@ public class ServerPackets {
         }
 
         if (player != null) {
-            // Send packet to specific player
             LOGGER.info("Sending whitelist / blacklist packet to player: " + player.getDisplayName().getString());
             PacketHelper.send(player, PACKET_S2C_WHITELIST, buffer);
         } else {
-            // Iterate over all players and send the packet
             for (ServerPlayer serverPlayer : serverInstance.getPlayerList().getPlayers()) {
                 PacketHelper.send(serverPlayer, PACKET_S2C_WHITELIST, buffer);
             }
@@ -544,25 +511,20 @@ public class ServerPackets {
         if (!request.isCurrent(chatData)) {
             return;
         }
-        // Apply server language override if configured
         String effectiveLanguage = config.getGenerationLanguage().isEmpty()
                 ? userLanguage
                 : MinecraftLanguages.displayName(config.getGenerationLanguage());
-        // Set talk to player goal (prevent entity from walking off)
         TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
         EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
-        // Grab random adjective
         String randomAdjective = Randomizer.getRandomMessage(Randomizer.RandomType.ADJECTIVE);
         String randomClass = Randomizer.getRandomMessage(Randomizer.RandomType.CLASS);
         String randomAlignment = Randomizer.getRandomMessage(Randomizer.RandomType.ALIGNMENT);
         String randomSpeakingStyle = Randomizer.getRandomMessage(Randomizer.RandomType.SPEAKING_STYLE);
 
-        // Generate random name parameters
         String randomLetter = Randomizer.RandomLetter();
         int randomSyllables = Randomizer.RandomNumber(5) + 1;
 
-        // Build the message
         StringBuilder userMessageBuilder = new StringBuilder();
         userMessageBuilder.append("Please generate a ").append(randomAdjective).append(" character. ");
         userMessageBuilder.append("This character is a ").append(randomClass).append(" class, who is ").append(randomAlignment).append(". ");
@@ -574,19 +536,15 @@ public class ServerPackets {
         }
         userMessageBuilder.append("They speak in '").append(effectiveLanguage).append("' with a ").append(randomSpeakingStyle).append(" style.");
 
-        // Generate new character
         chatData.generateCharacter(request, effectiveLanguage, player, userMessageBuilder.toString(), is_auto_message);
 
-        // Populate inventory with some simple starter items if empty
         if (entity instanceof ChatInventory chatInv) {
             Container inv = chatInv.creaturechat$getInventory();
 
-            // Server-side only to avoid client duplicates
             if (entity.level().isClientSide) return;
 
-            // If this entity has a chest, copy its inventory into ours
             if (entity instanceof AbstractChestedHorse chested && chested.hasChest()) {
-                int chestStart = AbstractHorse.CHEST_SLOT_OFFSET + 1; // skip the chest item slot
+                int chestStart = AbstractHorse.CHEST_SLOT_OFFSET + 1;
                 int chestSlots = chested.getInventoryColumns() * 3;
 
                 for (int i = 0; i < chestSlots && i < inv.getContainerSize(); i++) {
@@ -618,7 +576,6 @@ public class ServerPackets {
                 if (stacks.isEmpty()) {
                     LOGGER.info("No loot matched for {}", tableId);
                 } else {
-                    // Randomly assign inventory loot items into random slots
                     RandomSource random = entity.getRandom();
                     int limit = Math.min(3, Math.min(inv.getContainerSize(), stacks.size()));
                     List<Integer> slots = new ArrayList<>();
@@ -642,23 +599,19 @@ public class ServerPackets {
                 request -> generate_chat(request, userLanguage, chatData, player, entity, message, is_auto_message, config));
     }
 
-    /** Shared preparation for reactive callers that already admitted and rate-limited their request. */
     public static void generate_chat(ChatSession.Request request, String userLanguage, EntityChatData chatData,
                                     ServerPlayer player, Mob entity, String message, boolean is_auto_message,
                                     ConfigurationHandler.Config config) {
         if (request == null || !request.isCurrent(chatData)) {
             return;
         }
-        // Apply server language override if configured
         String effectiveLanguage = config.getGenerationLanguage().isEmpty()
                 ? userLanguage
                 : MinecraftLanguages.displayName(config.getGenerationLanguage());
 
-        // Set talk to player goal (prevent entity from walking off)
         TalkPlayerGoal talkGoal = new TalkPlayerGoal(player, entity, 3.5F);
         EntityBehaviorManager.addGoal(entity, talkGoal, GoalPriority.TALK_PLAYER);
 
-        // Add new message
         chatData.generateMessage(request, effectiveLanguage, player, message, is_auto_message, !is_auto_message);
     }
 
@@ -777,7 +730,6 @@ public class ServerPackets {
         ChatDataManager manager = ChatDataManager.getServerInstance();
         return manager.dispatchRequest(chatData, player,
                 () -> manager.handleAmbientResponse(chatData, player, config), request -> {
-                    // Apply server language override if configured
                     String effectiveLanguage = config.getGenerationLanguage().isEmpty()
                             ? userLanguage
                             : MinecraftLanguages.displayName(config.getGenerationLanguage());
@@ -834,7 +786,6 @@ public class ServerPackets {
     public static void writeViewerRelationship(FriendlyByteBuf buffer, EntityChatData chatData,
                                                String playerId, String playerName) {
         PlayerData data = chatData.getPlayerDataForDisplay(playerId, playerName);
-        // The receiver expects a map. Send just the viewer's entry under their UUID.
         buffer.writeInt(1);
         buffer.writeUtf(playerId);
         buffer.writeInt(data.friendship);
@@ -845,20 +796,17 @@ public class ServerPackets {
         buffer.writeUtf(data.socialSummary == null ? "" : data.socialSummary);
     }
 
-    // Send new message to all connected players
     public static void BroadcastEntityMessage(EntityChatData chatData) {
         if (serverInstance == null) {
             LOGGER.warn("Skipping entity message broadcast because the server instance is not available.");
             return;
         }
-        // Log useful information before looping through all players
         LOGGER.info("Broadcasting entity message: entityId={}, status={}, currentMessage={}, currentLineNumber={}, senderType={}",
                 chatData.entityId, chatData.status,
                 chatData.currentMessage.length() > 24 ? chatData.currentMessage.substring(0, 24) + "..." : chatData.currentMessage,
                 chatData.currentLineNumber, chatData.sender);
 
         for (ServerLevel world : serverInstance.getAllLevels()) {
-            // Find Entity by UUID and update custom name
             UUID entityId = UUID.fromString(chatData.entityId);
             Mob entity = (Mob)ServerEntityFinder.getEntityByUUID(world, entityId);
             if (entity != null) {
@@ -870,12 +818,10 @@ public class ServerPackets {
                     entity.setPersistenceRequired();
                 }
 
-                // Make auto-generated message appear as a pending icon (attack, show/give, arrival)
                 if (chatData.sender == ChatDataManager.ChatSender.USER && chatData.auto_generated > 0) {
                     chatData.status = ChatDataManager.ChatStatus.PENDING;
                 }
 
-                // Iterate over all players and send the packet
                 for (ServerPlayer player : serverInstance.getPlayerList().getPlayers()) {
                     if (!playerPreferences.canReceiveEntityUpdate(player.getUUID(), chatData.currentPlayerId, chatData.sender)) {
                         continue;
@@ -888,7 +834,6 @@ public class ServerPackets {
                     buffer.writeUtf(chatData.sender.toString());
                     writeViewerRelationship(buffer, chatData, player.getStringUUID(), player.getDisplayName().getString());
 
-                    // Send message to player
                     PacketHelper.send(player, PACKET_S2C_ENTITY_MESSAGE, buffer);
                 }
                 break;
@@ -896,25 +841,20 @@ public class ServerPackets {
         }
     }
 
-    // Send new message to all connected players
     public static void BroadcastPlayerMessage(EntityChatData chatData, ServerPlayer sender) {
         if (serverInstance == null) {
             LOGGER.warn("Skipping player message broadcast because the server instance is not available.");
             return;
         }
-        // Log the specific data being sent
         LOGGER.info("Broadcasting player message: senderUUID={}, message={}", sender.getStringUUID(),
                 chatData.currentMessage);
 
-        // Create the buffer for the packet
         FriendlyByteBuf buffer = BufferHelper.create();
 
-        // Write the sender's UUID and the chat message to the buffer
         buffer.writeUtf(sender.getStringUUID());
         buffer.writeUtf(sender.getDisplayName().getString());
         buffer.writeUtf(chatData.currentMessage);
 
-        // Iterate over all connected players and send the packet
         for (ServerPlayer serverPlayer : serverInstance.getPlayerList().getPlayers()) {
             PacketHelper.send(serverPlayer, PACKET_S2C_PLAYER_MESSAGE, buffer);
         }
@@ -937,7 +877,6 @@ public class ServerPackets {
         }
     }
 
-    // Send new message to all connected players
     public static void BroadcastPlayerStatus(Player player, boolean isChatOpen) {
         if (serverInstance == null) {
             LOGGER.warn("Skipping player status broadcast because the server instance is not available.");
@@ -945,18 +884,15 @@ public class ServerPackets {
         }
         FriendlyByteBuf buffer = BufferHelper.create();
 
-        // Write the entity's chat updated data
         buffer.writeUtf(player.getStringUUID());
         buffer.writeBoolean(isChatOpen);
 
-        // Iterate over all players and send the packet
         for (ServerPlayer serverPlayer : serverInstance.getPlayerList().getPlayers()) {
             LOGGER.debug("Server broadcast " + player.getDisplayName().getString() + " player status to client: " + serverPlayer.getDisplayName().getString() + " | isChatOpen: " + isChatOpen);
             PacketHelper.send(serverPlayer, PACKET_S2C_PLAYER_STATUS, buffer);
         }
     }
 
-    // Send a chat message to all players (i.e. death message)
     public static void BroadcastMessage(Component message) {
         if (serverInstance == null) {
             LOGGER.warn("Skipping server chat broadcast because the server instance is not available.");
@@ -967,13 +903,11 @@ public class ServerPackets {
         };
     }
 
-    // Send an error message to all ops.
     public static void sendErrorToAllOps(MinecraftServer server, String message) {
         if (server == null) {
             return;
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Check if the player is an operator
             if (server.getPlayerList().isOp(player.getGameProfile())) {
                 player.displayClientMessage(Component.literal(message).withStyle(ChatFormatting.RED), false);
             }

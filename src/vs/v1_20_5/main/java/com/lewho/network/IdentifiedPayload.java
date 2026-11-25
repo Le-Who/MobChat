@@ -9,11 +9,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * A generic payload that wraps an Identifier and a byte array for packet data. This is for
- * Minecraft 1.20.5+ versions, which switched to CustomPayload. This maintains compatibility
- * with the rest of CreatureChat code.
- */
 public record IdentifiedPayload(ResourceLocation id, byte[] data) implements CustomPacketPayload {
     public static final CustomPacketPayload.Type<IdentifiedPayload> PACKET_ID =
             new CustomPacketPayload.Type<>(new ResourceLocation("creaturechat", "identified_payload"));

@@ -50,10 +50,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-/**
- * The {@code CreatureChatCommands} class registers custom commands to set new API key, model, and url.
- * Permission level set to 4 (server owner), since this deals with API keys and potential costs.
- */
 public class CreatureChatCommands {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
 
@@ -115,7 +111,6 @@ public class CreatureChatCommands {
                 .keySet()
                 .stream()
                 .filter(id ->
-                        // getOptional(...) returns Optional<EntityType<?>> on all versions
                         BuiltInRegistries.ENTITY_TYPE
                                 .getOptional(id)
                                 .map(type -> type.getCategory() != MobCategory.MISC
@@ -753,10 +748,10 @@ public class CreatureChatCommands {
             if ("all".equals(action)) {
                 if ("whitelist".equals(listName)) {
                     config.setWhitelist(entityTypes);
-                    config.setBlacklist(new ArrayList<>()); // Clear blacklist
+                    config.setBlacklist(new ArrayList<>());
                 } else if ("blacklist".equals(listName)) {
                     config.setBlacklist(entityTypes);
-                    config.setWhitelist(new ArrayList<>()); // Clear whitelist
+                    config.setWhitelist(new ArrayList<>());
                 }
             } else if ("clear".equals(action)) {
                 if ("whitelist".equals(listName)) {
@@ -774,7 +769,6 @@ public class CreatureChatCommands {
                         whitelist.add(action);
                         config.setWhitelist(whitelist);
                     }
-                    // Remove from blacklist if present
                     List<String> blacklist = new ArrayList<>(config.getBlacklist());
                     blacklist.remove(action);
                     config.setBlacklist(blacklist);
@@ -784,7 +778,6 @@ public class CreatureChatCommands {
                         blacklist.add(action);
                         config.setBlacklist(blacklist);
                     }
-                    // Remove from whitelist if present
                     List<String> whitelist = new ArrayList<>(config.getWhitelist());
                     whitelist.remove(action);
                     config.setWhitelist(whitelist);
@@ -801,7 +794,6 @@ public class CreatureChatCommands {
             Component feedbackMessage = CCText.CONFIG_LIST_UPDATE_SUCCESS.comp(listName, action).withStyle(ChatFormatting.GREEN);
             source.sendSuccess(() -> feedbackMessage, false);
 
-            // Send whitelist / blacklist to all players
             ServerPackets.send_whitelist_blacklist(null);
             return 1;
         } else {

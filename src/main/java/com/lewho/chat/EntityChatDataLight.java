@@ -6,11 +6,6 @@ package com.lewho.chat;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * The {@code EntityChatDataLight} class represents the current displayed message, and no
- * previous messages or player message history. This is primarily used to broadcast the
- * currently displayed messages to players as they connect to the server.
- */
 public class EntityChatDataLight {
     public String entityId;
     public String currentMessage;
@@ -19,7 +14,6 @@ public class EntityChatDataLight {
     public ChatDataManager.ChatSender sender;
     public Map<String, PlayerData> players;
 
-    // Constructor to initialize the light version from the full version
     public EntityChatDataLight(EntityChatData fullData, String playerId, String playerName) {
         this.entityId = fullData.entityId;
         this.currentMessage = fullData.currentMessage;
@@ -27,7 +21,6 @@ public class EntityChatDataLight {
         this.status = fullData.status;
         this.sender = fullData.sender;
 
-        // Login sync must leave legacy entries available for migration during gameplay.
         this.players = new HashMap<>();
         this.players.put(playerId, fullData.getPlayerDataForDisplay(playerId, playerName));
     }

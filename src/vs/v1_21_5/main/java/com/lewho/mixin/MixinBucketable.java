@@ -19,14 +19,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.UUID;
 
-/**
- * {@code copyDataFromNbt} – read that tag when the mob respawns and move
- * chat data from the old UUID to the new one. Modified for Minecraft 1.21.0+.
- */
 @Mixin(Bucketable.class)
 public interface MixinBucketable {
 
-    // capture: mob → bucket
     @Inject(
             method = "saveDefaultDataToBucketTag(Lnet/minecraft/world/entity/Mob;Lnet/minecraft/world/item/ItemStack;)V",
             at     = @At("TAIL")
@@ -34,7 +29,6 @@ public interface MixinBucketable {
     private static void captureCCUUID(Mob entity, ItemStack stack, CallbackInfo ci) {
         UUID oldId = entity.getUUID();
 
-        // Append our CCUUID to the existing BUCKET_ENTITY_DATA component
         CustomData.update(
                 DataComponents.BUCKET_ENTITY_DATA,
                 stack,
@@ -45,7 +39,6 @@ public interface MixinBucketable {
                 .info("[Bucket-Capture] stored {}", oldId);
     }
 
-    // release: bucket → mob
     @Inject(
             method = "loadDefaultDataFromBucketTag(Lnet/minecraft/world/entity/Mob;Lnet/minecraft/nbt/CompoundTag;)V",
             at     = @At("TAIL")

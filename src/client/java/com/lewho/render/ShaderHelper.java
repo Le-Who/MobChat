@@ -6,7 +6,6 @@ package com.lewho.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.GameRenderer;
 
-/** Binds the GUI textured-quad shader (1.20.x mappings). */
 public final class ShaderHelper {
     private ShaderHelper() {}
 

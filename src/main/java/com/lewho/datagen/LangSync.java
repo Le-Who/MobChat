@@ -13,10 +13,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.TreeMap;
 
-/**
- * Updates existing static translation files with keys from the English map.
- * New keys are added with English text and missing keys are removed.
- */
 public final class LangSync {
     private static Path findLangDir() {
         Path dir = Path.of(System.getProperty("user.dir"));

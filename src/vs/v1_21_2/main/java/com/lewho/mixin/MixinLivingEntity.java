@@ -20,10 +20,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Modifies LivingEntity: prevents friendly targeting, auto-chat on damage,
- * and custom death messages.
- */
 @Mixin(LivingEntity.class)
 public class MixinLivingEntity {
 
@@ -63,7 +59,6 @@ public class MixinLivingEntity {
         Level world = entity.level();
 
         if (!world.isClientSide() && entity.hasCustomName()) {
-            // Skip tamed entities and players
             if (entity instanceof TamableAnimal && ((TamableAnimal) entity).isTame()) {
                 return;
             }
@@ -72,12 +67,9 @@ public class MixinLivingEntity {
                 return;
             }
 
-            // Get chatData for the entity
             EntityChatData chatData = getChatData(entity);
             if (chatData != null && !chatData.characterSheet.isEmpty()) {
-                // Get the original death message
                 Component deathMessage = entity.getCombatTracker().getDeathMessage();
-                // Broadcast the death message to all players in the world
                 ServerPackets.BroadcastMessage(deathMessage);
             }
         }

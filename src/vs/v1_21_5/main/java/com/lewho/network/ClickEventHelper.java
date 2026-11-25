@@ -8,7 +8,6 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.ClickEvent.OpenUrl;
 
 public class ClickEventHelper {
-    /** new API: use the OpenUrl record */
     public static ClickEvent openUrl(String url) {
         return new OpenUrl(URI.create(url));
     }

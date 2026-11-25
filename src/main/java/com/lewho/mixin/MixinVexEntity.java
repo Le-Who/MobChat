@@ -11,9 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Mixin to modify Vex behavior by setting `alive = false` if chat data exists.
- */
 @Mixin(Vex.class)
 public abstract class MixinVexEntity {
     @Inject(method = "tick", at = @At("HEAD"))
@@ -22,7 +19,6 @@ public abstract class MixinVexEntity {
 
         EntityChatData chatData = ChatDataManager.getServerInstance().getOrCreateChatData(vex.getStringUUID());
         if (!chatData.characterSheet.isEmpty()) {
-            // Prevents starvation death by keeping the timer reset
             vex.setLimitedLife(20);
         }
     }

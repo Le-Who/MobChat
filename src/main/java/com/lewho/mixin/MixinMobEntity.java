@@ -15,7 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.SimpleContainer;
+import com.lewho.inventory.MobInventory;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.world.entity.Mob;
@@ -30,16 +30,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * The {@code MixinMobEntity} mixin class exposes the goalSelector field from the MobEntity class.
- */
 @Mixin(Mob.class)
 public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
 
-    private final SimpleContainer creaturechat$inventory = new SimpleContainer(15);
+    private final MobInventory creaturechat$inventory = new MobInventory();
 
     @Override
-    public SimpleContainer creaturechat$getInventory() {
+    public MobInventory creaturechat$getInventory() {
         return creaturechat$inventory;
     }
 
@@ -91,7 +88,6 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
             return;
         }
 
-        // Only open the inventory if chat data exists and has been used
         EntityChatData chatData = ChatDataManager.getServerInstance().entityChatDataMap.get(thisEntity.getStringUUID());
         if (chatData == null || chatData.status == ChatDataManager.ChatStatus.NONE) {
             return;
@@ -123,7 +119,7 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
     private void creaturechat$saveInventory(CompoundTag tag, CallbackInfo ci) {
         ListTag listTag = new ListTag();
         for (int i = 0; i < creaturechat$inventory.getContainerSize(); i++) {
-            ItemStack stack = creaturechat$inventory.getItem(i);
+            ItemStack stack = creaturechat$inventory.getPersistentItem(i);
             if (!stack.isEmpty()) {
                 CompoundTag wrapper = new CompoundTag();
                 wrapper.putByte("Slot", (byte) i);

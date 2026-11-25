@@ -13,7 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.SimpleContainer;
+import com.lewho.inventory.MobInventory;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -28,16 +28,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * The {@code MixinMobEntity} mixin class exposes the goalSelector field from the MobEntity class.
- */
 @Mixin(Mob.class)
 public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
 
-    private final SimpleContainer creaturechat$inventory = new SimpleContainer(15);
+    private final MobInventory creaturechat$inventory = new MobInventory();
 
     @Override
-    public SimpleContainer creaturechat$getInventory() {
+    public MobInventory creaturechat$getInventory() {
         return creaturechat$inventory;
     }
 
@@ -89,7 +86,6 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
             return;
         }
 
-        // Only open the inventory if chat data exists and has been used
         EntityChatData chatData = ChatDataManager.getServerInstance().entityChatDataMap.get(thisEntity.getStringUUID());
         if (chatData == null || chatData.status == ChatDataManager.ChatStatus.NONE) {
             return;
@@ -119,7 +115,15 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
 
     @Inject(method = "addAdditionalSaveData", at = @At("RETURN"))
     private void creaturechat$saveInventory(ValueOutput tag, CallbackInfo ci) {
-        creaturechat$inventory.storeAsItemList(tag.list("CreatureChatInventory", ItemStack.CODEC));
+        ValueOutput.ValueOutputList items = tag.childrenList("CreatureChatInventory");
+        for (int slot = 0; slot < creaturechat$inventory.getContainerSize(); slot++) {
+            ItemStack stack = creaturechat$inventory.getPersistentItem(slot);
+            if (!stack.isEmpty()) {
+                ValueOutput entry = items.addChild();
+                entry.putByte("Slot", (byte) slot);
+                entry.store("Item", ItemStack.CODEC, stack);
+            }
+        }
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("RETURN"))

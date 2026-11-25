@@ -17,14 +17,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.UUID;
 
-/*  This is modified for Minecraft 1.21.6. */
 @Mixin(Entity.class)
 public abstract class MixinEntityChatData {
 
     @Shadow
     public abstract UUID getUUID();
 
-    /** Add "CCUUID" when the entity already owns chat data. */
     @Inject(method = "saveWithoutId(Lnet/minecraft/world/level/storage/ValueOutput;)V",
             at = @At("TAIL"))
     private void writeChatData(ValueOutput valueOutput, CallbackInfo ci) {
@@ -37,7 +35,6 @@ public abstract class MixinEntityChatData {
         }
     }
 
-    /** Re-link old chat data after the entity is deserialized. */
     @Inject(method = "load(Lnet/minecraft/world/level/storage/ValueInput;)V",
             at = @At("TAIL"))
     private void readChatData(ValueInput valueInput, CallbackInfo ci) {

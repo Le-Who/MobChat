@@ -8,11 +8,6 @@ import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.world.entity.Entity;
 
-/**
- * The {@code EntityRendererAccessor} class returns the EntityRenderer class for a specific Entity.
- * This is needed to get the texture path associated with the entity (for rendering our icons). This
- * is modified for Minecraft 1.21.2.
- */
 public class EntityRendererAccessor {
     public static EntityRenderer<?, ?> getEntityRenderer(Entity entity) {
         Minecraft client = Minecraft.getInstance();

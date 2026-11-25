@@ -11,15 +11,11 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
 public class UseItemCallbackHelper {
-    /**
-     * Fabric 1.21.2+ handler using ActionResult
-     */
     public static InteractionResult handleUseItemAction(
             Player player,
             Level world,
             InteractionHand hand
     ) {
-        // fully qualified call into your ClickHandler
         if (ClickHandler.shouldCancelAction(world)) {
             return InteractionResult.FAIL;
         }

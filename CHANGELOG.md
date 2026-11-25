@@ -6,6 +6,14 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.1.3] - 2026-11-25
+
+### Fixed
+
+- Preserve distinct item variants when opening mob inventories and count transfers by NBT or components. Keep equipment mirrors out of storage and retain inventory slot positions in 1.21.6 and later saves.
+- Pause player-directed mob goals while their player is unavailable or in another dimension. Resume with the live player in the mob's level and discard protection threats tied to a past player instance.
+- Restore vanilla attributes when a former friend becomes untamed on Minecraft 1.20.5 and later.
+
 ## [3.1.2] - 2026-11-25
 
 ### Fixed

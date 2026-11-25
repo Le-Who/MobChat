@@ -8,10 +8,6 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.core.particles.SimpleParticleType;
 
-/**
- * The {@code CreatureParticleFactory} class is responsible for creating instances of
- * {@link BehaviorParticle} with the specified parameters.
- */
 public class CreatureParticleFactory implements ParticleProvider<SimpleParticleType> {
     private final SpriteSet spriteProvider;
 

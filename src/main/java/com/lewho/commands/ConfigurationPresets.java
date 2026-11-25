@@ -9,9 +9,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
-/**
- * Provider presets and display helpers for CreatureChat configuration commands.
- */
 public final class ConfigurationPresets {
     public static final String OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
     public static final String AI_STUDIO_NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta";

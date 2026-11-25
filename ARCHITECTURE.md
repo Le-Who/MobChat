@@ -1,8 +1,10 @@
 # MobChat architecture
 
-This is the code map for the MobChat fork at [Le-Who/MobChat](https://github.com/Le-Who/MobChat). It describes local source and resources as of 2026-10-04. The default Minecraft target comes from [gradle.properties](gradle.properties); the code and asset namespace remains `creaturechat` for saved-world and packet compatibility. The former AI Villager trees are intentionally absent and their development is paused.
+This is the code map for the MobChat fork at [Le-Who/MobChat](https://github.com/Le-Who/MobChat). The default Minecraft target comes from [gradle.properties](gradle.properties). The code and asset namespace remains `creaturechat` for saved-world and packet compatibility. AI Villager development is paused.
 
 Use [README](README.md) for playing and administration, [INSTALL](INSTALL.md) for building, and [CONTRIBUTING](CONTRIBUTING.md) for changing the code. This document explains ownership, data flow, and constraints. It does not imply that every historical Minecraft target has been tested.
+
+The ADRs record decisions about [chat state and providers](docs/adr/0001-chat-state-and-provider-boundaries.md), [Minecraft adapters](docs/adr/0002-minecraft-version-adapters.md), [client bubbles](docs/adr/0003-world-bubbles-and-client-state.md), and [inventory and goal ownership](docs/adr/0004-inventory-and-goal-ownership.md).
 
 ## 1. System map
 
@@ -178,13 +180,13 @@ Ambient replies may update text, mood and memories, but `BehaviorPolicy` blocks 
 | FOLLOW, FLEE, ATTACK, LEAD | 3 | Follow/teleport policy, flee target, native/fallback attack, or a sequence of reachable waypoints. |
 | WAIT, RETURN_HOME, GUARD_HOME | 4 | Hold a location, return within the home radius, or remain around home. |
 
-`EntityBehaviorManager` owns goal-selector mutation and deduplication. `GoalUtils` accesses selectors through the checked accessor mixin. `LookControls`/`SpeedControls` handle creatures whose movement differs from ordinary pathfinding mobs; `DamageHelper` isolates hurt API differences. Goals themselves are not serialized. The persisted `guardingHome` flag does not reconstruct a live goal after a restart. `GuardHomeGoal` keeps the mob in an area; it does not independently search for enemies.
+`EntityBehaviorManager` owns goal-selector mutation and deduplication. `GoalUtils` accesses selectors through the checked accessor mixin. `LookControls`/`SpeedControls` handle creatures whose movement differs from ordinary pathfinding mobs. `DamageHelper` isolates hurt API differences. Long-lived player goals resolve their target UUID through the current server roster and pause while that player is absent, dead, or in another dimension. TALK and deferred tour callbacks remain specific to the originating player instance. Goals themselves are not serialized. The persisted `guardingHome` flag does not reconstruct a live goal after a restart. `GuardHomeGoal` keeps the mob in an area.
 
 ## 7. Inventories and Minecraft hooks
 
 `MobInventoryMenu` has 15 mob slots arranged as three rows of five. Main/offhand equipment is mirrored in slots 10/11. Ordinary inventory access requires positive friendship; hand access requires friendship 3. Shift-right-click opens supported mob inventories; the riding inventory key uses its own eligible-mob and friendship checks.
 
-`MobHandSlot` maintains equal container/equipment counts after `set`, in-place `setChanged` and `onTake`, using copies to avoid aliasing. Vanilla quick-move can mutate an occupied stack without calling `set`, so synchronizing only `set`/`onTake` is insufficient. Closing the menu compares starting/current items, accounts separately for disarmed equipment, records gifts/theft, updates advancements and builds the automatic reaction text. Item totals are currently grouped by `Item`; this is not a component-level transaction ledger.
+`MobHandSlot` synchronizes the container and equipment after `set`, in-place `setChanged`, and `onTake`, using copies to avoid aliasing. Vanilla quick-move can mutate an occupied stack without calling `set`. Marked mirrors stay out of mod inventory NBT because vanilla already stores the equipped item. Opening the menu preserves separately stored stacks with a different NBT tag or component set. Closing compares exact variants and counts, separates disarm from ordinary withdrawals, and uses the result for social events, advancements, and reaction text.
 
 `MobInventoryTransferMenu` applies the slot placement predicate to occupied-stack merges as well as empty destinations, preserving vanilla merge-before-insert and forward/reverse ordering. Without this boundary, shift-clicking can insert matching items into an occupied locked slot. Advancement API overrides use the same UUID/legacy player lookup and social event accounting as base.
 
@@ -276,9 +278,7 @@ HTTP regression tests use loopback fixtures, synthetic keys and deterministic re
 
 These source-level concerns remain separate from the repairs in this audit. They are useful follow-up targets, with their own behavioral reproduction required before changing policy:
 
-- `PlayerBaseGoal` only rebinds a dead target in its former world. Disconnection and cross-dimension respawn need explicit target-lifetime policy; `ProtectPlayerGoal` also retains its original protected entity reference.
 - NPC history is shared and persisted without a total length cap, although provider context and UI history selection are bounded. A retention policy must preserve memory/relationship semantics and existing saves.
-- Initial hand synchronization and close-menu item accounting need component-aware cases; same-type items with different NBT/components require more than aggregate `Item` counts.
 - Character normalization still accepts legacy plain sheets. Tightening this boundary needs tests distinguishing real legacy saves from unexpected provider text.
 - Verify newer-target mixin, network, and render behavior in Minecraft, including the 1.21.6+ bubble renderer and the alignment of clickable regions with the rendered bubbles.
 - The multi-version workflow still needs reproducible CI coverage for the full matrix and its datagen outputs.

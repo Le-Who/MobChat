@@ -11,22 +11,17 @@ import net.minecraft.network.FriendlyByteBuf;
 
 import static com.lewho.network.ServerPackets.LEAD_PARTICLE;
 
-/**
- * The {@code LeadParticleEffect} class allows for an 'angle' to be passed along with the Particle, to rotate it in the direction of LEAD behavior.
- */
 public class LeadParticleEffect implements ParticleOptions {
-    @SuppressWarnings("deprecation") // ParticleOptions.Deserializer is correct for 1.20.1; replacement is in src/vs/v1_20_5/
+    @SuppressWarnings("deprecation")
     public static final ParticleOptions.Deserializer<LeadParticleEffect> DESERIALIZER = new Deserializer<>() {
         @Override
         public LeadParticleEffect fromNetwork(ParticleType<LeadParticleEffect> particleType, FriendlyByteBuf buf) {
-            // Read the angle (or any other data) from the packet
             double angle = buf.readDouble();
             return new LeadParticleEffect(angle);
         }
 
         @Override
         public LeadParticleEffect fromCommand(ParticleType<LeadParticleEffect> particleType, StringReader reader) throws CommandSyntaxException {
-            // Read the angle from a string
             double angle = reader.readDouble();
             return new LeadParticleEffect(angle);
         }
@@ -49,7 +44,6 @@ public class LeadParticleEffect implements ParticleOptions {
 
     @Override
     public void writeToNetwork(FriendlyByteBuf buf) {
-        // Write the angle to the packet
         buf.writeDouble(angle);
     }
 

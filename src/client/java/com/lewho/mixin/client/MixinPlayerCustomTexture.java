@@ -9,9 +9,6 @@ import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 
-/**
- * A Mixin for PlayerCustomTexture to implement hasCustomIcon using SkinUtils.
- */
 @Mixin(PlayerCustomTexture.class)
 public abstract class MixinPlayerCustomTexture {
     /**
@@ -25,7 +22,6 @@ public abstract class MixinPlayerCustomTexture {
      */
     @Overwrite
     public static boolean hasCustomIcon(ResourceLocation skinId) {
-        // Delegate to SkinUtils to check for custom skin properties
         return SkinUtils.checkCustomSkinKey(skinId);
     }
 }

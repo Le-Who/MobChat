@@ -15,10 +15,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * The {@code MessageParser} class parses out behaviors that are included in messages, and outputs
- * a {@code ParsedMessage} result, which separates the cleaned message and the included behaviors.
- */
 public class MessageParser {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final Gson GSON = new Gson();
@@ -63,10 +59,8 @@ public class MessageParser {
         }
         matcher.appendTail(cleanedMessage);
 
-        // Get final cleaned string
         String displayMessage = cleanedMessage.toString().trim();
 
-        // Remove all occurrences of "<>" and "**" (if any)
         displayMessage = displayMessage.replaceAll("<>", "").replaceAll("\\*\\*", "").trim();
         LOGGER.debug("Cleaned message: {}", displayMessage);
 

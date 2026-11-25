@@ -9,10 +9,6 @@ import net.minecraft.world.entity.npc.Villager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-/**
- * The {@code MixinVillagerEntity} class adds an accessor to expose the gossip system of {@link Villager}.
- * This allows external classes to retrieve and interact with a villager's gossip data.
- */
 @Mixin(Villager.class)
 public abstract class MixinVillagerEntity implements VillagerEntityAccessor {
 

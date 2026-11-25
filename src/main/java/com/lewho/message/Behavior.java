@@ -3,13 +3,6 @@
 // Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © lewho LLC - unauthorized use prohibited
 package com.lewho.message;
 
-/**
- * The {@code Behavior} class represents a single behavior with an optional integer argument.
- * This class is used to model behaviors extracted from a parsed message, where each
- * behavior might have an associated argument that further defines the behavior.
- *
- * For example: "<FOLLOW>", "<FRIENDSHIP 3>", "<UNFOLLOW>"
- */
 public class Behavior {
     private String name;
     private Integer argument;
@@ -19,7 +12,6 @@ public class Behavior {
         this.argument = argument;
     }
 
-    // Getters
     public String getName() {
         return name;
     }

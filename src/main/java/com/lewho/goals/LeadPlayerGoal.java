@@ -20,13 +20,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * The {@code LeadPlayerGoal} class instructs a Mob Entity to lead the player to a random location, consisting
- * of many random waypoints. It supports PathAware and NonPathAware entities.
- */
 public class LeadPlayerGoal extends PlayerBaseGoal {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private final Mob entity;
@@ -40,7 +37,7 @@ public class LeadPlayerGoal extends PlayerBaseGoal {
     private final Vec3 startPos;
 
     public LeadPlayerGoal(ServerPlayer player, Mob entity, double speed) {
-        super(player);
+        super(player, entity);
         this.entity = entity;
         this.speed = speed;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -50,48 +47,55 @@ public class LeadPlayerGoal extends PlayerBaseGoal {
 
     @Override
     public boolean canUse() {
-        return super.canUse() && !foundWaypoint && this.entity.distanceToSqr(this.targetEntity) <= 16 * 16 && !foundWaypoint;
+        return !foundWaypoint && super.canUse() && this.entity.distanceToSqr(this.targetEntity) <= 16 * 16;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return super.canUse() && !foundWaypoint && this.entity.distanceToSqr(this.targetEntity) <= 16 * 16 && !foundWaypoint;
+        return canUse();
+    }
+
+    @Override
+    public void stop() {
+        this.entity.getNavigation().stop();
     }
 
     @Override
     public void tick() {
-        ticksSinceLastWaypoint++;
-
-        if (this.entity.distanceToSqr(this.targetEntity) > 16 * 16) {
-            this.entity.getNavigation().stop();
+        if (!canContinueToUse()) {
+            stop();
             return;
         }
+        ticksSinceLastWaypoint++;
 
-        // Are we there yet?
-        if (currentWaypoint >= totalWaypoints && !foundWaypoint) {
+        if (currentWaypoint >= totalWaypoints) {
             foundWaypoint = true;
-            double distance = this.startPos.distanceTo(this.targetEntity.position());
+            ServerPlayer player = (ServerPlayer) this.targetEntity;
+            this.targetEntity = null;
+            double distance = this.startPos.distanceTo(player.position());
             if (distance >= 64) {
-                AdvancementHelper.guidedTour((ServerPlayer) this.targetEntity);
+                AdvancementHelper.guidedTour(player);
             }
             LOGGER.info("Tick: You have ARRIVED at your destination");
 
+            Level arrivalLevel = this.entity.level();
             ServerPackets.scheduler.scheduleTask(() -> {
-                // Prepare a message about the interaction
+                if (!this.entity.isAlive() || this.entity.level() != arrivalLevel
+                        || !GoalTarget.isCurrent(this.entity, player)) {
+                    return;
+                }
                 String arrivedMessage = "<You have arrived at your destination>";
 
                 ChatDataManager chatDataManager = ChatDataManager.getServerInstance();
                 EntityChatData chatData = chatDataManager.getOrCreateChatData(this.entity.getStringUUID());
                 if (!chatData.characterSheet.isEmpty()) {
-                    ServerPackets.generate_chat("N/A", chatData, (ServerPlayer) this.targetEntity, this.entity, arrivedMessage, true);
+                    ServerPackets.generate_chat("N/A", chatData, player, this.entity, arrivedMessage, true);
                 }
             });
 
-            // Stop navigation
             this.entity.getNavigation().stop();
 
         } else if (this.currentTarget == null || this.entity.distanceToSqr(this.currentTarget) < 2 * 2 || ticksSinceLastWaypoint >= 20 * 10) {
-            // Set next waypoint
             setNewTarget();
             moveToTarget();
             ticksSinceLastWaypoint = 0;
@@ -112,20 +116,15 @@ public class LeadPlayerGoal extends PlayerBaseGoal {
                      }
                  }
             } else {
-                // Make the entity look at the player without moving towards them
                 LookControls.lookAtPosition(this.currentTarget, this.entity);
 
-                // Move towards the target for non-path aware entities
                 Vec3 entityPos = this.entity.position();
                 Vec3 moveDirection = this.currentTarget.subtract(entityPos).normalize();
 
-                // Calculate current speed from the entity's current velocity
                 double currentSpeed = this.entity.getDeltaMovement().horizontalDistance();
 
-                // Gradually adjust speed towards the target speed
                 currentSpeed = Mth.approach((float) currentSpeed, (float) this.speed, (float) (0.005 * (this.speed / Math.max(currentSpeed, 0.1))));
 
-                // Apply movement with the adjusted speed towards the target
                 Vec3 newVelocity = new Vec3(moveDirection.x * currentSpeed, moveDirection.y * currentSpeed, moveDirection.z * currentSpeed);
 
                 this.entity.setDeltaMovement(newVelocity);
@@ -135,7 +134,6 @@ public class LeadPlayerGoal extends PlayerBaseGoal {
     }
 
     private void setNewTarget() {
-        // Increment waypoint
         currentWaypoint++;
         LOGGER.info("Waypoint " + currentWaypoint + " / " + this.totalWaypoints);
         this.currentTarget = RandomTargetFinder.findRandomTarget(this.entity, 30, 24, 36);
@@ -143,7 +141,6 @@ public class LeadPlayerGoal extends PlayerBaseGoal {
             emitParticlesAlongRaycast(this.entity.position(), this.currentTarget);
         }
 
-        // Stop following current path (if any)
         this.entity.getNavigation().stop();
     }
 
@@ -151,38 +148,31 @@ public class LeadPlayerGoal extends PlayerBaseGoal {
         if (this.entity.level() instanceof ServerLevel) {
             ServerLevel serverWorld = (ServerLevel) this.entity.level();
 
-            // Pass the angle using the "speed" argument, with deltaX, deltaY, deltaZ set to 0
             LeadParticleEffect effect = new LeadParticleEffect((float)angle);
             serverWorld.sendParticles(effect, position.x, position.y + 0.05, position.z, 1, 0, 0, 0, 0);
         }
     }
 
     private void emitParticlesAlongRaycast(Vec3 start, Vec3 end) {
-        // Calculate the direction vector from the entity (start) to the target (end)
         Vec3 direction = end.subtract(start);
 
-        // Calculate the angle in the XZ-plane using atan2 (this is in radians)
         double angleRadians = Math.atan2(direction.z, direction.x);
 
-        // Convert from radians to degrees
         double angleDegrees = Math.toDegrees(angleRadians);
 
-        // Convert the calculated angle to Minecraft's yaw system:
         double minecraftYaw = (360 - (angleDegrees + 90)) % 360;
 
-        // Correct the 180-degree flip
         minecraftYaw = (minecraftYaw + 180) % 360;
         if (minecraftYaw < 0) {
             minecraftYaw += 360;
         }
 
-        // Emit particles along the ray from startRange to endRange
         double distance = start.distanceTo(end);
         double startRange = Math.min(5, distance);;
         double endRange = Math.min(startRange + 10, distance);
         for (double d = startRange; d <= endRange; d += 5) {
             Vec3 pos = start.add(direction.normalize().scale(d));
-            emitParticleAt(pos, Math.toRadians(minecraftYaw));  // Convert back to radians for rendering
+            emitParticleAt(pos, Math.toRadians(minecraftYaw));
         }
     }
 }

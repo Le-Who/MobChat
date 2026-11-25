@@ -19,11 +19,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * The {@code EntityTestData} class is a test representation of our regular EntityChatData class. This allows us
- * to simulate loading entity JSON data, adding new messages, and sending HTTP requests for the testing module. It
- * is not possible to use the original class, due to Minecraft and Fabric imports and dependencies.
- */
 public class EntityTestData {
     public String entityId;
     public String playerId;
@@ -33,7 +28,7 @@ public class EntityTestData {
     public List<ChatMessage> previousMessages;
     public String characterSheet;
     public ChatDataManager.ChatSender sender;
-    public int friendship; // -3 to 3 (0 = neutral)
+    public int friendship;
     public int auto_generated;
 
     public EntityTestData(String entityId, String playerId) {
@@ -50,34 +45,26 @@ public class EntityTestData {
     }
 
     public String getCharacterProp(String propertyName) {
-        // Create a case-insensitive regex pattern to match the property name and capture its value
         Pattern pattern = Pattern.compile("-?\\s*" + Pattern.quote(propertyName) + ":\\s*(.+)", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(characterSheet);
 
         if (matcher.find()) {
-            // Return the captured value, trimmed of any excess whitespace
             return matcher.group(1).trim().replace("\"", "");
         }
 
         return "N/A";
     }
 
-    // Add a message to the history and update the current message
     public void addMessage(String message, ChatDataManager.ChatSender messageSender, String playerName) {
-        // Truncate message (prevent crazy long messages... just in case)
         String truncatedMessage = message.substring(0, Math.min(message.length(), ChatDataManager.MAX_CHAR_IN_USER_MESSAGE));
 
-        // Add message to history
         previousMessages.add(new ChatMessage(truncatedMessage, messageSender, playerName));
 
-        // Set new message and reset line number of displayed text
         currentMessage = truncatedMessage;
         currentLineNumber = 0;
         if (messageSender == ChatDataManager.ChatSender.ASSISTANT) {
-            // Show new generated message
             status = ChatDataManager.ChatStatus.DISPLAY;
         } else if (messageSender == ChatDataManager.ChatSender.USER) {
-            // Show pending icon
             status = ChatDataManager.ChatStatus.PENDING;
         }
         sender = messageSender;
@@ -89,22 +76,18 @@ public class EntityTestData {
         Map<String, String> contextData = new HashMap<>();
 
         try {
-            // Load world context
             String worldContent = Files.readString(worldPath);
             Map<String, String> worldContext = gson.fromJson(worldContent, mapType);
             contextData.putAll(worldContext);
 
-            // Load player context
             String playerContent = Files.readString(playerPath);
             Map<String, String> playerContext = gson.fromJson(playerContent, mapType);
             contextData.putAll(playerContext);
 
-            // Load entity context
             String entityContent = Files.readString(entityPath);
             Map<String, String> entityContext = gson.fromJson(entityContent, mapType);
             contextData.putAll(entityContext);
 
-            // Read character sheet info
             contextData.put("entity_name", getCharacterProp("Name"));
             contextData.put("entity_friendship", String.valueOf(this.friendship));
             contextData.put("entity_personality", getCharacterProp("Personality"));

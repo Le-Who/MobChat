@@ -29,6 +29,8 @@ Ordinary provider tests use localhost HTTP fixtures and temporary files, with sy
 
 Write behavioral regressions that catch the original defect. Real `ItemStack`/container fixtures, manually drained executors, temporary files, and controlled HTTP responses are preferable to assertions about source text or trivial getters. Headless tests do not establish rendering correctness or live Minecraft behavior; use `runClient`/`runServer` when those are the changed surfaces.
 
+The comment lint runs separately in GitHub Actions and uses Python 3.10 or newer. Run `python tools/comment_lint.py check` locally. See [Comment rules](CODING_STANDARDS.md#comments) for the baseline and review procedure.
+
 ## Version adapters and resources
 
 Before changing Minecraft signatures, mixins, or source overrides, read [CODING_STANDARDS: Mixins and version adapters](CODING_STANDARDS.md#mixins-and-version-adapters).

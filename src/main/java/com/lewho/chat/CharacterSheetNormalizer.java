@@ -13,10 +13,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Converts structured character JSON into the legacy dash-list character sheet
- * format consumed by existing UI and prompt context code.
- */
 public class CharacterSheetNormalizer {
     private static final Gson GSON = new Gson();
     private static final String MISSING = "N/A";

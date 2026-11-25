@@ -12,23 +12,17 @@ import net.minecraft.core.particles.ParticleType;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
-/**
- * Lead particle effect (for Minecraft 1.20.5+ compatibility)
- */
 public record LeadParticleEffect(float angle) implements ParticleOptions {
-    //Registry/command codec
     public static final MapCodec<LeadParticleEffect> MAP_CODEC = RecordCodecBuilder.mapCodec(inst ->
             inst.group(Codec.FLOAT.fieldOf("angle").forGetter(LeadParticleEffect::angle)).apply(inst, LeadParticleEffect::new)
     );
 
-    // Network codec: writer first, then reader
     public static final StreamCodec<FriendlyByteBuf, LeadParticleEffect> PACKET_CODEC =
             StreamCodec.ofMember(
-                    LeadParticleEffect::write, // encoder: write the float
-                    buf -> new LeadParticleEffect(buf.readFloat()) // decoder: read the float
+                    LeadParticleEffect::write,
+                    buf -> new LeadParticleEffect(buf.readFloat())
             );
 
-    // The ParticleType, wired up with both codecs
     public static final ParticleType<LeadParticleEffect> TYPE =
             FabricParticleTypes.complex(
                     type -> MAP_CODEC,

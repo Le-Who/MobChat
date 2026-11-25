@@ -19,11 +19,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * The {@code MixinLivingEntity} class modifies the behavior of {@link LivingEntity} to integrate
- * custom friendship, chat, and death message mechanics. It prevents friendly entities from targeting players,
- * generates contextual chat messages on attacks, and broadcasts custom death messages for named entities.
- */
 @Mixin(LivingEntity.class)
 public class MixinLivingEntity {
 
@@ -50,7 +45,6 @@ public class MixinLivingEntity {
         Level world = entity.level();
 
         if (!world.isClientSide() && entity.hasCustomName()) {
-            // Skip tamed entities and players
             if (entity instanceof TamableAnimal && ((TamableAnimal) entity).isTame()) {
                 return;
             }
@@ -59,12 +53,9 @@ public class MixinLivingEntity {
                 return;
             }
 
-            // Get chatData for the entity
             EntityChatData chatData = getChatData(entity);
             if (chatData != null && !chatData.characterSheet.isEmpty()) {
-                // Get the original death message
                 Component deathMessage = entity.getCombatTracker().getDeathMessage();
-                // Broadcast the death message to all players in the world
                 ServerPackets.BroadcastMessage(deathMessage);
             }
         }

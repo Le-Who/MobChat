@@ -9,9 +9,6 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Utility for retrieving loot tables in a version-agnostic way.
- */
 public class LootTableHelper {
     private static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
 

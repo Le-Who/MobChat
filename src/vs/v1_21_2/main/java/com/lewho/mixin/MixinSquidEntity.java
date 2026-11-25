@@ -9,10 +9,8 @@ import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-/** Exposes forceSwimVector(...) by writing the private swimVec field. */
 @Mixin(Squid.class)
 public abstract class MixinSquidEntity implements ISquidEntity {
-    // shadow the private field
     @Shadow private Vec3 movementVector;
 
     @Override

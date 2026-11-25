@@ -5,12 +5,8 @@ package com.lewho.utils;
 
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 
-/**
- * Returns the per-frame tick-delta for Minecraft. This API changes in later
- * versions of Minecraft, so we split this into a helper class.
- */
 public final class TickDelta {
-    private TickDelta() { }          // utility class
+    private TickDelta() { }
 
     public static float get(WorldRenderContext ctx) {
         return ctx.tickDelta();

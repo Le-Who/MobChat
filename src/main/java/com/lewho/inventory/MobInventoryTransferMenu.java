@@ -7,7 +7,6 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
-/** Transfer policy shared by the mob inventory's slot operations. */
 public abstract class MobInventoryTransferMenu extends AbstractContainerMenu {
     protected MobInventoryTransferMenu(MenuType<?> type, int containerId) {
         super(type, containerId);
@@ -19,8 +18,6 @@ public abstract class MobInventoryTransferMenu extends AbstractContainerMenu {
         int first = reverse ? end - 1 : start;
         int step = reverse ? -1 : 1;
 
-        // Vanilla checks mayPlace for empty slots, but ignores it during stack merges.
-        // Filter occupied destinations too, keeping its merge-before-insert ordering.
         if (stack.isStackable()) {
             for (int index = first; index >= start && index < end && !stack.isEmpty(); index += step) {
                 Slot slot = slots.get(index);

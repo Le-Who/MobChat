@@ -13,9 +13,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.inventory.MenuType;
 
-/**
- * Registry for custom menus.
- */
 public class ModMenus {
     public static MenuType<MobInventoryMenu> MOB_INVENTORY;
 

@@ -6,9 +6,6 @@ package com.lewho.commands;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Sanitized configuration data exchanged with the client-side setup screen.
- */
 public final class ConfigurationScreenData {
     private ConfigurationScreenData() {
     }

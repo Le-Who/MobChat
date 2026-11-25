@@ -22,16 +22,11 @@ import net.fabricmc.fabric.api.client.particle.v1.ParticleFactoryRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.gui.screens.MenuScreens;
 
-/**
- * The {@code ClientInit} class initializes this mod in the client and defines all hooks into the
- * render pipeline to draw chat bubbles, text, and entity icons.
- */
 public class ClientInit implements ClientModInitializer {
     private static long tickCounter = 0;
 
     @Override
     public void onInitializeClient() {
-        // Register particle factories
         ParticleFactoryRegistry.getInstance().register(Particles.HEART_SMALL_PARTICLE,   CreatureParticleFactory::new);
         ParticleFactoryRegistry.getInstance().register(Particles.HEART_BIG_PARTICLE,     CreatureParticleFactory::new);
         ParticleFactoryRegistry.getInstance().register(Particles.FIRE_SMALL_PARTICLE,    CreatureParticleFactory::new);
@@ -51,13 +46,11 @@ public class ClientInit implements ClientModInitializer {
             ClientUpdateManager.tick(client);
         });
 
-        // Register events
         ClickHandler.register();
         InventoryKeyHandler.register();
         ClientPackets.register();
         MenuScreens.register(ModMenus.MOB_INVENTORY, MobInventoryScreen::new);
 
-        // Register an event callback to render text bubbles
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(ctx -> {
             float delta = TickDelta.get(ctx);
             BubbleRenderer.drawTextAboveEntities(ctx, tickCounter, delta);

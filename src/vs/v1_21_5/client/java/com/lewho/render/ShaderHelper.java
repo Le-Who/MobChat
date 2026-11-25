@@ -4,9 +4,7 @@
 package com.lewho.render;
 
 public final class ShaderHelper {
-    /** Bind the vanilla “position-tex” shader and leave the rest of the GL state alone. */
     public static void setTexturedShader() {
-        /* void function */
     }
 
     private ShaderHelper() {}

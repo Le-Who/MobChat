@@ -6,7 +6,6 @@ package com.lewho.render;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-// Official Mojang mappings for 1.21+
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.Tesselator;
@@ -16,10 +15,6 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 
 import org.joml.Matrix4f;
 
-/**
- * Wrapper for Tessellator/BufferBuilder. Since the API changes between different versions of Minecraft,
- * this wrapper helps standardize the rendering/drawing calls. This is modified for Minecraft 1.21.0+.
- */
 @Environment(EnvType.CLIENT)
 public final class QuadBuffer {
     public static final QuadBuffer INSTANCE = new QuadBuffer();
@@ -28,7 +23,6 @@ public final class QuadBuffer {
 
     private QuadBuffer() {}
 
-    // begin
     public QuadBuffer begin() {
         return begin(Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP);
     }
@@ -42,13 +36,11 @@ public final class QuadBuffer {
         return this;
     }
 
-    /** Add a vertex and set a default normal (pointing up) to satisfy the format */
     public QuadBuffer vertex(float x, float y, float z) {
         buf.addVertex(x, y, z);
         return this;
     }
 
-    // vertex helpers
     public QuadBuffer vertex(Matrix4f mat, float x, float y, float z) {
         buf.addVertex(mat, x, y, z);
         return this;

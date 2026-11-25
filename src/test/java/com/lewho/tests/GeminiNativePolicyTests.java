@@ -470,7 +470,6 @@ public class GeminiNativePolicyTests {
         ConfigurationHandler.Config config = start(request -> new Response(200,
                 "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Accepted AIza-first and AIza-second\"}]},\"finishReason\":\"STOP\"}]}"));
         config.setApiKey("AIza-first,AIza-second");
-        // The public URL router recognizes the provider marker; the endpoint remains entirely on loopback.
         config.setUrl(config.getUrl() + "/generativelanguage.googleapis.com");
 
         ChatGPTRequest.RequestResult result = scopedFetch(config).get(10, TimeUnit.SECONDS);

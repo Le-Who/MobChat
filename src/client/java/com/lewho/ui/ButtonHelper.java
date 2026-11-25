@@ -9,10 +9,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 public class ButtonHelper {
-  /**
-   * Create an image‐only button that swaps between normal/hover textures.
-   * Version‐specific subclasses just override the rendering hook.
-   */
   public static Button createImageButton(
       int x, int y,
       int width, int height,

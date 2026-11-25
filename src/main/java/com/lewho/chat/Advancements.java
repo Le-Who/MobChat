@@ -13,12 +13,6 @@ import com.lewho.i18n.TR;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
-/**
- * Central registry for all CreatureChat advancements.
- * Provides a single source of truth for IDs, titles, descriptions and types
- * so version-specific code only needs to map these values to the respective
- * Minecraft APIs.
- */
 public enum Advancements {
     ROOT("root", "CreatureChat", "Your world just got way more alive.", Type.TASK,
             Items.BOOK, null, 0, false,

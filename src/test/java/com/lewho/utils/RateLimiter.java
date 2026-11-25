@@ -7,9 +7,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/**
- * The {@code RateLimiter} class is used to slow down LLM unit tests so we don't hit any rate limits accidentally.
- */
 public class RateLimiter {
     private final Semaphore semaphore;
 

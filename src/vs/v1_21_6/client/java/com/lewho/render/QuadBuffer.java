@@ -24,17 +24,12 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.Supplier;
 
-/**
- * Wrapper for Tessellator/BufferBuilder. Since the API changes between different versions of Minecraft,
- * this wrapper helps standardize the rendering/drawing calls. This is modified for Minecraft 1.21.6.
- */
 @Environment(EnvType.CLIENT)
 public final class QuadBuffer {
     public static final QuadBuffer INSTANCE = new QuadBuffer();
     private static final Vector4f WHITE = new Vector4f(1f, 1f, 1f, 1f);
     private BufferBuilder buf;
 
-    // 🔧 STATIC CUSTOM PIPELINE SETUP (only once)
     private static final RenderPipeline.Snippet QUAD_SNIPPET = RenderPipeline.builder()
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withUniform("Projection", UniformType.UNIFORM_BUFFER)
@@ -45,14 +40,13 @@ public final class QuadBuffer {
             .buildSnippet();
 
     private static final RenderPipeline QUAD_PIPELINE = RenderPipeline.builder(QUAD_SNIPPET)
-            .withLocation("creaturechat/quad") // arbitrary ID
-            .withDepthBias(3.0f, 3.0f) // mimic polygonOffset
-            .withBlend(BlendFunction.TRANSLUCENT) // vanilla style alpha blending
+            .withLocation("creaturechat/quad")
+            .withDepthBias(3.0f, 3.0f)
+            .withBlend(BlendFunction.TRANSLUCENT)
             .build();
 
     private QuadBuffer() {}
 
-    // begin
     public QuadBuffer begin() {
         return begin(Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP);
     }
@@ -66,13 +60,11 @@ public final class QuadBuffer {
         return this;
     }
 
-    /** Add a vertex and set a default normal (pointing up) to satisfy the format */
     public QuadBuffer vertex(float x, float y, float z) {
         buf.addVertex(x, y, z);
         return this;
     }
 
-    // vertex helpers
     public QuadBuffer vertex(Matrix4f mat, float x, float y, float z) {
         buf.addVertex(mat, x, y, z);
         return this;
@@ -121,7 +113,6 @@ public final class QuadBuffer {
                     .type();
 
             RenderTarget fb = Minecraft.getInstance().getMainRenderTarget();
-            // label supplier for debugging
             Supplier<String> passName = () -> "quad-pass";
 
             try (RenderPass pass = encoder.createRenderPass(

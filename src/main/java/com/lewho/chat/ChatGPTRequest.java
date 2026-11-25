@@ -21,10 +21,6 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * The {@code ChatGPTRequest} class is used to send HTTP requests to our LLM to generate
- * messages.
- */
 public class ChatGPTRequest {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final Gson GSON = new Gson();
@@ -43,7 +39,6 @@ public class ChatGPTRequest {
         CHARACTER
     }
 
-    /** Immutable diagnostics belonging to one request, including any successful retry. */
     public record RequestResult(
             String content,
             int errorCode,
@@ -232,7 +227,6 @@ public class ChatGPTRequest {
         return str;
     }
 
-    // Class to represent the error response structure
     public static class ErrorResponse {
         Error error;
 
@@ -263,7 +257,6 @@ public class ChatGPTRequest {
                 LOGGER.error("Error Code: " + sanitize(response.error.code, secrets));
                 return message != null ? message : "Unknown error";
             } else {
-                // Some gateways return {"message":"Internal server error"} or similar
                 try {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> m = GSON.fromJson(root, Map.class);
@@ -274,7 +267,6 @@ public class ChatGPTRequest {
                         return message;
                     }
                 } catch (Exception ignore) {
-                    // fall through to generic handling below
                 }
                 LOGGER.error("Unknown error response: " + errorResponse);
                 return "Unknown error";
@@ -288,7 +280,6 @@ public class ChatGPTRequest {
         return removeQuotes(errorResponse);
     }
 
-    // Function to replace placeholders in the template
     public static String replacePlaceholders(String template, Map<String, String> replacements) {
         String result = template;
         for (Map.Entry<String, String> entry : replacements.entrySet()) {
@@ -326,7 +317,6 @@ public class ChatGPTRequest {
         return fetchResult(config, systemPrompt, contextData, messageHistory, outputMode, false);
     }
 
-    // The explicit native entrypoint also uses this runner, including localhost fixtures.
     static CompletableFuture<RequestResult> fetchResult(
             ConfigurationHandler.Config config,
             String systemPrompt,
@@ -357,7 +347,6 @@ public class ChatGPTRequest {
             List<ChatMessage> messageHistory,
             StructuredOutputMode outputMode) {
         ConfigurationHandler.Config config = new ConfigurationHandler.Config();
-        // Copy every request/quota setting before starting asynchronous work. The copy owns its cursors.
         synchronized (source) {
             config.setApiKey(source.getApiKey());
             config.setUrl(source.getUrl());
@@ -383,7 +372,6 @@ public class ChatGPTRequest {
                 * config.getPercentOfContext());
         int usedTokens = estimateTokenSize("system: " + systemMessage);
         if (messageHistory != null) {
-            // Resolve the mutable ChatMessage fields now, before the caller can change them during a retry.
             List<ChatGPTRequestMessage> copiedHistory = new ArrayList<>();
             for (ChatMessage message : messageHistory) {
                 copiedHistory.add(new ChatGPTRequestMessage(
@@ -407,7 +395,6 @@ public class ChatGPTRequest {
                 if (!key.isBlank()) secrets.add(key.trim());
             }
         }
-        // Redact a longer overlapping key before a shorter key can hide part of it.
         secrets.sort(Comparator.comparingInt(String::length).reversed());
         return new RequestSnapshot(config, source, List.copyOf(history), systemMessage, mode,
                 maxOutputTokens, List.copyOf(secrets));
@@ -428,8 +415,6 @@ public class ChatGPTRequest {
             String activeKey = config.getActiveApiKey();
             String modelName = config.getActiveModel();
             publishCandidatePreference(snapshot, activeKey, modelName);
-            // Match the established compatible policy: prefer another candidate on connection failure,
-            // with one transient retry after the final candidate. Every real attempt reserves quota.
             for (int connectionAttempt = 0; connectionAttempt < 2; connectionAttempt++) {
                 HttpURLConnection connection = null;
                 try {
@@ -470,7 +455,6 @@ public class ChatGPTRequest {
                         if (statusCode == 429) {
                             limiter.markProviderRateLimited(config, apiUrl, activeKey, modelName);
                         }
-                        // Provider-controlled bodies and headers are sanitized before parsing or logging.
                         String reason = sanitize(connection.getResponseMessage(), snapshot.secrets());
                         String body = sanitize(readResponse(connection.getErrorStream(), connection.getContentEncoding()), snapshot.secrets());
                         String cleanError = body.isEmpty() ? "Unknown error" : parseAndLogErrorResponse(body, snapshot.secrets());
@@ -502,7 +486,6 @@ public class ChatGPTRequest {
                     String warning = structuredResponseWarning(snapshot.outputMode(), safeContent,
                             safeFinishReason, sanitize(modelName, snapshot.secrets()), snapshot.maxOutputTokens(), response.completionTokens());
                     if (warning != null) LOGGER.warn(warning);
-                    // A successful retry constructs fresh diagnostics and drops all earlier failure fields.
                     return new RequestResult(safeContent, 0, null,
                             safeFinishReason, response.completionTokens(), preview(safeContent), warning, snapshot.maxOutputTokens());
                 } catch (IOException connectionFailure) {
@@ -538,7 +521,6 @@ public class ChatGPTRequest {
 
     private static ChatGPTRequestPayload compatiblePayload(RequestSnapshot snapshot, String modelName) {
         List<ChatGPTRequestMessage> messages = new ArrayList<>();
-        // Gemini compatible endpoints require user content even for an empty history/config test.
         messages.add(new ChatGPTRequestMessage(snapshot.history().isEmpty() ? "user" : "system", snapshot.systemMessage()));
         messages.addAll(snapshot.history());
         return new ChatGPTRequestPayload(snapshot.config().getUrl(), modelName, messages, snapshot.outputMode(),
@@ -584,7 +566,6 @@ public class ChatGPTRequest {
     private static void publishCandidatePreference(RequestSnapshot snapshot, String key, String model) {
         ConfigurationHandler.Config source = snapshot.sourceConfig();
         synchronized (source) {
-            // A retry must not overwrite an administrator's newer configuration.
             if (Objects.equals(source.getApiKey(), snapshot.config().getApiKey())
                     && Objects.equals(source.getModel(), snapshot.config().getModel())
                     && Objects.equals(source.getUrl(), snapshot.config().getUrl())) {
@@ -634,9 +615,6 @@ public class ChatGPTRequest {
             safe.append(redactLiteral(message.substring(cursor, start), secrets));
             String token = message.substring(start, end + 1);
             try {
-                // Decode complete string tokens before redaction: a JSON escape can hide part of a key.
-                // Only changed strings are reserialized; action numbers, structure, fences and incomplete
-                // tails keep their original representation, including the parser's salvage paths.
                 String decoded = JsonParser.parseString(token).getAsString();
                 String redacted = redactLiteral(decoded, secrets);
                 safe.append(decoded.equals(redacted) ? token : GSON.toJson(redacted));

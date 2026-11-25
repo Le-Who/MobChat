@@ -14,11 +14,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 
-/**
- * The {@code TextureLoader} class registers and returns texture identifiers for resources
- * contained for this mod. UI and Entity icons. Missing textures are logged once.
- * Pre-1.21.5: RenderSystem.setShaderTexture(int, Identifier) is used.
- */
 public class TextureLoader {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final Set<String> missing = new HashSet<>();
@@ -34,7 +29,6 @@ public class TextureLoader {
                 .getResource(textureId);
 
         if (resource.isPresent()) {
-            // replace bindTexture(...) with RenderSystem
             RenderSystem.setShaderTexture(0, textureId);
             return textureId;
         } else {
@@ -67,9 +61,6 @@ public class TextureLoader {
         }
     }
 
-    /**
-     * Binds the given Identifier to the specified texture unit.
-     */
     public static void bind(int unit, ResourceLocation textureId) {
         RenderSystem.setShaderTexture(unit, textureId);
     }

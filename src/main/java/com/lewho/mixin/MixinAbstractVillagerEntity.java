@@ -17,9 +17,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Redirect abstract villager inventory to CreatureChat inventory when chat data exists.
- */
 @Mixin(AbstractVillager.class)
 public abstract class MixinAbstractVillagerEntity {
 

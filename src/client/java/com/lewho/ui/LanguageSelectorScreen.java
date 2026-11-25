@@ -14,17 +14,12 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * A modal sub-screen that shows all official Minecraft locale codes and their
- * in-language display names, letting the admin pick one as the generation language
- * override. "Auto" (empty code) is always the first entry.
- */
 public class LanguageSelectorScreen extends VersionedScreen {
 
     private static final int ITEM_HEIGHT = 20;
 
     private final Screen parent;
-    private final Consumer<String> onSelect;  // receives the selected locale code, or "" for auto
+    private final Consumer<String> onSelect;
     private final String currentCode;
 
     private LanguageList list;
@@ -80,21 +75,18 @@ public class LanguageSelectorScreen extends VersionedScreen {
         return false;
     }
 
-    // ---- List widget ----
 
     static class LanguageList extends LanguageListWidget<LanguageEntry> {
 
         LanguageList(Minecraft mc, int width, int top, int bottom, int itemHeight, String currentCode) {
             super(mc, width, top, bottom, itemHeight);
 
-            // First entry: Auto
             LanguageEntry autoEntry = new LanguageEntry("", "Auto (client locale)", this);
             addEntry(autoEntry);
             if (currentCode.isEmpty()) {
                 setSelected(autoEntry);
             }
 
-            // All known locale codes, already sorted
             List<String> codes = MinecraftLanguages.ALL_CODES;
             for (String code : codes) {
                 String display = MinecraftLanguages.displayName(code);

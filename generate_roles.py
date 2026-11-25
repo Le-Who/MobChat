@@ -74,10 +74,6 @@ roles = {
     "Sniffer": "A sniffer. It is a large, ancient creature that sniffs the ground for seeds."
 }
 
-# The mod might use the entity's namespaced ID or just the translation key. 
-# Looking at contextData.put("entity_type", entity.method_5864().method_5897().getString());
-# entity.getType().getName().getString() gives the localized name like "Sheep", "Zombie", etc.
-# We will use exactly those localized English names as keys.
 
 output_path = Path(__file__).resolve().parent / "data" / "creaturechat" / "custom_roles.json"
 output_path.parent.mkdir(parents=True, exist_ok=True)

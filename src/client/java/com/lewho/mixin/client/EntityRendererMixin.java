@@ -13,9 +13,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/*
- * This class cancels the rendering of labels above player heads.
- * */
 @Mixin(EntityRenderer.class)
 public abstract class EntityRendererMixin<T extends Entity> {
 
@@ -24,6 +21,6 @@ public abstract class EntityRendererMixin<T extends Entity> {
             at = @At("HEAD"),
             cancellable = true
     )    private void cancelRenderLabel(T entity, Component text, PoseStack matrices, MultiBufferSource vertexConsumers, int light, CallbackInfo ci) {
-        ci.cancel(); // Hide Entity Custom Names
+        ci.cancel();
     }
 }

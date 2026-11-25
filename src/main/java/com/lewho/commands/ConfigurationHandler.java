@@ -24,11 +24,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The {@code ConfigurationHandler} class loads and saves configuration settings for this mod. It first
- * checks for a config file in the world save folder, and if not found, falls back to the root folder.
- * This allows for global/default settings, or optional server-specific settings.
- */
 
 public class ConfigurationHandler {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
@@ -50,7 +45,7 @@ public class ConfigurationHandler {
         if (config == null) {
             config = loadConfigFromFile(defaultConfigPath);
         }
-        return config != null ? config : new Config(); // Return new config if both are null
+        return config != null ? config : new Config();
     }
 
     public boolean saveConfig(Config config, boolean useServerConfig) {
@@ -81,7 +76,6 @@ public class ConfigurationHandler {
         } catch (NoSuchFileException e) {
             return null;
         } catch (IOException | JsonParseException e) {
-            // JSON syntax errors can quote fields containing stored credentials.
             LOGGER.error("Could not read CreatureChat config at {}. Repair the file or run /creaturechat setup.", filePath.toAbsolutePath());
             return new Config();
         }
@@ -125,7 +119,6 @@ public class ConfigurationHandler {
         private int mobToMobChatRadius = 10;
         private int maxMobToMobResponsesPerMessage = 1;
 
-        /** Locale code override for LLM generation, e.g. "ru_ru". Empty string = auto (client locale). */
         private String generationLanguage = "";
 
         private transient int currentKeyIndex = 0;
@@ -199,14 +192,12 @@ public class ConfigurationHandler {
             return parseModels().length;
         }
 
-        // Getters and setters for existing fields
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) {
             this.apiKey = apiKey;
             this.currentKeyIndex = 0;
             String activeKey = getActiveApiKey();
             if (activeKey.startsWith("sk-") && !activeKey.startsWith("sk-or-") && isOpenAiUrl(url)) {
-                // Update URL if an OpenAI API key is detected
                 setUrl("https://api.openai.com/v1/chat/completions");
             }
         }
@@ -275,7 +266,6 @@ public class ConfigurationHandler {
         public String getStory() { return story; }
         public void setStory(String story) { this.story = story; }
 
-        // Add getter and setter
         public boolean getChatBubbles() { return chatBubbles; }
         public void setChatBubbles(boolean chatBubblesEnabled) { this.chatBubbles = chatBubblesEnabled; }
 
@@ -342,13 +332,8 @@ public class ConfigurationHandler {
         public int getMaxMobToMobResponsesPerMessage() { return maxMobToMobResponsesPerMessage; }
         public void setMaxMobToMobResponsesPerMessage(int maxMobToMobResponsesPerMessage) { this.maxMobToMobResponsesPerMessage = maxMobToMobResponsesPerMessage; }
 
-        /** Returns the locale-code override, e.g. {@code "ru_ru"}, or {@code ""} for auto. */
         public String getGenerationLanguage() { return generationLanguage == null ? "" : generationLanguage; }
 
-        /**
-         * Sets the locale-code override. Passing {@code null}, blank, or {@code "auto"}
-         * resets to automatic (client locale).
-         */
         public void setGenerationLanguage(String code) {
             if (code == null || code.isBlank() || code.equalsIgnoreCase("auto")) {
                 this.generationLanguage = "";

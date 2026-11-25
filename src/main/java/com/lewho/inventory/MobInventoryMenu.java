@@ -19,32 +19,24 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Consumer;
 
-/**
- * Menu for mob inventories.
- */
 public class MobInventoryMenu extends MobInventoryTransferMenu {
     private final Container inventory;
     private final Mob mob;
     private final ServerPlayer serverPlayer;
     private final PlayerData playerData;
-    private final Map<Item, Integer> initialCounts = new HashMap<>();
+    private final MobInventorySnapshot initialInventory;
     private final int mobInvSize;
     private final int rows;
     private final int mainHandSlot;
     private final int offHandSlot;
-    private final ItemStack initialMainHand;
-    private final ItemStack initialOffHand;
 
     public MobInventoryMenu(int syncId, Inventory playerInventory, Container inventory, Mob mob, ServerPlayer player) {
         super(ModMenus.MOB_INVENTORY, syncId);
@@ -72,17 +64,10 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
         int bottomRowStart = (rows - 1) * 5;
         this.mainHandSlot = bottomRowStart;
         this.offHandSlot = bottomRowStart + 1;
-        this.initialMainHand = mob.getMainHandItem().copy();
-        this.initialOffHand = mob.getOffhandItem().copy();
-
-        syncHandSlots();
-
-        for (int i = 0; i < mobInvSize; i++) {
-            ItemStack stack = inventory.getItem(i);
-            if (!stack.isEmpty()) {
-                initialCounts.merge(stack.getItem(), stack.getCount(), Integer::sum);
-            }
-        }
+        ItemStack mainHand = mob.getMainHandItem();
+        ItemStack offHand = mob.getOffhandItem();
+        syncHandSlots(inventory, mainHandSlot, offHandSlot, mainHand, offHand, this::dropDisplacedHandStack);
+        this.initialInventory = new MobInventorySnapshot(inventory, mainHandSlot, offHandSlot, mainHand, offHand);
         inventory.startOpen(playerInventory.player);
 
         int slot = 0;
@@ -90,7 +75,6 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
         boolean canAccessHands = playerData.friendship >= 3;
         for (int row = 0; row < rows; ++row) {
             for (int col = 0; col < 5 && slot < mobInvSize; ++col) {
-                // shift the mob inventory grid two columns to the right so it no longer overlaps the entity preview
                 int x = 75 + col * 18;
                 int y = 18 + row * 18;
                 if (slot == mainHandSlot) {
@@ -165,37 +149,16 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
             if (playerData.friendship <= 0) {
                 return;
             }
-            Map<Item, Integer> finalCounts = new HashMap<>();
-            for (int i = 0; i < mobInvSize; i++) {
-                ItemStack stack = inventory.getItem(i);
-                if (!stack.isEmpty()) {
-                    finalCounts.merge(stack.getItem(), stack.getCount(), Integer::sum);
-                }
-            }
-            Set<Item> all = new HashSet<>(initialCounts.keySet());
-            all.addAll(finalCounts.keySet());
-            Map<Item, Integer> added = new HashMap<>();
-            Map<Item, Integer> removed = new HashMap<>();
-            for (Item item : all) {
-                int before = initialCounts.getOrDefault(item, 0);
-                int after = finalCounts.getOrDefault(item, 0);
-                int diff = after - before;
-                if (diff > 0) {
-                    added.put(item, diff);
-                } else if (diff < 0) {
-                    removed.put(item, -diff);
-                }
-            }
-            List<String> disarmedToInventory = new ArrayList<>();
-            List<String> disarmedTaken = new ArrayList<>();
-            boolean diamondsTaken = removed.containsKey(Items.DIAMOND);
             ItemStack finalMain = mob.getMainHandItem();
             ItemStack finalOff = mob.getOffhandItem();
-            collectDisarmed(initialMainHand, finalMain, finalOff, disarmedToInventory, disarmedTaken, removed);
-            collectDisarmed(initialOffHand, finalMain, finalOff, disarmedToInventory, disarmedTaken, removed);
-            boolean swapped = handsSwapped(initialMainHand, initialOffHand, finalMain, finalOff);
-            boolean handChanged = (!sameItem(initialMainHand, finalMain) && !finalMain.isEmpty()) ||
-                                 (!sameItem(initialOffHand, finalOff) && !finalOff.isEmpty());
+            MobInventorySnapshot current = new MobInventorySnapshot(inventory, mainHandSlot, offHandSlot, finalMain, finalOff);
+            MobInventorySnapshot.Changes changes = initialInventory.changesTo(current);
+            var added = changes.added();
+            var removed = changes.removed();
+            List<String> disarmedToInventory = changes.disarmedToInventory();
+            List<String> disarmedTaken = changes.disarmedTaken();
+            boolean swapped = changes.handsSwapped();
+            boolean handChanged = changes.handChanged();
             if (!added.isEmpty() || !removed.isEmpty() || !disarmedToInventory.isEmpty() || !disarmedTaken.isEmpty() || swapped || handChanged) {
                 ChatDataManager chatDataManager = ChatDataManager.getServerInstance();
                 EntityChatData chatData = chatDataManager.getOrCreateChatData(mob.getStringUUID());
@@ -210,7 +173,7 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
                 if (recordTakenItems(chatData, serverPlayer.getStringUUID(), player.getDisplayName().getString(),
                         removed, disarmedTaken)) {
                     AdvancementHelper.itemTaken(serverPlayer, pd);
-                    if (diamondsTaken) {
+                    if (changes.diamondsTaken()) {
                         AdvancementHelper.theHeist(serverPlayer);
                     }
                 }
@@ -275,84 +238,54 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
         }
     }
 
-    private void syncHandSlots() {
-        handleHandSlot(mainHandSlot, mob.getMainHandItem());
-        handleHandSlot(offHandSlot, mob.getOffhandItem());
+    static void syncHandSlots(Container inventory, int mainHandSlot, int offHandSlot,
+                              ItemStack mainHand, ItemStack offHand, Consumer<ItemStack> drop) {
+        syncHandSlot(inventory, mainHandSlot, offHandSlot, mainHand, drop);
+        syncHandSlot(inventory, offHandSlot, mainHandSlot, offHand, drop);
     }
 
-    private void handleHandSlot(int slotIndex, ItemStack handStack) {
-        if (slotIndex >= mobInvSize) {
+    private static void syncHandSlot(Container inventory, int slot, int otherHandSlot,
+                                     ItemStack handStack, Consumer<ItemStack> drop) {
+        if (slot < 0 || slot >= inventory.getContainerSize()) {
             return;
         }
-        ItemStack current = inventory.getItem(slotIndex);
-        if (handStack.isEmpty()) {
-            if (!current.isEmpty()) {
-                moveOrDrop(slotIndex, current);
+        ItemStack current = inventory.getItem(slot);
+        boolean knownMirror = inventory instanceof MobInventory mobInventory && mobInventory.isHandMirror(slot);
+        if (!current.isEmpty() && !knownMirror && !ItemStackVariant.matches(current, handStack)) {
+            inventory.setItem(slot, ItemStack.EMPTY);
+            int emptySlot = findEmptyInventorySlot(inventory, slot, otherHandSlot);
+            if (emptySlot >= 0) {
+                inventory.setItem(emptySlot, current);
+            } else {
+                drop.accept(current);
             }
-            inventory.setItem(slotIndex, ItemStack.EMPTY);
-        } else {
-            if (!current.isEmpty() && !ItemStack.isSameItem(current, handStack)) {
-                moveOrDrop(slotIndex, current);
-            }
-            inventory.setItem(slotIndex, handStack.copy());
+        }
+        inventory.setItem(slot, handStack.copy());
+        if (inventory instanceof MobInventory mobInventory) {
+            mobInventory.markHandMirror(slot);
         }
     }
 
-    private void moveOrDrop(int fromSlot, ItemStack stack) {
-        int empty = findEmptySlot(fromSlot);
-        inventory.setItem(fromSlot, ItemStack.EMPTY);
-        if (empty >= 0) {
-            inventory.setItem(empty, stack);
-        } else if (mob.level() instanceof ServerLevel serverLevel) {
+    private void dropDisplacedHandStack(ItemStack stack) {
+        if (mob.level() instanceof ServerLevel serverLevel) {
             ItemEntity item = new ItemEntity(serverLevel, mob.getX(), mob.getY(), mob.getZ(), stack);
             item.setDefaultPickUpDelay();
             serverLevel.addFreshEntity(item);
         }
     }
 
-    private int findEmptySlot(int skip) {
-        for (int i = 0; i < mobInvSize; i++) {
-            if (i == mainHandSlot || i == offHandSlot || i == skip) {
-                continue;
-            }
-            if (inventory.getItem(i).isEmpty()) {
+    private static int findEmptyInventorySlot(Container inventory, int handSlot, int otherHandSlot) {
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            if (i != handSlot && i != otherHandSlot && inventory.getItem(i).isEmpty()) {
                 return i;
             }
         }
         return -1;
     }
 
-    private void collectDisarmed(ItemStack initial, ItemStack finalMain, ItemStack finalOff,
-                                 List<String> toInventory, List<String> taken, Map<Item, Integer> removed) {
-        if (initial.isEmpty()) {
-            return;
-        }
-        if (ItemStack.isSameItem(initial, finalMain) || ItemStack.isSameItem(initial, finalOff)) {
-            return;
-        }
-        String name = initial.getHoverName().getString();
-        for (int i = 0; i < mobInvSize; i++) {
-            if (i == mainHandSlot || i == offHandSlot) {
-                continue;
-            }
-            ItemStack stack = inventory.getItem(i);
-            if (!stack.isEmpty() && ItemStack.isSameItem(stack, initial)) {
-                toInventory.add(name);
-                return;
-            }
-        }
-        taken.add(name);
-        removed.computeIfPresent(initial.getItem(), (item, count) -> {
-            int remaining = count - initial.getCount();
-            return remaining > 0 ? remaining : null;
-        });
-    }
-
-    private static String joinCounts(Map<Item, Integer> map) {
+    private static String joinCounts(Map<MobInventorySnapshot.Variant, Integer> map) {
         List<String> parts = new ArrayList<>();
-        for (Map.Entry<Item, Integer> entry : map.entrySet()) {
-            parts.add(entry.getValue() + " " + new ItemStack(entry.getKey()).getHoverName().getString());
-        }
+        map.forEach((variant, count) -> parts.add(variant.format(count, true)));
         return String.join(", ", parts);
     }
 
@@ -365,21 +298,8 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
         return !mainName.isEmpty() ? mainName : offName;
     }
 
-    private static boolean sameItem(ItemStack a, ItemStack b) {
-        if (a.isEmpty() && b.isEmpty()) {
-            return true;
-        }
-        return ItemStack.isSameItem(a, b);
-    }
-
-    private static boolean handsSwapped(ItemStack initMain, ItemStack initOff, ItemStack finalMain, ItemStack finalOff) {
-        return sameItem(initMain, finalOff) && sameItem(initOff, finalMain) &&
-               !(sameItem(initMain, finalMain) && sameItem(initOff, finalOff));
-    }
-
-    /** Item text accounting removes disarmed items from the ordinary removal counts. */
     public static boolean recordTakenItems(EntityChatData data, String playerId, String playerName,
-                                           Map<Item, Integer> removed, List<String> disarmedTaken) {
+                                           Map<?, Integer> removed, List<String> disarmedTaken) {
         if (removed.isEmpty() && disarmedTaken.isEmpty()) {
             return false;
         }

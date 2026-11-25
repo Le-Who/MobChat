@@ -17,9 +17,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Redirect Pillager inventory to CreatureChat inventory when chat data exists.
- */
 @Mixin(Pillager.class)
 public abstract class MixinPillagerEntity {
 

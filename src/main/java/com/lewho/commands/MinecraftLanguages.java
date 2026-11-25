@@ -8,23 +8,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Static registry of all official Minecraft locale codes and their self-names (display names
- * in the language's own script). Used server-side to convert a stored locale code such as
- * {@code ru_ru} into the human-readable string {@code "Русский (Россия)"} that is embedded
- * in the LLM character-generation and chat prompts.
- * <p>
- * The map is ordered alphabetically by locale code. Unknown codes fall back to the raw
- * code string so the prompt still receives something meaningful.
- */
 public final class MinecraftLanguages {
 
     private MinecraftLanguages() {}
 
-    /** All known Minecraft locale codes, sorted alphabetically. */
     public static final List<String> ALL_CODES;
 
-    /** Locale code → in-language display name. */
     private static final Map<String, String> DISPLAY_NAMES;
 
     static {
@@ -161,11 +150,6 @@ public final class MinecraftLanguages {
         ALL_CODES = Collections.unmodifiableList(codes);
     }
 
-    /**
-     * Returns the in-language display name for the given locale code, e.g.
-     * {@code displayName("ru_ru")} → {@code "Русский (Россия)"}. Falls back to the
-     * raw code if the locale is not in the table.
-     */
     public static String displayName(String code) {
         if (code == null || code.isBlank()) {
             return "";
@@ -173,12 +157,6 @@ public final class MinecraftLanguages {
         return DISPLAY_NAMES.getOrDefault(code.trim().toLowerCase(), code.trim());
     }
 
-    /**
-     * Returns a short human-readable description suitable for display in the
-     * {@code /creaturechat setup show} output.
-     *
-     * @param code locale code, or {@code ""} / {@code "auto"} for automatic
-     */
     public static String describe(String code) {
         if (code == null || code.isBlank() || code.equalsIgnoreCase("auto")) {
             return "auto (client locale)";

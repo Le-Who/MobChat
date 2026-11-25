@@ -11,9 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Prevents WanderingTraderEntity from despawning if it has chat data or a character sheet.
- */
 @Mixin(WanderingTrader.class)
 public abstract class MixinWanderingTrader {
 
@@ -21,10 +18,8 @@ public abstract class MixinWanderingTrader {
     private void preventTraderDespawn(CallbackInfo ci) {
         WanderingTrader trader = (WanderingTrader) (Object) this;
 
-        // Get chat data for this trader
         EntityChatData chatData = ChatDataManager.getServerInstance().getOrCreateChatData(trader.getStringUUID());
 
-        // If the character sheet is not empty, cancel the function to prevent despawning
         if (!chatData.characterSheet.isEmpty()) {
             ci.cancel();
         }

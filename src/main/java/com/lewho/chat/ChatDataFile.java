@@ -16,7 +16,6 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** UTF-8 persistence boundary for a server-owned chat snapshot. */
 public final class ChatDataFile {
     private static final Gson GSON = new Gson();
     private static final Type CHAT_DATA_TYPE = new TypeToken<ConcurrentHashMap<String, EntityChatData>>() {}.getType();
@@ -49,7 +48,6 @@ public final class ChatDataFile {
         if (loadFailed) {
             return false;
         }
-        // Traverse mutable state before touching either the old file or a temporary file.
         AtomicFile.replace(path, GSON.toJson(snapshot).getBytes(StandardCharsets.UTF_8));
         return true;
     }

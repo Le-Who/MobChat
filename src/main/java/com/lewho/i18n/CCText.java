@@ -5,11 +5,7 @@ package com.lewho.i18n;
 
 import java.util.List;
 
-/**
- * Central translation buckets for CreatureChat.
- */
 public class CCText {
-    // UI text
     public static final TR UI_CHAT_TITLE = new TR("ui.chat_title", "CreatureChat");
     public static final TR UI_ENTER_MESSAGE = new TR("ui.enter_message", "Enter your message:");
     public static final TR UI_HISTORY_TITLE = new TR("ui.history_title", "History");
@@ -25,7 +21,6 @@ public class CCText {
             UI_HISTORY_PLAYER
     );
 
-    // Configuration command text
     public static final TR CONFIG_CHATBUBBLE_ENABLED = new TR("config.chatbubble.enabled", "Player chat bubbles have been enabled.");
     public static final TR CONFIG_CHATBUBBLE_DISABLED = new TR("config.chatbubble.disabled", "Player chat bubbles have been disabled.");
     public static final TR CONFIG_CHATBUBBLE_UPDATE_FAILED = new TR("config.chatbubble.update_failed", "Failed to update player chat bubble setting.");

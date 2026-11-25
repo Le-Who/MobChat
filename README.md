@@ -221,6 +221,8 @@ Look at a mob and right-click its chat bubble to start a greeting. Use the bubbl
 
 Shift-right-click an eligible mob to open its inventory. Ordinary inventory slots require positive friendship, and the mob's hand slots require friendship level 3. Villager and tameable interactions retain their own restrictions. For eligible mounts, the inventory key can open the mob menu while riding. Giving, showing or taking items can affect the relationship and trigger a rate-limited reaction.
 
+The inventory distinguishes items with different names, damage, or other item data. A player-directed goal pauses while its target is dead, offline, or in another dimension. The mob can resume the goal when that player returns to its dimension.
+
 Players can choose whether NPC replies to other players are shown in their own CreatureChat bubble sync and normal chat feed:
 
 ```text

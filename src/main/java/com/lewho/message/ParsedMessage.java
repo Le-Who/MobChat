@@ -6,9 +6,6 @@ package com.lewho.message;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The {@code ParsedMessage} class represents a list of behaviors and a cleaned message.
- */
 public class ParsedMessage {
     private String cleanedMessage;
     private String originalMessage;
@@ -28,12 +25,10 @@ public class ParsedMessage {
         this.memoryUpdates = memoryUpdates == null ? new ArrayList<>() : memoryUpdates;
     }
 
-    // Get cleaned message (no behaviors)
     public String getCleanedMessage() {
         return cleanedMessage.trim();
     }
 
-    // Get original message
     public String getOriginalMessage() {
         return originalMessage.trim();
     }

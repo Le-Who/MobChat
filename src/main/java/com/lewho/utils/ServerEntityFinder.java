@@ -8,10 +8,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
-/**
- * The {@code ServerEntityFinder} class is used to find a specific LivingEntity by UUID, since
- * there is not a built-in method for this.
- */
 public class ServerEntityFinder {
     public static LivingEntity getEntityByUUID(ServerLevel world, UUID uuid) {
         for (Entity entity : world.getAllEntities()) {
@@ -19,6 +15,6 @@ public class ServerEntityFinder {
                 return (LivingEntity) entity;
             }
         }
-        return null; // Entity not found
+        return null;
     }
 }

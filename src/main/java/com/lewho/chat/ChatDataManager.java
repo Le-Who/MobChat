@@ -23,12 +23,7 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-/**
- * The {@code ChatDataManager} class manages chat data for all entities. This class also helps
- * generate new messages, set entity goals, and other useful chat-related functions.
- */
 public class ChatDataManager {
-    // Use a static instance to manage our data globally
     private static final ChatDataManager SERVER_INSTANCE = new ChatDataManager(true);
     private static final ChatDataManager CLIENT_INSTANCE = new ChatDataManager(false);
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
@@ -39,18 +34,17 @@ public class ChatDataManager {
     private static final Gson GSON = new Gson();
 
     public enum ChatStatus {
-        NONE,       // No chat status yet
-        PENDING,    // Chat is pending (e.g., awaiting response or processing)
-        DISPLAY,    // Chat is currently being displayed
-        HIDDEN,     // Chat is currently hidden
+        NONE,
+        PENDING,
+        DISPLAY,
+        HIDDEN,
     }
 
     public enum ChatSender {
-        USER,      // A user chat message
-        ASSISTANT  // A GPT generated message
+        USER,
+        ASSISTANT
     }
 
-    // HashMap to associate unique entity IDs with their chat data
     public ConcurrentHashMap<String, EntityChatData> entityChatDataMap;
     public ConcurrentHashMap<UUID, AutoMessageBucket> autoResponseBuckets;
     public ConcurrentHashMap<UUID, AutoMessageBucket> ambientResponseBuckets;
@@ -65,36 +59,28 @@ public class ChatDataManager {
         responseSession = null;
         sessionServer = null;
         chatDataFile = null;
-        // Clear the chat data for the previous session
         entityChatDataMap.clear();
         autoResponseBuckets.clear();
         ambientResponseBuckets.clear();
     }
 
     private ChatDataManager(Boolean server_only) {
-        // Constructor
         entityChatDataMap = new ConcurrentHashMap<>();
         autoResponseBuckets = new ConcurrentHashMap<>();
         ambientResponseBuckets = new ConcurrentHashMap<>();
 
         if (server_only) {
-            // Generate initial quest
-            // TODO: Complete the quest flow
-            //generateQuest();
         }
     }
 
-    // Method to get the global instance of the server data manager
     public static ChatDataManager getServerInstance() {
         return SERVER_INSTANCE;
     }
 
-    // Method to get the global instance of the client data manager (synced from server)
     public static ChatDataManager getClientInstance() {
         return CLIENT_INSTANCE;
     }
 
-    // Retrieve chat data for a specific entity, or create it if it doesn't exist
     public EntityChatData getOrCreateChatData(String entityId) {
         return entityChatDataMap.computeIfAbsent(entityId, k -> new EntityChatData(entityId));
     }
@@ -116,13 +102,11 @@ public class ChatDataManager {
         }
     }
 
-    /** Admit before consuming rate allowance, resetting cooldowns or preparing gameplay effects. */
     public boolean dispatchRequest(EntityChatData data, ServerPlayer player, BooleanSupplier policy,
                                    Consumer<ChatSession.Request> action) {
         return ChatSession.dispatch(() -> beginRequest(data, player), policy, action);
     }
 
-    /** Capture world, entity and player identities before dispatching an HTTP request. */
     public ChatSession.Request beginRequest(EntityChatData data, ServerPlayer player) {
         MinecraftServer server = player == null ? null : player.getServer();
         ChatSession session = getSession(server);
@@ -278,7 +262,6 @@ public class ChatDataManager {
         return true;
     }
 
-    // Update the UUID in the map (i.e. bucketed entity and then released, changes their UUID)
     public void updateUUID(String oldUUID, String newUUID) {
         EntityChatData data = entityChatDataMap.get(oldUUID);
         if (data != null) {
@@ -288,26 +271,22 @@ public class ChatDataManager {
             entityChatDataMap.put(newUUID, data);
             LOGGER.info("Updated chat data from UUID (" + oldUUID + ") to UUID (" + newUUID + ")");
 
-            // Broadcast to all players
             ServerPackets.BroadcastEntityMessage(data);
         } else {
             LOGGER.info("Unable to update chat data, UUID not found: " + oldUUID);
         }
     }
 
-    // Save chat data to file
     public String GetLightChatData(String playerId) {
         return GetLightChatData(playerId, new PlayerChatPreferences());
     }
 
-    // Save chat data to file
     public String GetLightChatData(String playerId, PlayerChatPreferences preferences) {
         return GetLightChatData(playerId, "", preferences);
     }
 
     public String GetLightChatData(String playerId, String playerName, PlayerChatPreferences preferences) {
         try {
-            // Create "light" version of entire chat data HashMap
             HashMap<String, EntityChatDataLight> lightVersionMap = new HashMap<>();
             UUID viewerId = parsePlayerId(playerId);
             PlayerChatPreferences effectivePreferences = preferences == null ? new PlayerChatPreferences() : preferences;
@@ -318,7 +297,6 @@ public class ChatDataManager {
             });
             return GSON.toJson(lightVersionMap);
         } catch (Exception e) {
-            // Handle exceptions
             return "";
         }
     }
@@ -334,7 +312,6 @@ public class ChatDataManager {
         }
     }
 
-    // Save chat data to file
     public void saveChatData(MinecraftServer server) {
         if (sessionServer != server) {
             return;
@@ -346,7 +323,6 @@ public class ChatDataManager {
             }
             return;
         }
-        // Clean up blank, temp entities in data
         entityChatDataMap.values().removeIf(entityChatData -> entityChatData.status == ChatStatus.NONE);
 
         try {
@@ -360,7 +336,6 @@ public class ChatDataManager {
         }
     }
 
-    // Load chat data from file
     public void loadChatData(MinecraftServer server) {
         clearData();
         sessionServer = server;

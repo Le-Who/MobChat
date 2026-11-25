@@ -11,7 +11,6 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/** Completion boundary between HTTP requests and the server's chat state. */
 public final class ChatSession {
     private final Executor owner;
     private final IdentityHashMap<EntityChatData, Request> requests = new IdentityHashMap<>();
@@ -25,7 +24,6 @@ public final class ChatSession {
         return open;
     }
 
-    /** May be called by a timer; ownership is checked again after the executor handoff. */
     public void execute(Runnable task) {
         if (open) {
             owner.execute(() -> {
@@ -36,7 +34,6 @@ public final class ChatSession {
         }
     }
 
-    /** Admission, cancellation and close are called only by the owning server thread. */
     public Request tryBegin(EntityChatData data, BooleanSupplier currentState,
                             BooleanSupplier currentContext, Runnable settlePending) {
         if (!open || !currentState.getAsBoolean() || !currentContext.getAsBoolean()) {
@@ -68,7 +65,6 @@ public final class ChatSession {
         }
     }
 
-    /** Dispatch boundary shared by request triggers and their rate-limit policy. */
     public static boolean dispatch(Supplier<Request> admission, BooleanSupplier policy, Consumer<Request> action) {
         Request request = admission.get();
         if (request == null) {
@@ -105,7 +101,6 @@ public final class ChatSession {
             this.settlePending = settlePending;
         }
 
-        /** Checked only on the server owner before accepting already-admitted preparation. */
         public boolean isCurrent(EntityChatData state) {
             return state == data && open && requests.get(data) == this
                     && currentState.getAsBoolean() && currentContext.getAsBoolean();

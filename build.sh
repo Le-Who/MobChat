@@ -18,7 +18,6 @@ run_build() {
   ./gradlew build "$@" -x test -x compileTestJava --build-cache --parallel --no-daemon </dev/null
 }
 
-# Format: minecraft_version  yarn_mappings       loader_version  loom_version      fabric_version
 VERSIONS=$(cat <<'EOF'
 1.20    1.20+build.1       0.17.2    1.11-SNAPSHOT   0.83.0+1.20
 1.20.1  1.20.1+build.10    0.17.2    1.11-SNAPSHOT   0.92.1+1.20.1
@@ -69,7 +68,6 @@ EOD
   fi
   cp -- "build/libs/$jar" "build/libs/$jar.sha512" .
 
-  # Safe Forge/NeoForge packaging
   case "$mc_version" in
     "1.20.1") suffix="forge" ;;
     "1.21.1") suffix="neoforge" ;;
@@ -89,7 +87,6 @@ EOD
     trap - EXIT
   fi
 
-  # download Fabric API
   api_jar="fabric-api-${fabric_version}.jar"
   url="https://github.com/FabricMC/fabric/releases/download/${fabric_version//+/%2B}/${api_jar}"
   wget -q -O "$api_jar" "$url"

@@ -9,9 +9,6 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
-/**
- * Encodes and decodes the UTF-8 login snapshot using zlib.
- */
 public class Compression {
 
     public static byte[] compressString(String data) {

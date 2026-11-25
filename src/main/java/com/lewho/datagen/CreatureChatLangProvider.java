@@ -14,9 +14,6 @@ import java.util.stream.Stream;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricLanguageProvider;
 
-/**
- * Generates the English fallback language file.
- */
 public class CreatureChatLangProvider extends FabricLanguageProvider {
     public CreatureChatLangProvider(FabricDataOutput output) {
         super(output, "creaturechat");

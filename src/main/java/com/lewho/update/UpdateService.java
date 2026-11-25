@@ -67,16 +67,10 @@ public final class UpdateService {
                 return Optional.of(pending);
             }
         } catch (IOException | IllegalArgumentException | JsonParseException ignored) {
-            // An unusable staged update can be replaced by the latest available release.
         }
         return Optional.empty();
     }
 
-    /**
-     * Downloads, verifies, and stages a specific {@link UpdateCandidate} without re-running the
-     * version check. Use this when the caller already holds the candidate from a prior
-     * {@link #check} call.
-     */
     public PendingUpdate stageCandidate(Path gameDir, Path currentJar, UpdateCandidate candidate)
             throws IOException, InterruptedException {
         String hash = UpdateHashes.normalizeSha512(source.downloadText(candidate.sha512Url()));

@@ -7,9 +7,6 @@ import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 
-/**
- * Particle definitions for CreatureChat.
- */
 public class Particles {
     public static final SimpleParticleType HEART_SMALL_PARTICLE   = FabricParticleTypes.simple();
     public static final SimpleParticleType HEART_BIG_PARTICLE     = FabricParticleTypes.simple();

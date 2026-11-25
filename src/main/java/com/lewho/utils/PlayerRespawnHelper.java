@@ -7,7 +7,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
-/** Minecraft-version adapter for the player's configured home/respawn point. */
 public final class PlayerRespawnHelper {
     private PlayerRespawnHelper() {
     }

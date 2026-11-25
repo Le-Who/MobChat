@@ -30,10 +30,6 @@ import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The {@code BehaviorTests} class tests a variety of LLM prompts and expected outputs from specific characters
- * and personality types. For example, an aggressive character will attack, a nervous character will flee, etc...
- */
 public class BehaviorTests {
     static String PROMPT_PATH = "src/main/resources/data/creaturechat/prompts/";
     static String RESOURCE_PATH = "src/test/resources/data/creaturechat/";
@@ -43,7 +39,6 @@ public class BehaviorTests {
     static String OUTPUT_JSON_PATH = "src/test/BehaviorOutputs.json";
     static String NO_API_KEY = "No API_KEY environment variable has been set.";
 
-    // Requests per second limit
     private static final RateLimiter rateLimiter = new RateLimiter(1);
 
     static ConfigurationHandler.Config config = null;
@@ -92,20 +87,17 @@ public class BehaviorTests {
     @AfterAll
     static public void cleanup() throws IOException {
         if (outputData != null) {
-            // Save BehaviorOutput.json file (with appended prompt outputs)
-            final Gson gsonOutput = new GsonBuilder().setPrettyPrinting().create(); // Pretty-print enabled
+            final Gson gsonOutput = new GsonBuilder().setPrettyPrinting().create();
             Files.write(Paths.get(OUTPUT_JSON_PATH), gsonOutput.toJson(outputData).getBytes());
         }
     }
 
     @BeforeAll
     public static void setup() {
-        // Get API key from env var
         API_KEY = System.getenv("API_KEY");
         API_URL = System.getenv("API_URL");
         API_MODEL = System.getenv("API_MODEL");
 
-        // Config
         config = new ConfigurationHandler.Config();
         config.setTimeout(0);
         if (API_KEY != null && !API_KEY.isEmpty()) {
@@ -117,13 +109,10 @@ public class BehaviorTests {
         if (API_MODEL != null && !API_MODEL.isEmpty()) {
             config.setModel(API_MODEL);
         }
-        // Live LLM behavior checks run only when an API key is provided.
         Assumptions.assumeTrue(API_KEY != null && !API_KEY.isEmpty(), NO_API_KEY);
 
-        // Load system chat prompt
         systemChatContents = readFileContents(systemChatPath);
 
-        // Load previous unit tests outputs (so new ones can be appended)
         outputData = loadExistingOutputData();
     }
 
@@ -219,29 +208,23 @@ public class BehaviorTests {
                 "' expecting behavior: " + goodBehavior + " and avoid: " + badBehavior);
 
         try {
-            // Enforce rate limit
             rateLimiter.acquire();
 
             try {
-                // Load entity chat data
                 String chatDataPathContents = readFileContents(chatDataPath);
                 EntityTestData entityTestData = gson.fromJson(chatDataPathContents, EntityTestData.class);
 
-                // Load context
                 Map<String, String> contextData = entityTestData.getPlayerContext(worldPath, playerPath, entityPigPath);
                 assertNotNull(contextData);
 
-                // Add test message
                 for (String message : messages) {
                     entityTestData.addMessage(message, ChatDataManager.ChatSender.USER, "TestPlayer1");
                 }
 
-                // Get prompt
                 Path promptPath = Paths.get(PROMPT_PATH, "system-chat");
                 String promptText = Files.readString(promptPath);
                 assertNotNull(promptText);
 
-                // Fetch HTTP response from ChatGPT
                 CompletableFuture<String> future = ChatGPTRequest.fetchMessageFromChatGPT(
                         config, promptText, contextData, entityTestData.previousMessages, false);
 
@@ -249,16 +232,13 @@ public class BehaviorTests {
                     String outputMessage = future.get(60 * 60, TimeUnit.SECONDS);
                     assertNotNull(outputMessage);
 
-                    // Chat Message: Check for behaviors
                     ParsedMessage result = MessageParser.parseMessage(outputMessage.replace("\n", " "));
 
-                    // Save model outputs (for comparison later)
                     String[] filePathParts = chatDataPath.toString().split("/");
                     String Key = filePathParts[filePathParts.length - 1] + ": " + messages.get(0);
                     outputData.putIfAbsent(Key, new HashMap<>());
                     outputData.get(Key).put(config.getModel(), result.getCleanedMessage());
 
-                    // Check for the presence of good behavior
                     if (goodBehavior != null && goodBehavior.contains("FRIENDSHIP")) {
                         boolean isPositive = goodBehavior.equals("FRIENDSHIP+");
                         assertTrue(result.getBehaviors().stream().anyMatch(b -> "FRIENDSHIP".equals(b.getName()) &&
@@ -267,7 +247,6 @@ public class BehaviorTests {
                         assertTrue(result.getBehaviors().stream().anyMatch(b -> goodBehavior.equals(b.getName())));
                     }
 
-                    // Check for the absence of bad behavior if badBehavior is not empty
                     if (badBehavior != null && !badBehavior.isEmpty()) {
                         assertTrue(result.getBehaviors().stream().noneMatch(b -> badBehavior.equals(b.getName())));
                     }

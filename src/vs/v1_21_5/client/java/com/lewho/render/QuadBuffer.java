@@ -22,17 +22,12 @@ import org.joml.Matrix4f;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
-/**
- * Wrapper for Tessellator/BufferBuilder. Since the API changes between different versions of Minecraft,
- * this wrapper helps standardize the rendering/drawing calls. This is modified for Minecraft 1.21.5+.
- */
 @Environment(EnvType.CLIENT)
 public final class QuadBuffer {
     public static final QuadBuffer INSTANCE = new QuadBuffer();
     private BufferBuilder buf;
     boolean hasVertices = false;
 
-    // 🔧 STATIC CUSTOM PIPELINE SETUP (only once)
     private static final RenderPipeline.Snippet QUAD_SNIPPET = RenderPipeline.builder()
             .withUniform("ModelViewMat", UniformType.MATRIX4X4)
             .withUniform("ProjMat", UniformType.MATRIX4X4)
@@ -44,14 +39,13 @@ public final class QuadBuffer {
             .buildSnippet();
 
     private static final RenderPipeline QUAD_PIPELINE = RenderPipeline.builder(QUAD_SNIPPET)
-            .withLocation("pipeline/gui_textured") // arbitrary ID
-            .withDepthBias(3.0f, 3.0f) // mimic polygonOffset
-            .withBlend(BlendFunction.PANORAMA) // vanilla style alpha blending
+            .withLocation("pipeline/gui_textured")
+            .withDepthBias(3.0f, 3.0f)
+            .withBlend(BlendFunction.PANORAMA)
             .build();
 
     private QuadBuffer() {}
 
-    // begin
     public QuadBuffer begin() {
         return begin(Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP);
     }
@@ -65,13 +59,11 @@ public final class QuadBuffer {
         return this;
     }
 
-    /** Add a vertex and set a default normal (pointing up) to satisfy the format */
     public QuadBuffer vertex(float x, float y, float z) {
         buf.addVertex(x, y, z);
         return this;
     }
 
-    // vertex helpers
     public QuadBuffer vertex(Matrix4f mat, float x, float y, float z) {
         buf.addVertex(mat, x, y, z);
         return this;
@@ -101,7 +93,7 @@ public final class QuadBuffer {
         if (buf == null) return;
 
         try (MeshData meshData = buf.buildOrThrow()) {
-            buf = null; // always clear reference
+            buf = null;
 
             GpuTexture gpuTex = TextureLoader.lastTexture;
             if (gpuTex == null) return;
@@ -131,7 +123,6 @@ public final class QuadBuffer {
             }
 
         } catch (IllegalStateException e) {
-            // BufferBuilder was empty — clean up safely
             buf = null;
         }
     }

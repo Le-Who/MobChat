@@ -12,6 +12,12 @@ SPDX-FileCopyrightText = "2025 lewho LLC"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
 [[annotations]]
+path = [".github/workflows/comment-lint.yml", ".agents/skills/delete-comment/agents/openai.yaml", "tools/comment-baseline.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 lewho LLC"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
 path = ["gradle/wrapper/gradle-wrapper.jar", "gradle/wrapper/gradle-wrapper.properties"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2015-2021 The original authors"

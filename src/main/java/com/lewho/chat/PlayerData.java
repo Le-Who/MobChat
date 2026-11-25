@@ -3,10 +3,6 @@
 // Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © lewho LLC - unauthorized use prohibited
 package com.lewho.chat;
 
-/**
- * The {@code PlayerData} class represents data associated with a player,
- * specifically tracking their friendship level.
- */
 public class PlayerData {
     private static final int MAX_SOCIAL_SUMMARY_CHARS = 180;
 

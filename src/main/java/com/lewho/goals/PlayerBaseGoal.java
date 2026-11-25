@@ -3,46 +3,36 @@
 // Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © lewho LLC - unauthorized use prohibited
 package com.lewho.goals;
 
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 
-/**
- * The {@code PlayerBaseGoal} class sets a targetEntity, and will automatically update the targetEntity
- * when a player die's and respawns, or logs back in, etc... Other types of targetEntity classes will
- * be set to null after they die.
- */
 public abstract class PlayerBaseGoal extends Goal {
     protected LivingEntity targetEntity;
-    private final int updateInterval = 20;
-    private int tickCounter = 0;
+    private final GoalTarget<LivingEntity> target;
 
-    public PlayerBaseGoal(LivingEntity targetEntity) {
-        this.targetEntity = targetEntity;
+    protected PlayerBaseGoal(LivingEntity targetEntity, Mob owner) {
+        this.target = GoalTarget.track(owner, targetEntity);
     }
 
     @Override
     public boolean canUse() {
-        if (++tickCounter >= updateInterval) {
-            tickCounter = 0;
-            updateTargetEntity();
-        }
-        return targetEntity != null && targetEntity.isAlive();
+        return refreshTarget();
     }
 
-    private void updateTargetEntity() {
-        if (targetEntity != null && !targetEntity.isAlive()) {
-            if (targetEntity instanceof ServerPlayer) {
-                ServerLevel world = (ServerLevel) targetEntity.level();
-                ServerPlayer lookupPlayer = (ServerPlayer)world.getPlayerByUUID(targetEntity.getUUID());
-                if (lookupPlayer != null && lookupPlayer.isAlive()) {
-                    // Update player to alive player with same UUID
-                    targetEntity = lookupPlayer;
-                }
-            } else {
-                targetEntity = null;
-            }
+    protected final boolean refreshTarget() {
+        LivingEntity previousTarget = targetEntity;
+        targetEntity = resolveTarget();
+        if (targetEntity != previousTarget) {
+            onTargetChanged(previousTarget);
         }
+        return targetEntity != null;
+    }
+
+    protected LivingEntity resolveTarget() {
+        return target.resolve();
+    }
+
+    protected void onTargetChanged(LivingEntity previousTarget) {
     }
 }

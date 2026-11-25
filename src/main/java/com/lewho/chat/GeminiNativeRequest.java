@@ -15,9 +15,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Native Google Gemini API client executing generateContent requests.
- */
 public final class GeminiNativeRequest {
     private GeminiNativeRequest() {
     }
@@ -36,7 +33,6 @@ public final class GeminiNativeRequest {
         URI base = URI.create(baseUrl);
         String path = base.getPath() == null ? "" : base.getPath().replaceAll("/+$", "");
         int modelPath = path.indexOf("/models/");
-        // Explicit generateContent URLs must still follow the selected fallback model.
         if (modelPath >= 0) path = path.substring(0, modelPath);
         path += "/models/" + modelName + ":generateContent";
         return new URI(base.getScheme(), base.getAuthority(), path, base.getQuery(), base.getFragment()).toString();
@@ -67,7 +63,6 @@ public final class GeminiNativeRequest {
         GeminiPayload.GenerationConfig generation = new GeminiPayload.GenerationConfig();
         generation.maxOutputTokens = maxOutputTokens;
         String normalizedModel = modelName.toLowerCase(Locale.ENGLISH);
-        // Keep the existing Flash-Lite temperature exception.
         if (!normalizedModel.contains("3.5-flash-lite")) {
             generation.temperature = 1.0f;
         }
@@ -85,15 +80,6 @@ public final class GeminiNativeRequest {
         return payload;
     }
 
-    /**
-     * Returns a deep copy of the given JSON schema map with all {@code additionalProperties}
-     * keys removed at every nesting level.
-     *
-     * <p>The Gemini native {@code generationConfig.responseSchema} field accepts a restricted
-     * OpenAPI 3.0 subset that does <em>not</em> support {@code additionalProperties}. Our schemas
-     * are built for OpenAI structured output, which requires the field. Stripping it here keeps
-     * the two serialisation paths independent.</p>
-     */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> stripAdditionalProperties(Map<String, Object> schema) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -156,7 +142,6 @@ public final class GeminiNativeRequest {
                 }
             }
         }
-        // A valid candidate can stop at MAX_TOKENS before producing text. Keep its diagnostics.
         return new ChatGPTRequest.ResponseContent(answer.length() == 0 ? null : answer.toString(),
                 finishReason, completionTokens);
     }

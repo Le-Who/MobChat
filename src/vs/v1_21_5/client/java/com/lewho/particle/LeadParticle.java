@@ -12,9 +12,6 @@ import net.minecraft.client.particle.TextureSheetParticle;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
-/**
- * 1.21.5 override: use prevX/prevY/prevZ instead of the removed prevPosX/prevPosY/prevPosZ fields.
- */
 public class LeadParticle extends TextureSheetParticle {
     private final SpriteSet spriteProvider;
 
@@ -54,7 +51,6 @@ public class LeadParticle extends TextureSheetParticle {
     @Override
     public void render(VertexConsumer vertexConsumer, Camera camera, float tickDelta) {
         Vec3 cameraPos = camera.getPosition();
-        // ← use prevX/Y/Z instead of prevPosX/Y/Z
         float px = (float)(this.x - cameraPos.x());
         float py = (float)(this.y - cameraPos.y());
         float pz = (float)(this.z - cameraPos.z());

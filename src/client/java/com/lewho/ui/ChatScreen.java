@@ -21,12 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * The ChatScreen class displays a chat dialog UI for the player
- * and handles keyboard entry events.
- */
 public class ChatScreen extends ScreenHelper {
-    // Chat background size
     private static final int CHAT_BACKGROUND_WIDTH   = 261;
     private static final int CHAT_BACKGROUND_HEIGHT   = 88;
     private static final int HISTORY_PANEL_MAX_HEIGHT = 108;
@@ -41,15 +36,12 @@ public class ChatScreen extends ScreenHelper {
     private static final int HISTORY_COLOR_NPC = 0xFFFFD37A;
     private static final int HISTORY_COLOR_PLAYER = 0xFF8FD7FF;
 
-    // Chat bubble title (enter your message)
     private static final int CHAT_TITLE_OFFSET = 13;
 
-    // text input margins and size
     private static final int TEXT_INPUT_MARGIN_X   = 22;
     private static final int TEXT_INPUT_MARGIN_TOP = 30;
     private static final int TEXT_INPUT_HEIGHT     = 20;
 
-    // button dimensions and margins
     private static final int BUTTON_WIDTH    = 101;
     private static final int BUTTON_HEIGHT   = 21;
     private static final int BUTTON_MARGIN_X = 10;
@@ -74,7 +66,6 @@ public class ChatScreen extends ScreenHelper {
     public ChatScreen(Entity entity, Player player) {
         super(CCText.UI_CHAT_TITLE.comp());
         this.screenEntity = entity;
-        // tell server that chat opened
         ClientPackets.sendOpenChat(entity);
         ClientPackets.sendRequestHistory(entity);
     }
@@ -83,12 +74,10 @@ public class ChatScreen extends ScreenHelper {
     protected void init() {
         super.init();
 
-        // Update the super background size
         BG_WIDTH = CHAT_BACKGROUND_WIDTH;
         BG_HEIGHT = CHAT_BACKGROUND_HEIGHT;
         TITLE_OFFSET = CHAT_TITLE_OFFSET;
 
-        // center background horizontally, leaving room for history above the input box
         bgX = (this.width  - BG_WIDTH)  / 2;
         int availableHistoryHeight = Math.max(HISTORY_PANEL_MIN_HEIGHT, this.height - BG_HEIGHT - HISTORY_PANEL_GAP - 24);
         historyHeight = Math.min(HISTORY_PANEL_MAX_HEIGHT, availableHistoryHeight);
@@ -97,7 +86,6 @@ public class ChatScreen extends ScreenHelper {
         historyY = bgY - historyHeight - HISTORY_PANEL_GAP;
         historyWidth = BG_WIDTH - HISTORY_PANEL_MARGIN * 2;
 
-        // 1) text input
         int inputX = bgX + TEXT_INPUT_MARGIN_X;
         int inputY = bgY + TEXT_INPUT_MARGIN_TOP;
         int inputW = BG_WIDTH - TEXT_INPUT_MARGIN_X * 2;
@@ -112,32 +100,29 @@ public class ChatScreen extends ScreenHelper {
         setFocused(textField);
         addRenderableWidget(textField);
 
-        // 2) image buttons anchored to bottom corners
         int btnY = bgY + BG_HEIGHT - BUTTON_HEIGHT - BUTTON_MARGIN_Y;
 
-        // CANCEL / EXIT
         cancelButton = ButtonHelper.createImageButton(
-                bgX + BUTTON_MARGIN_X,            // x
-                btnY,                             // y
-                BUTTON_WIDTH,                     // width
-                BUTTON_HEIGHT,                    // height
-                textures.GetUI("chat-button-exit"),        // normal texture
-                textures.GetUI("chat-button-exit-hover"),  // hover texture
-                widget -> onClose(),                // onPress
-                widget -> Component.empty()            // narrationSupplier
+                bgX + BUTTON_MARGIN_X,
+                btnY,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT,
+                textures.GetUI("chat-button-exit"),
+                textures.GetUI("chat-button-exit-hover"),
+                widget -> onClose(),
+                widget -> Component.empty()
         );
         addRenderableWidget(cancelButton);
 
-        // SEND / DONE
         sendButton = ButtonHelper.createImageButton(
-                bgX + BG_WIDTH - BUTTON_WIDTH - BUTTON_MARGIN_X,  // x
-                btnY,                                             // y
-                BUTTON_WIDTH,                                     // width
-                BUTTON_HEIGHT,                                    // height
-                textures.GetUI("chat-button-done"),               // normal texture
-                textures.GetUI("chat-button-done-hover"),         // hover texture
-                widget -> sendChatMessage(),                      // onPress
-                widget -> Component.empty()                            // narrationSupplier
+                bgX + BG_WIDTH - BUTTON_WIDTH - BUTTON_MARGIN_X,
+                btnY,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT,
+                textures.GetUI("chat-button-done"),
+                textures.GetUI("chat-button-done-hover"),
+                widget -> sendChatMessage(),
+                widget -> Component.empty()
         );
         sendButton.active = false;
         addRenderableWidget(sendButton);
@@ -226,7 +211,6 @@ public class ChatScreen extends ScreenHelper {
     }
 
     private void sendChatMessage() {
-        // Send message to server
         String message = textField.getValue();
         ClientPackets.sendChat(screenEntity, message);
         onClose();
@@ -244,7 +228,6 @@ public class ChatScreen extends ScreenHelper {
     }
 
     private void onTextChanged(String text) {
-        // Enable the button only if the text field is not empty
         sendButton.active = !text.isEmpty();
     }
 

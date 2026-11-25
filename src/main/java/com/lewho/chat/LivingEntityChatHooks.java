@@ -11,7 +11,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 
-/** Shared gameplay policy behind the version-specific living-entity injections. */
 public final class LivingEntityChatHooks {
     private LivingEntityChatHooks() {
     }
@@ -28,7 +27,6 @@ public final class LivingEntityChatHooks {
         return data.getPlayerData(playerId, playerName).friendship > 0;
     }
 
-    /** Every applied hit is remembered, even when its automatic reply is suppressed. */
     public static boolean recordDamageReaction(EntityChatData data, String playerId, String playerName,
                                                ConfigurationHandler.Config config) {
         PlayerData playerData = recordDamageEvent(data, playerId, playerName);

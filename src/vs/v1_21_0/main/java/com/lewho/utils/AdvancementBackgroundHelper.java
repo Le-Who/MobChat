@@ -5,20 +5,13 @@ package com.lewho.utils;
 
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * Version-specific advancement background helper for 1.21+ where the
- * background path no longer resides under the "textures" directory and
- * omits the file extension.
- */
 public final class AdvancementBackgroundHelper {
     private AdvancementBackgroundHelper() {}
 
-    /** Returns the base UI texture location for the given name. */
     public static ResourceLocation ui(String name) {
         return new ResourceLocation("creaturechat", "ui/" + name);
     }
 
-    /** Returns the provided location unchanged. */
     public static ResourceLocation prependTextures(ResourceLocation base) {
         return base;
     }

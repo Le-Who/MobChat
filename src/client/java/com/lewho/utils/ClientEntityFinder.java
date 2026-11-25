@@ -8,10 +8,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 
-/**
- * The {@code ClientEntityFinder} class is used to find a specific MobEntity by UUID, since
- * the client level does not provide a mob lookup by UUID.
- */
 public class ClientEntityFinder {
     public static Mob getEntityByUUID(ClientLevel world, UUID uuid) {
         for (Entity entity : world.entitiesForRendering()) {
@@ -19,7 +15,7 @@ public class ClientEntityFinder {
                 return (Mob)entity;
             }
         }
-        return null; // Entity not found
+        return null;
     }
 
 }

@@ -10,15 +10,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-/**
- * Helper for UseItemCallback, forwarding to the shared shouldCancelAction logic.
- */
 public final class UseItemCallbackHelper {
     private UseItemCallbackHelper() {}
 
-    /**
-     * Fabric 1.20.x & 1.21.2 handler using TypedActionResult&lt;ItemStack&gt;.
-     */
     public static InteractionResultHolder<ItemStack> handleUseItemAction(
             Player player,
             Level world,
@@ -30,10 +24,6 @@ public final class UseItemCallbackHelper {
         return InteractionResultHolder.pass(player.getItemInHand(hand));
     }
 
-    /**
-     * Mirrors whatever logic you had in ClickHandler.shouldCancelAction.
-     * You’ll need to make that method public in ClickHandler so you can call it here.
-     */
     private static boolean shouldCancelAction(Level world) {
         return ClickHandler.shouldCancelAction(world);
     }

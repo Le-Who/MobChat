@@ -1,0 +1,6 @@
+interface:
+  display_name: "Delete comments"
+  short_description: "Audit comments and shrink the MobChat baseline"
+  default_prompt: "Use $delete-comment to review a MobChat source directory and apply the comment ratchet."
+policy:
+  allow_implicit_invocation: false

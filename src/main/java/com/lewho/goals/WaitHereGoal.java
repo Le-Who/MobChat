@@ -8,9 +8,6 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * Keeps a mob near the position where the wait command was issued.
- */
 public class WaitHereGoal extends net.minecraft.world.entity.ai.goal.Goal {
     private final Mob entity;
     private final Vec3 anchor;

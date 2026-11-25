@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-// Let the inventory-opening injection handle its shortcut before capturing a vanilla interaction.
 @Mixin(value = Mob.class, priority = 900)
 public class MixinMobItemInteraction {
     @Unique

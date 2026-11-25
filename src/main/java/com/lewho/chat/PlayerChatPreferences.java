@@ -15,10 +15,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Stores per-player chat display preferences that should follow the player on
- * the server without changing global OP-only CreatureChat configuration.
- */
 public class PlayerChatPreferences {
     private static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

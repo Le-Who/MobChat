@@ -16,21 +16,11 @@ import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraft.world.level.storage.loot.providers.number.NumberProvider;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 
-/**
- * Builds the per-biome inventory loot tables used by the datagen providers.
- * The generated tables mirror the former static JSON files but are defined in
- * code so they can compile across multiple Minecraft versions.
- */
 public final class InventoryLootTableGenerator {
     private static final NumberProvider DEFAULT_ROLLS = UniformGenerator.between(2.0F, 8.0F);
 
     private InventoryLootTableGenerator() {}
 
-    /**
-     * Emits loot tables for every supported biome.
-     *
-     * @param out callback receiving the biome name and built table
-     */
     public static void generate(BiConsumer<String, LootTable.Builder> out) {
         biome(out, "aquatic", b -> {
             b.item(Items.SAND, 10, 1, 16);

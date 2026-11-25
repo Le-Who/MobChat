@@ -7,7 +7,6 @@ import net.minecraft.resources.ResourceLocation;
 
 public class PlayerCustomTexture {
     public static boolean hasCustomIcon(ResourceLocation skinId) {
-        // By default, do nothing special
         return false;
     }
 }

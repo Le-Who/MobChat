@@ -26,9 +26,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * Tracks provider request usage before HTTP calls so local key/model rotation can avoid known quotas.
- */
 public class ApiUsageLimiter {
     private static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

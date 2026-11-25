@@ -10,9 +10,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 
-/**
- * The {@code RarityItemCollector} class is used to find items & entities by rarity
- */
 public class RarityItemCollector {
 
     public static List<String> getItemsByRarity(Rarity rarity, int quantity) {
@@ -28,39 +25,29 @@ public class RarityItemCollector {
             }
         }
 
-        // Shuffle the list to randomize it
         Collections.shuffle(itemsOfSpecificRarity);
 
-        // If the quantity requested is more than the number of available items, return them all
         if (quantity >= itemsOfSpecificRarity.size()) {
             return itemsOfSpecificRarity;
         }
 
-        // Otherwise, return a sublist containing only the number of items requested
         return itemsOfSpecificRarity.subList(0, quantity);
     }
 
-    /*
-    Categorize all entities and return a random list filtered by rarity. Rarity is calculated mostly with
-    Spawn Group, with a few manual exclusions.
-     */
     public static List<String> getEntitiesByRarity(Rarity rarity, int quantity) {
         List<String> categoryCommonEntities = new ArrayList<>();
         List<String> categoryUncommonEntities = new ArrayList<>();
         List<String> categoryRareEntities = new ArrayList<>();
         List<String> entitiesOfSpecificRarity = new ArrayList<>();
 
-        // Categorize spawn groups & entity types into rarity
         Set<String> commonEntities = new HashSet<>(Arrays.asList("creature"));
         Set<String> unCommonEntities = new HashSet<>(Arrays.asList("ambient", "water_ambient", "water_creature",
                 "axolotl", "underground_water_creature", "zombie", "spider", "skeleton", "enderman", "drowned",
                 "creeper", "slime", "silverfish", "cave_spider", "piglin", "witch", "zombie_villager"));
         Set<String> rareEntities = new HashSet<>(Arrays.asList("monster"));
 
-        // Always exclude these
         Set<String> excludedMonsters = new HashSet<>(Arrays.asList("ender_dragon", "phantom", "bat"));
 
-        // Iterate through entities
         for (EntityType<?> entityType : BuiltInRegistries.ENTITY_TYPE) {
             String entityName = entityType.toShortString();
             String spawnGroup = entityType.getCategory().getSerializedName();
@@ -76,7 +63,6 @@ public class RarityItemCollector {
             }
         }
 
-        // Determine which list to use
         if (rarity == Rarity.COMMON) {
             entitiesOfSpecificRarity = categoryCommonEntities;
         } else if (rarity == Rarity.UNCOMMON) {
@@ -85,15 +71,12 @@ public class RarityItemCollector {
             entitiesOfSpecificRarity = categoryRareEntities;
         }
 
-        // Shuffle the list to randomize it
         Collections.shuffle(entitiesOfSpecificRarity);
 
-        // If the quantity requested is more than the number of available items, return them all
         if (quantity >= entitiesOfSpecificRarity.size()) {
             return entitiesOfSpecificRarity;
         }
 
-        // Otherwise, return a sublist containing only the number of items requested
         return entitiesOfSpecificRarity.subList(0, quantity);
     }
 }

@@ -9,6 +9,14 @@ Apply every branch that matches the change. [ARCHITECTURE.md](ARCHITECTURE.md) o
 
 Find the module in [ARCHITECTURE: Source ownership](ARCHITECTURE.md#2-source-ownership).
 
+## Comments
+
+Put executable intent in names, tests, and types. Record non-obvious decisions in [ADRs](docs/adr/). Keep SPDX headers, generated wrapper text, and directives required by a tool.
+
+Run `python tools/comment_lint.py check` to check the current tree. When a change removes grandfathered comments, run `python tools/comment_lint.py shrink` in the same change. The baseline records each allowed comment by path, text hash, and occurrence count. CI rejects increases against the base commit. Use `/delete-comment` or `$delete-comment` for a scoped audit.
+
+The lint scans Java, Gradle, Python, shell and batch scripts, HTML and its scripts and styles, and the repository's comment-bearing configuration formats.
+
 ## Requests, JSON, And Quotas
 
 - Keep shared orchestration in `ChatGPTRequest`: immutable input snapshots, quota preflight, candidate traversal, retry, and error policy. Keep native Gemini payload/envelope and OpenAI-compatible chat-completions wire formats in their separate adapters.

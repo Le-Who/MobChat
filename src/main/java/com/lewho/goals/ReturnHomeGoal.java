@@ -10,9 +10,6 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * Moves a mob toward a stored CreatureChat home position.
- */
 public class ReturnHomeGoal extends Goal {
     protected final Mob entity;
     protected final BlockPos home;

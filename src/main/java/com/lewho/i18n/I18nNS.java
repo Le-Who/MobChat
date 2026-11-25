@@ -7,9 +7,6 @@ import static com.lewho.ModInit.MODID;
 
 import net.minecraft.network.chat.Component;
 
-/**
- * Namespace helper for translation keys.
- */
 public final class I18nNS {
     private I18nNS() {}
 

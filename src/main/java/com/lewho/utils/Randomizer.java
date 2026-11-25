@@ -10,10 +10,6 @@ import java.util.stream.Stream;
 
 import com.lewho.i18n.TR;
 
-/**
- * The {@code Randomizer} class provides easy functions for generating a variety of different random numbers
- * and phrases used by this mod.
- */
 public class Randomizer {
     public enum RandomType { ADJECTIVE, SPEAKING_STYLE, CLASS, ALIGNMENT }
     public enum ErrorType { GENERAL, CONNECTION, CODE401, CODE403, CODE429, CODE500, CODE503 }
@@ -121,7 +117,6 @@ public class Randomizer {
             "lawful evil", "neutral evil", "chaotic evil"
     );
 
-    // Get random message by type
     public static String getRandomMessage(RandomType messageType) {
         Random random = new Random();
         List<String> messages = null;
@@ -139,7 +134,6 @@ public class Randomizer {
         return messages.get(index).trim();
     }
 
-    // Get error text by type
     public static TR getRandomError(ErrorType errorType) {
         return switch (errorType) {
             case CONNECTION -> ERROR_CONNECTION;
@@ -153,13 +147,11 @@ public class Randomizer {
     }
 
     public static String RandomLetter() {
-        // Return random letter between 'A' and 'Z'
         int randomNumber = RandomNumber(26);
         return String.valueOf((char) ('A' + randomNumber));
     }
 
     public static int RandomNumber(int max) {
-        // Generate a random integer between 0 and max (inclusive)
         Random random = new Random();
         return random.nextInt(max);
     }

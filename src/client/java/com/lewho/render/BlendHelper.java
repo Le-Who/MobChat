@@ -6,9 +6,6 @@ package com.lewho.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
-/**
- * Pre-1.21.5: delegate blend & depth calls to RenderSystem
- */
 public final class BlendHelper {
     private BlendHelper() {}
 

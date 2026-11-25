@@ -7,9 +7,6 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 1.21.5+: use getEquippedStack
- */
 public class ArmorHelper {
     public static ItemStack getArmor(Player player, EquipmentSlot slot) {
         return player.getItemBySlot(slot);

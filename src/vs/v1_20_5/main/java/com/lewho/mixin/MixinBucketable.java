@@ -20,9 +20,6 @@ import net.minecraft.world.entity.animal.Bucketable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
-/**
- * Updated Bucketable mixin for Minecraft 1.20.5+ compatibility (new Data Component API for NBT)
- */
 @Mixin(Bucketable.class)
 public interface MixinBucketable {
     @Inject(
@@ -34,11 +31,8 @@ public interface MixinBucketable {
         UUID originalUUID = entity.getUUID();
         LOGGER.info("Saving original UUID of bucketed entity: " + originalUUID);
 
-        // Use Data Components for NBT data
         DataComponentType<CustomData> type = DataComponents.BUCKET_ENTITY_DATA;
-        // Get existing or create a new component with an empty NbtCompound
         CustomData component = stack.getOrDefault(type, CustomData.of(new CompoundTag()));
-        // Copy its internal NBT, modify, then reapply
         CompoundTag data = component.copyTag();
         data.putUUID("CCUUID", originalUUID);
         stack.set(type, CustomData.of(data));

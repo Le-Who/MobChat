@@ -15,9 +15,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 
-/**
- * Shared logic for mob inventory screens.
- */
 public abstract class MobInventoryScreenBase extends AbstractContainerScreen<MobInventoryMenu> {
     protected static final TextureLoader textures = new TextureLoader();
     protected static final ResourceLocation FRIEND_TEXTURE = textures.GetUI("inventory");

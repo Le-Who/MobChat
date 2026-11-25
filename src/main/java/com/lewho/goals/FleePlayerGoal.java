@@ -11,17 +11,13 @@ import net.minecraft.world.entity.ai.util.LandRandomPos;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * The {@code FleePlayerGoal} class instructs a Mob Entity to flee from the current player
- * and only recalculates path when it has reached its destination and the player is close again.
- */
 public class FleePlayerGoal extends PlayerBaseGoal {
     private final Mob entity;
     private final double speed;
     private final float fleeDistance;
 
     public FleePlayerGoal(ServerPlayer player, Mob entity, double speed, float fleeDistance) {
-        super(player);
+        super(player, entity);
         this.entity = entity;
         this.speed = speed;
         this.fleeDistance = fleeDistance;
@@ -46,7 +42,6 @@ public class FleePlayerGoal extends PlayerBaseGoal {
     private void fleeFromPlayer() {
         int roundedFleeDistance = Math.round(fleeDistance);
         if (this.entity instanceof PathfinderMob) {
-            // Set random path away from player
             Vec3 fleeTarget = LandRandomPos.getPosAway((PathfinderMob) this.entity, roundedFleeDistance,
                     roundedFleeDistance, this.targetEntity.position());
 
@@ -58,14 +53,11 @@ public class FleePlayerGoal extends PlayerBaseGoal {
             }
 
         } else {
-            // Move in the opposite direction from player (for non-path aware entities)
             Vec3 playerPos = this.targetEntity.position();
             Vec3 entityPos = this.entity.position();
 
-            // Calculate the direction away from the player
             Vec3 fleeDirection = entityPos.subtract(playerPos).normalize();
 
-            // Apply movement with the entity's speed in the opposite direction
             this.entity.setDeltaMovement(fleeDirection.x * this.speed, fleeDirection.y * this.speed, fleeDirection.z * this.speed);
             this.entity.hurtMarked = true;
         }
@@ -78,7 +70,9 @@ public class FleePlayerGoal extends PlayerBaseGoal {
 
     @Override
     public void tick() {
-        if (!this.entity.getNavigation().isInProgress()) {
+        if (!canContinueToUse()) {
+            stop();
+        } else if (!this.entity.getNavigation().isInProgress()) {
             fleeFromPlayer();
         }
     }

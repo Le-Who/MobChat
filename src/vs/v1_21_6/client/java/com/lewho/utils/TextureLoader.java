@@ -19,11 +19,6 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * The {@code TextureLoader} class registers and returns texture identifiers for resources
- * contained for this mod. UI and Entity icons. Missing textures are logged once.
- * This is modified for Minecraft 1.21.6.
- */
 public class TextureLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     private static final Set<String> missing = new HashSet<>();
@@ -32,18 +27,10 @@ public class TextureLoader {
 
     public TextureLoader() {}
 
-    /**
-     * Load and bind a UI texture (assets/creaturechat/textures/ui/{name}.png).
-     * Returns the Identifier if found, or null if missing.
-     */
     public ResourceLocation GetUI(String name) {
         return load(new ResourceLocation("creaturechat", "textures/ui/" + name + ".png"));
     }
 
-    /**
-     * Load and bind an entity texture (assets/creaturechat/{texturePath}).
-     * Returns the Identifier if found, or falls back to not_found.png.
-     */
     public ResourceLocation GetEntity(String texturePath) {
         ResourceLocation id = new ResourceLocation("creaturechat", texturePath);
         ResourceManager rm = Minecraft.getInstance().getResourceManager();
@@ -63,7 +50,6 @@ public class TextureLoader {
         Optional<Resource> res = rm.getResource(id);
 
         if (res.isEmpty()) {
-            // first time missing: log once
             if (missing.add(id.toString())) {
                 LOGGER.info("Missing texture: {}", id);
             }
@@ -72,26 +58,19 @@ public class TextureLoader {
         return id;
     }
 
-    /**
-     * Bind any already-registered texture at the given unit,
-     * or register+bind it if it's not yet in the TextureManager.
-     */
     public static void bind(int unit, ResourceLocation id) {
         Minecraft client = Minecraft.getInstance();
         TextureManager tm = client.getTextureManager();
         AbstractTexture tex = tm.getTexture(id);
         if (tex == null) {
-            // register a ResourceTexture so the manager will load it from assets
             tex = new SimpleTexture(id);
             tm.register(id, tex);
         }
 
-        // Store last GpuTexture
         GpuTextureView gpu = tex.getTextureView();
         lastTextureView = gpu;
         lastTextureId = id;
 
-        // Set Texture
         RenderSystem.setShaderTexture(unit, gpu);
     }
 }

@@ -10,11 +10,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * The {@code BubbleLocationManager} class is used to keep track of the currently rendered chat bubbles,
- * to simplify click handling of nearby chat bubbles. This data includes the exact location of the chat
- * bubbles, and their rotations (pitch, yaw).
- */
 public class BubbleLocationManager {
     private static final Map<UUID, BubbleData> bubbleDataMap = new ConcurrentHashMap<>();
 
@@ -43,7 +38,6 @@ public class BubbleLocationManager {
     }
 
     public static void performCleanup(List<UUID> activeEntityIds) {
-        // Retain only entries for active entities
         bubbleDataMap.keySet().retainAll(activeEntityIds);
     }
 

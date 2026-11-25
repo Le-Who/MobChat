@@ -6,21 +6,15 @@ package com.lewho.chat;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The {@code LineWrapper} class is used to wrap lines of text based on a rough
- * visual width. It attempts to break on whitespace when possible but will also
- * split long strings with no spaces (e.g. Chinese) so that text fits within the
- * chat bubble.
- */
 public class LineWrapper {
 
     public static List<String> wrapLines(String text, int maxWidth) {
         List<String> wrappedLines = new ArrayList<>();
         if (text == null || text.isEmpty()) return wrappedLines;
 
-        int lineStart = 0;      // index where the current line starts
-        int lastSpace = -1;     // index of the last seen whitespace character
-        int lineWidth = 0;      // visual width of the current line
+        int lineStart = 0;
+        int lastSpace = -1;
+        int lineWidth = 0;
 
         for (int i = 0; i < text.length();) {
             int codePoint = text.codePointAt(i);
@@ -43,7 +37,6 @@ public class LineWrapper {
                 lineWidth = 0;
                 lastSpace = -1;
 
-                // Skip leading whitespace on the next line
                 if (lineStart < text.length() && Character.isWhitespace(text.codePointAt(lineStart))) {
                     lineStart += Character.charCount(text.codePointAt(lineStart));
                 }

@@ -7,10 +7,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SpriteSet;
 
-/**
- * The {@code LeadParticleFactory} class generates new arrow particles for LEAD behavior. It passes along the 'angle' to rotate the particle. It also
- * sets the motion/acceleration to 0.
- */
 public class LeadParticleFactory implements ParticleProvider<LeadParticleEffect> {
     private final SpriteSet spriteProvider;
 

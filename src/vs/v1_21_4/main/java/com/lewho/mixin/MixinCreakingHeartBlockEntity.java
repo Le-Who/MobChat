@@ -19,17 +19,11 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.monster.creaking.Creaking;
 import net.minecraft.world.level.block.entity.CreakingHeartBlockEntity;
 
-/*
-* Mixin to allow a Creaking Puppet to maintain chat history when spawned / despawned (day / night)
-* */
 @Mixin(CreakingHeartBlockEntity.class)
 public class MixinCreakingHeartBlockEntity {
     @Shadow @Nullable private Either<Creaking, UUID> creakingInfo;
     @Unique private UUID creaturechatCachedId;
 
-    /**
-     * Cache the old puppet UUID when the heart kills its puppet (night despawn)
-     */
     @Inject(
             method = "removeProtector(Lnet/minecraft/world/damagesource/DamageSource;)V",
             at     = @At("HEAD")
@@ -43,9 +37,6 @@ public class MixinCreakingHeartBlockEntity {
         }
     }
 
-    /**
-     * Restore chat mapping when a new puppet is set (spawn at dawn)
-     */
     @Inject(
             method = "setCreakingInfo(Lnet/minecraft/world/entity/monster/creaking/Creaking;)V",
             at     = @At("TAIL")

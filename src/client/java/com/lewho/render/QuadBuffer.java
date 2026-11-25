@@ -11,10 +11,6 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Matrix4f;
 
-/**
- * Wrapper for Tessellator/BufferBuilder. Since the API changes between different versions of Minecraft,
- * this wrapper helps standardize the rendering/drawing calls, so we can override them in newer versions.
- */
 @Environment(EnvType.CLIENT)
 public final class QuadBuffer {
     public static final QuadBuffer INSTANCE = new QuadBuffer();
@@ -24,7 +20,6 @@ public final class QuadBuffer {
 
     private QuadBuffer() {}
 
-    // begin
     public QuadBuffer begin() {
         return begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP);
     }
@@ -39,13 +34,11 @@ public final class QuadBuffer {
         return this;
     }
 
-    // Accepts 0‒1 float channels, matches vanilla VertexConsumer.color(float…)
     public QuadBuffer color(float r, float g, float b, float a) {
         buf.color(r, g, b, a);
         return this;
     }
 
-    // vertex helpers
     public QuadBuffer vertex(Matrix4f mat, float x, float y, float z) {
         buf.vertex(mat, x, y, z);
         return this;
@@ -61,12 +54,11 @@ public final class QuadBuffer {
     public QuadBuffer light(int packed)                   { buf.uv2(packed);   return this; }
     public QuadBuffer overlay(int packed) {
         buf.overlayCoords(packed);
-        buf.endVertex(); // immediately finalize
+        buf.endVertex();
         return this;
     }
 
-    // end & draw
     public void draw() {
-        tessellator.end();              // 1.20.x path
+        tessellator.end();
     }
 }

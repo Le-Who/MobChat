@@ -6,7 +6,6 @@ package com.lewho.network;
 import net.minecraft.network.chat.ClickEvent;
 
 public class ClickEventHelper {
-    /** old API: construct the legacy ClickEvent */
     public static ClickEvent openUrl(String url) {
         return new ClickEvent(ClickEvent.Action.OPEN_URL, url);
     }

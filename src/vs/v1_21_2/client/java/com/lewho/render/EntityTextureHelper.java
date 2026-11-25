@@ -11,10 +11,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
-/**
- * Helper to access the getTexture method of a renderer. This API changes in later versions of Minecraft, so we
- * are isolating it into a Helper. This was modififed for Minecraft 1.21.2+.
- */
 public final class EntityTextureHelper {
     private EntityTextureHelper() {}
 
@@ -22,18 +18,15 @@ public final class EntityTextureHelper {
         if (renderer instanceof LivingEntityRenderer livingRenderer
                 && entity   instanceof LivingEntity       living) {
 
-            // Get the generic EntityRenderState then downcast
             EntityRenderState rawState = livingRenderer.createRenderState(living, 0.0f);
             LivingEntityRenderState state = (LivingEntityRenderState) rawState;
 
-            // Raw‐cast so we can call getTexture(state)
             @SuppressWarnings("unchecked")
             ResourceLocation tex = ((LivingEntityRenderer) livingRenderer).getTextureLocation(state);
 
             return tex;
         }
 
-        // non-living renderers (boats, items, etc.)
         return null;
     }
 }

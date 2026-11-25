@@ -53,11 +53,6 @@ import net.minecraft.ChatFormatting;
 
 import static com.lewho.network.ServerPackets.*;
 
-/**
- * The {@code EntityChatData} class represents a conversation between an
- * entity and one or more players, including friendship, character sheets,
- * and the status of the current displayed message.
- */
 public class EntityChatData {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
     public static final int MAX_MEMORY_ENTRIES = 20;
@@ -116,7 +111,6 @@ public class EntityChatData {
     @Expose(serialize = false)
     public Integer legacyFriendship;
 
-    // The map to store data for each player interacting with this entity
     public Map<String, PlayerData> players;
 
     public EntityChatData(String entityId) {
@@ -143,12 +137,10 @@ public class EntityChatData {
         this.autoBucket = null;
         this.ambientBucket = null;
 
-        // Old, unused migrated properties
         this.legacyPlayerId = null;
         this.legacyFriendship = null;
     }
 
-    // Post-deserialization initialization
     public void postDeserializeInitialization() {
         recoverPendingResponse();
         if (this.previousMessages == null) {
@@ -161,7 +153,7 @@ public class EntityChatData {
             this.characterSheet = "";
         }
         if (this.players == null) {
-            this.players = new HashMap<>(); // Ensure players map is initialized
+            this.players = new HashMap<>();
         }
         if (this.memories == null) {
             this.memories = new ArrayList<>();
@@ -194,7 +186,6 @@ public class EntityChatData {
         }
     }
 
-    /** A pending HTTP request cannot survive cancellation or reloading a world. */
     public void recoverPendingResponse() {
         if (this.status == ChatDataManager.ChatStatus.PENDING) {
             this.status = ChatDataManager.ChatStatus.HIDDEN;
@@ -306,12 +297,9 @@ public class EntityChatData {
         syncLegacyMemories();
     }
 
-    // Migrate old data into the new structure
     private void migrateData() {
-        // Ensure the blank player data entry exists
         PlayerData blankPlayerData = this.players.computeIfAbsent("", k -> new PlayerData());
 
-        // Update the previousMessages arraylist and add timestamps if missing
         if (this.previousMessages != null) {
             for (ChatMessage message : this.previousMessages) {
                 if (message.timestamp == null) {
@@ -327,7 +315,6 @@ public class EntityChatData {
             this.born = System.currentTimeMillis();;
         }
 
-        // Clean up old player data
         this.legacyPlayerId = null;
         this.legacyFriendship = null;
     }
@@ -348,7 +335,6 @@ public class EntityChatData {
         return getPlayerData(getPlayerKey(player), player == null ? "" : player.getDisplayName().getString());
     }
 
-    // Get the player data (or fallback to the blank player)
     public PlayerData getPlayerData(String playerName) {
         return getPlayerData(playerName, "");
     }
@@ -372,7 +358,6 @@ public class EntityChatData {
         }
 
         if (this.players.containsKey("")) {
-            // Legacy single-player save data uses a blank key; keep it stable until an explicit UUID entry exists.
             return this.players.get("");
         }
 
@@ -407,12 +392,10 @@ public class EntityChatData {
     }
 
     public String getCharacterProp(String propertyName) {
-        // Create a case-insensitive regex pattern to match the property name and capture its value
         Pattern pattern = Pattern.compile("-?\\s*" + Pattern.quote(propertyName) + ":\\s*(.+)", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(characterSheet);
 
         if (matcher.find()) {
-            // Return the captured value, trimmed of any excess whitespace
             return matcher.group(1).trim().replace("\"", "");
         }
 
@@ -464,10 +447,9 @@ public class EntityChatData {
         return "I lost my words for a moment. Say that again?";
     }
 
-    // Get list of status effects for player (handle different Minecraft versions)
     private static MobEffect effectOf(MobEffectInstance inst) {
-        Object raw = inst.getEffect();        // 1.20.4: StatusEffect
-        if (raw instanceof MobEffect se) {     // J 17-compatible pattern match
+        Object raw = inst.getEffect();
+        if (raw instanceof MobEffect se) {
             return se;
         }
         @SuppressWarnings("unchecked")
@@ -475,9 +457,7 @@ public class EntityChatData {
         return holder.value();
     }
 
-    // Generate context object
     public Map<String, String> getPlayerContext(ServerPlayer player, String userLanguage, ConfigurationHandler.Config config) {
-        // Add PLAYER context information
         Map<String, String> contextData = new HashMap<>();
         contextData.put("player_name", player.getDisplayName().getString());
         contextData.put("player_health", Math.round(player.getHealth()) + "/" + Math.round(player.getMaxHealth()));
@@ -498,13 +478,11 @@ public class EntityChatData {
         contextData.put("player_armor_legs", legsArmor.getItem().toString());
         contextData.put("player_armor_feet", feetArmor.getItem().toString());
 
-        // Get active player effects
         String effectsString = player.getActiveEffectsMap().values().stream()
             .map(inst -> effectOf(inst).getDescriptionId() + " x" + (inst.getAmplifier() + 1))
             .collect(Collectors.joining(", "));
         contextData.put("player_active_effects", effectsString);
 
-        // Add custom story section (if any)
         if (!config.getStory().isEmpty()) {
             contextData.put("story", "Story: " + config.getStory());
         } else {
@@ -512,8 +490,7 @@ public class EntityChatData {
         }
 
 
-        // Get World time (as 24 hour value)
-        int hours = (int) ((player.level().getDayTime() / 1000 + 6) % 24); // Minecraft day starts at 6 AM
+        int hours = (int) ((player.level().getDayTime() / 1000 + 6) % 24);
         int minutes = (int) (((player.level().getDayTime() % 1000) / 1000.0) * 60);
         contextData.put("world_time", String.format("%02d:%02d", hours, minutes));
         contextData.put("world_is_raining", player.level().isRaining() ? "yes" : "no");
@@ -521,7 +498,6 @@ public class EntityChatData {
         contextData.put("world_difficulty", player.level().getDifficulty().getKey());
         contextData.put("world_is_hardcore", player.level().getLevelData().isHardcore() ? "yes" : "no");
 
-        // Get moon phase
         String moonPhaseDescription = switch (player.level().getMoonPhase()) {
             case 0 -> "Full Moon";
             case 1 -> "Waning Gibbous";
@@ -535,7 +511,6 @@ public class EntityChatData {
         };
         contextData.put("world_moon_phase", moonPhaseDescription);
 
-        // Get Entity details
         Mob entity = (Mob) ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), UUID.fromString(entityId));
         if (entity.getCustomName() == null) {
             contextData.put("entity_name", "");
@@ -586,7 +561,6 @@ public class EntityChatData {
         return contextData;
     }
 
-    // Generate a new character
     public void generateCharacter(String userLanguage, ServerPlayer player, String userMessage, boolean is_auto_message) {
         ChatDataManager.getServerInstance().dispatchRequest(this, player, () -> true,
                 request -> generateCharacter(request, userLanguage, player, userMessage, is_auto_message));
@@ -599,24 +573,18 @@ public class EntityChatData {
         }
         String systemPrompt = "system-character";
         if (is_auto_message) {
-            // Increment an auto-generated message
             this.auto_generated++;
         } else {
-            // Reset auto-generated counter
             this.auto_generated = 0;
         }
 
-        // Add USER Message
         this.addMessage(userMessage, ChatDataManager.ChatSender.USER, player, systemPrompt);
 
-        // Get config (api key, url, settings)
         ConfigurationHandler.Config config = new ConfigurationHandler(player.getServer()).loadConfig();
         String promptText = ChatPrompt.loadPromptFromResource(player.getServer().getResourceManager(), systemPrompt);
 
-        // Add PLAYER context information
         Map<String, String> contextData = getPlayerContext(player, userLanguage, config);
 
-        // fetch HTTP response from ChatGPT
         request.whenComplete(ChatGPTRequest.fetchResultFromChatGPT(config, promptText, contextData, previousMessages,
                 ChatGPTRequest.StructuredOutputMode.CHARACTER), (requestResult, failure) -> {
             try {
@@ -625,22 +593,18 @@ public class EntityChatData {
                 }
                 String output_message = requestResult == null ? null : requestResult.content();
                 if (output_message != null) {
-                    // Character Sheet: Remove system-character message from previous messages
                     previousMessages.clear();
 
-                    // Add NEW CHARACTER sheet & greeting
                     this.characterSheet = CharacterSheetNormalizer.normalize(output_message);
                     String shortGreeting = getShortGreetingOrFallback(getSpokenFallbackMessage(userLanguage));
                     this.addMessage(shortGreeting, ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt);
 
                 } else {
-                    // No valid LLM response
                     throw new RuntimeException(requestResult == null || requestResult.errorMessage() == null
                             ? "No response from the AI provider." : requestResult.errorMessage());
                 }
 
             } catch (Exception e) {
-                // Log the exception for debugging
                 LOGGER.error("Error processing LLM response", e);
 
                 Randomizer.ErrorType type = Randomizer.ErrorType.GENERAL;
@@ -671,7 +635,6 @@ public class EntityChatData {
                 }
                 player.displayClientMessage(errorComp.withStyle(ChatFormatting.RED), false);
 
-                // Remove the error message from history to prevent it from affecting future ChatGPT requests
                 if (!previousMessages.isEmpty()) {
                     previousMessages.remove(previousMessages.size() - 1);
                 }
@@ -686,7 +649,6 @@ public class EntityChatData {
         });
     }
 
-    // Generate greeting
     public void generateMessage(String userLanguage, ServerPlayer player, String userMessage, boolean is_auto_message) {
         generateMessage(userLanguage, player, userMessage, is_auto_message, !is_auto_message);
     }
@@ -703,32 +665,24 @@ public class EntityChatData {
         }
         String systemPrompt = "system-chat";
         if (is_auto_message) {
-            // Increment an auto-generated message
             this.auto_generated++;
         } else {
-            // Reset auto-generated counter
             this.auto_generated = 0;
         }
 
-        // Add USER Message
         this.addMessage(userMessage, ChatDataManager.ChatSender.USER, player, systemPrompt);
 
-        // Get config (api key, url, settings)
         ConfigurationHandler.Config config = new ConfigurationHandler(player.getServer()).loadConfig();
         String promptText = ChatPrompt.loadPromptFromResource(player.getServer().getResourceManager(), systemPrompt);
 
-        // Add PLAYER context information
         Map<String, String> contextData = getPlayerContext(player, userLanguage, config);
 
-        // Get messages for player
         PlayerData playerData = this.getPlayerData(player);
         if (previousMessages.size() == 1) {
-            // No messages exist yet for this player (start with normal greeting)
             String shortGreeting = getShortGreetingOrFallback(getSpokenFallbackMessage(userLanguage));
             previousMessages.add(0, new ChatMessage(shortGreeting, ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
         }
 
-        // fetch HTTP response from ChatGPT
         request.whenComplete(ChatGPTRequest.fetchResultFromChatGPT(config, promptText, contextData, previousMessages,
                 ChatGPTRequest.StructuredOutputMode.CHAT), (requestResult, failure) -> {
             try {
@@ -737,26 +691,21 @@ public class EntityChatData {
                 }
                 String output_message = requestResult == null ? null : requestResult.content();
                 if (output_message != null) {
-                    // Chat Message: Parse message for behaviors
                     ParsedMessage result = MessageParser.parseMessage(output_message.replace("\n", " "));
                     this.applyStructuredMetadata(result);
                     Mob entity = (Mob) ServerEntityFinder.getEntityByUUID((ServerLevel)player.level(), UUID.fromString(entityId));
 
                     if (entity != null) {
-                        // Determine entity's default speed
-                        // Some Entities (i.e. Axolotl) set this incorrectly... so adjusting in the SpeedControls class
                         float entitySpeed = SpeedControls.getMaxSpeed(entity);
                         float entitySpeedMedium = Mth.clamp(entitySpeed * 1.15F, 0.5f, 1.15f);
                         float entitySpeedFast = Mth.clamp(entitySpeed * 1.3F, 0.5f, 1.3f);
 
-                        // Apply behaviors (if any)
                         boolean ambientContext = isAmbientContext(userMessage);
                         List<Behavior> allowedBehaviors = BehaviorPolicy.filterAllowed(result.getBehaviors(), playerData, ambientContext, hasHome());
                         for (Behavior behavior : allowedBehaviors) {
                             LOGGER.info("Behavior: " + behavior.getName() + (behavior.getArgument() != null ?
                                     ", Argument: " + behavior.getArgument() : ""));
 
-                            // Apply behaviors to entity
                             if (behavior.getName().equals("FOLLOW")) {
                                 FollowPlayerGoal followGoal = new FollowPlayerGoal(player, entity, entitySpeedMedium);
                                 EntityBehaviorManager.removeGoal(entity, TalkPlayerGoal.class);
@@ -824,7 +773,6 @@ public class EntityChatData {
 
                             } else if (behavior.getName().equals("PROTECT")) {
                                 if (playerData.friendship <= 0) {
-                                    // force friendship to prevent entity from attacking player when protecting
                                     playerData.friendship = 1;
                                 }
                                 ProtectPlayerGoal protectGoal = new ProtectPlayerGoal(player, entity, 1.0);
@@ -924,42 +872,33 @@ public class EntityChatData {
                                 int new_friendship = Math.max(-3, Math.min(3, behavior.getArgument()));
                                 int old_friendship = playerData.friendship;
 
-                                // Does friendship improve?
                                 if (new_friendship > playerData.friendship) {
-                                    // Stop any attack/flee if friendship improves
                                     EntityBehaviorManager.removeGoal(entity, FleePlayerGoal.class);
                                     EntityBehaviorManager.removeGoal(entity, AttackPlayerGoal.class);
 
                                     if (entity instanceof WitherBoss && new_friendship == 3) {
-                                        // Best friend a Nether and get a NETHER_STAR
                                         WitherBoss wither = (WitherBoss) entity;
                                         ((WitherEntityAccessor) wither).callDropEquipment(entity.level().damageSources().generic(), 1, true);
                                         entity.level().playSound(entity, entity.blockPosition(), SoundEvents.WITHER_DEATH, SoundSource.PLAYERS, 0.3F, 1.0F);
                                     }
 
                                     if (entity instanceof EnderDragon && new_friendship == 3) {
-                                        // Trigger end of game (friendship always wins!)
                                         EnderDragon dragon = (EnderDragon) entity;
 
-                                        // Emit particles & sound
                                         ParticleEmitter.emitCreatureParticle((ServerLevel) entity.level(), entity, (ParticleOptions) HEART_BIG_PARTICLE, 3, 200);
                                         entity.level().playSound(entity, entity.blockPosition(), SoundEvents.ENDER_DRAGON_DEATH, SoundSource.PLAYERS, 0.3F, 1.0F);
                                         entity.level().playSound(entity, entity.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 0.5F, 1.0F);
 
-                                        // Check if the game rule for mob loot is enabled
                                         ServerLevel serverWorld = (ServerLevel) entity.level();
                                         boolean doMobLoot = serverWorld.getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT);
 
-                                        // If this is the first time the dragon is 'befriended', adjust the XP
                                         EndDragonFight dragonFight = dragon.getDragonFight();
                                         int baseXP = 500;
                                         if (dragonFight != null && !dragonFight.hasPreviouslyKilledDragon()) {
                                             baseXP = 12000;
                                         }
 
-                                        // If the world is a server world and mob loot is enabled, spawn XP orbs
                                         if (entity.level() instanceof ServerLevel && doMobLoot) {
-                                            // Loop to spawn XP orbs
                                             for (int j = 1; j <= 11; j++) {
                                                 float xpFraction = (j == 11) ? 0.2F : 0.08F;
                                                 int xpAmount = Mth.floor((float) baseXP * xpFraction);
@@ -967,14 +906,12 @@ public class EntityChatData {
                                             }
                                         }
 
-                                        // Mark fight as over
                                         if (dragonFight != null) {
                                             dragonFight.setDragonKilled(dragon);
                                         }
                                     }
                                 }
 
-                                // Merchant deals (if friendship changes with a Villager
                                 if (entity instanceof Villager && playerData.friendship != new_friendship) {
                                     VillagerEntityAccessor villager = (VillagerEntityAccessor) entity;
                                     switch (new_friendship) {
@@ -1010,22 +947,18 @@ public class EntityChatData {
                                 }
 
 
-                                // Tame best friends and un-tame worst enemies
                                 if (entity instanceof TamableAnimal && playerData.friendship != new_friendship) {
                                     TamableAnimal tamableEntity = (TamableAnimal) entity;
                                     if (new_friendship == 3 && !tamableEntity.isTame()) {
                                         tamableEntity.tame(player);
                                     } else if (new_friendship == -3 && tamableEntity.isTame()) {
-                                        TameableHelper.setTamed((TamableAnimal) entity, false);
                                         TameableHelper.clearOwner(tamableEntity);
                                     }
                                 }
 
-                                // Emit friendship particles
                                 if (playerData.friendship != new_friendship) {
                                     int friendDiff = new_friendship - playerData.friendship;
                                     if (friendDiff > 0) {
-                                        // Heart particles
                                         if (new_friendship == 3) {
                                             ParticleEmitter.emitCreatureParticle((ServerLevel) entity.level(), entity, (ParticleOptions) HEART_BIG_PARTICLE, 0.5, 10);
                                         } else {
@@ -1033,7 +966,6 @@ public class EntityChatData {
                                         }
 
                                     } else if (friendDiff < 0) {
-                                        // Fire particles
                                         if (new_friendship == -3) {
                                             ParticleEmitter.emitCreatureParticle((ServerLevel) entity.level(), entity, (ParticleOptions) FIRE_BIG_PARTICLE, 0.5, 10);
                                         } else {
@@ -1058,7 +990,6 @@ public class EntityChatData {
                         }
                     }
 
-                    // Get cleaned message (i.e. no <BEHAVIOR> strings)
                     String cleanedMessage = result.getCleanedMessage();
                     boolean syntheticFallbackMessage = false;
                     if (!isSpokenReplyCandidate(cleanedMessage)) {
@@ -1066,10 +997,8 @@ public class EntityChatData {
                         syntheticFallbackMessage = true;
                     }
 
-                    // Add ASSISTANT message to history
                     this.addMessage(cleanedMessage, ChatDataManager.ChatSender.ASSISTANT, player, systemPrompt);
 
-                    // Update the last entry in previousMessages to use the original message
                     String historyMessage = syntheticFallbackMessage ? cleanedMessage : result.getOriginalMessage();
                     this.previousMessages.set(this.previousMessages.size() - 1,
                             new ChatMessage(historyMessage, ChatDataManager.ChatSender.ASSISTANT, player.getDisplayName().getString()));
@@ -1079,13 +1008,11 @@ public class EntityChatData {
                     }
 
                 } else {
-                    // No valid LLM response
                     throw new RuntimeException(requestResult == null || requestResult.errorMessage() == null
                             ? "No response from the AI provider." : requestResult.errorMessage());
                 }
 
             } catch (Exception e) {
-                // Log the exception for debugging
                 LOGGER.error("Error processing LLM response", e);
 
                 Randomizer.ErrorType type = Randomizer.ErrorType.GENERAL;
@@ -1116,7 +1043,6 @@ public class EntityChatData {
                 }
                 player.displayClientMessage(errorComp.withStyle(ChatFormatting.RED), false);
 
-                // Remove the error message from history to prevent it from affecting future ChatGPT requests
                 if (!previousMessages.isEmpty()) {
                     previousMessages.remove(previousMessages.size() - 1);
                 }
@@ -1156,48 +1082,39 @@ public class EntityChatData {
         };
     }
 
-    // Add a message to the history and update the current message
     public void addMessage(String message, ChatDataManager.ChatSender sender, ServerPlayer player, String systemPrompt) {
         addMessage(message, sender, player, systemPrompt, true);
     }
 
-    // Internal helper allowing callers to skip advancement triggers
     public void addMessage(String message, ChatDataManager.ChatSender sender, ServerPlayer player, String systemPrompt, boolean triggerAdvancement) {
-        // Truncate message (prevent crazy long messages... just in case)
         String truncatedMessage = message.substring(0, Math.min(message.length(), ChatDataManager.MAX_CHAR_IN_USER_MESSAGE));
 
-        // Add context-switching logic for USER messages only
         String playerName = player.getDisplayName().getString();
         this.currentPlayerId = player.getStringUUID();
         this.currentPlayerName = playerName;
         if (sender == ChatDataManager.ChatSender.USER && previousMessages.size() > 1) {
             ChatMessage lastMessage = previousMessages.get(previousMessages.size() - 1);
-            if (lastMessage.name == null || !lastMessage.name.equals(playerName)) {  // Null-safe check
-                boolean isReturningPlayer = previousMessages.stream().anyMatch(msg -> playerName.equals(msg.name)); // Avoid NPE here too
+            if (lastMessage.name == null || !lastMessage.name.equals(playerName)) {
+                boolean isReturningPlayer = previousMessages.stream().anyMatch(msg -> playerName.equals(msg.name));
                 String note = isReturningPlayer
                         ? "<returning player: " + playerName + " resumes the conversation>"
                         : "<a new player has joined the conversation: " + playerName + ">";
                 previousMessages.add(new ChatMessage(note, sender, playerName));
 
-                // Log context-switching message
                 LOGGER.info("Conversation-switching message: status=PENDING, sender={}, message={}, player={}, entity={}",
                         ChatDataManager.ChatStatus.PENDING, note, playerName, entityId);
             }
         }
 
-        // Add message to history
         previousMessages.add(new ChatMessage(truncatedMessage, sender, playerName));
 
-        // Log regular message addition
         LOGGER.info("Message added: status={}, sender={}, message={}, player={}, entity={}",
                 status.toString(), sender.toString(), truncatedMessage, playerName, entityId);
 
-        // Update current message and reset line number of displayed text
         this.currentMessage = truncatedMessage;
         this.currentLineNumber = 0;
         this.sender = sender;
 
-        // Determine status for message
         if (sender == ChatDataManager.ChatSender.ASSISTANT) {
             status = ChatDataManager.ChatStatus.DISPLAY;
         } else {
@@ -1205,11 +1122,9 @@ public class EntityChatData {
         }
 
         if (sender == ChatDataManager.ChatSender.USER && systemPrompt.equals("system-chat") && auto_generated == 0) {
-            // Broadcast new player message (when not auto-generated)
             ServerPackets.BroadcastPlayerMessage(this, player);
         }
 
-        // Broadcast new entity message status (i.e. pending)
         ServerPackets.BroadcastEntityMessage(this);
 
         if (sender == ChatDataManager.ChatSender.ASSISTANT && triggerAdvancement) {
@@ -1218,7 +1133,6 @@ public class EntityChatData {
             if (entity != null) {
                 AdvancementHelper.checkInnerCircle(player, entity);
 
-                // Send one-time message to player text chat if enabled
                 ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
                 if (config.getSendToChat()) {
                     ServerPackets.SendEntityReplyToChat(this, entity, truncatedMessage);
@@ -1227,30 +1141,25 @@ public class EntityChatData {
         }
     }
 
-    // Get wrapped lines
     public List<String> getWrappedLines() {
         return LineWrapper.wrapLines(this.currentMessage, ChatDataManager.MAX_CHAR_PER_LINE);
     }
 
     public boolean isEndOfMessage() {
         int totalLines = this.getWrappedLines().size();
-        // Check if the current line number plus DISPLAY_NUM_LINES covers or exceeds the total number of lines
         return currentLineNumber + ChatDataManager.DISPLAY_NUM_LINES >= totalLines;
     }
 
     public void setLineNumber(Integer lineNumber) {
         int totalLines = this.getWrappedLines().size();
-        // Ensure the lineNumber is within the valid range
         currentLineNumber = Math.min(Math.max(lineNumber, 0), totalLines);
 
-        // Broadcast to all players
         ServerPackets.BroadcastEntityMessage(this);
     }
 
     public void setStatus(ChatDataManager.ChatStatus new_status) {
         status = new_status;
 
-        // Broadcast to all players
         ServerPackets.BroadcastEntityMessage(this);
     }
 }

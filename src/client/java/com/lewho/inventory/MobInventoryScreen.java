@@ -9,9 +9,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Inventory;
 
-/**
- * Client screen for mob inventories.
- */
 public class MobInventoryScreen extends MobInventoryScreenBase {
 
     public MobInventoryScreen(MobInventoryMenu menu, Inventory playerInventory, Component title) {

@@ -8,7 +8,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 
-/** Version adapter for the setup wizard's command suggestion components. */
 public final class CommandHintHelper {
     private CommandHintHelper() {
     }

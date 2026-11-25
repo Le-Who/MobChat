@@ -9,9 +9,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.npc.Villager;
 
-/**
- * Handles the inventory key while riding mobs to open their inventory screen.
- */
 public class InventoryKeyHandler {
     public static void register() {
         ClientTickEvents.START_CLIENT_TICK.register(client -> {

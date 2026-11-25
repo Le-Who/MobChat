@@ -6,16 +6,9 @@ package com.lewho.controls;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 
-/**
- * Damage helper class to isolate our calls to damange, since the API changes in later versions of Minecraft.
- */
 public final class DamageHelper {
     private DamageHelper() {}
 
-    /**
-     * Applies a 1-point “leap” damage from attacker to target.
-     * @return true if damage was applied
-     */
     public static boolean applyLeapDamage(LivingEntity attacker, LivingEntity target, float amount) {
         DamageSource src = attacker.damageSources().generic();
         return target.hurt(src, amount);

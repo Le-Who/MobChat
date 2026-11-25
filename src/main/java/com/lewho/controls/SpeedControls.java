@@ -17,15 +17,10 @@ import net.minecraft.world.entity.monster.Witch;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.WanderingTrader;
 
-/**
- * The {@code SpeedControls} class has methods to return adjusted MaxSpeed values for different MobEntity instances.
- * Unfortunately, some entities need to be hard-coded here, for a comfortable max speed.
- */
 public class SpeedControls {
     public static float getMaxSpeed(Mob entity) {
         float speed = 1.0F;
 
-        // Adjust speeds for certain Entities
         if (entity instanceof Axolotl) {
             speed = 0.5F;
         } else if (entity instanceof Villager) {

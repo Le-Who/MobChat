@@ -11,9 +11,6 @@ import net.minecraft.world.entity.ai.util.LandRandomPos;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * The {@code RandomTargetFinder} class generates random targets around an entity (the LEAD behavior uses this)
- */
 public class RandomTargetFinder {
     private static final Random random = new Random();
 
@@ -57,13 +54,11 @@ public class RandomTargetFinder {
         double randomYawAngleOffset = (random.nextDouble() * Math.toRadians(maxAngleOffset)) - Math.toRadians(maxAngleOffset / 2);
         double randomPitchAngleOffset = (random.nextDouble() * Math.toRadians(maxAngleOffset)) - Math.toRadians(maxAngleOffset / 2);
 
-        // Apply the yaw rotation (around the Y axis)
         double cosYaw = Math.cos(randomYawAngleOffset);
         double sinYaw = Math.sin(randomYawAngleOffset);
         double xYaw = initialDirection.x * cosYaw - initialDirection.z * sinYaw;
         double zYaw = initialDirection.x * sinYaw + initialDirection.z * cosYaw;
 
-        // Apply the pitch rotation (around the X axis)
         double cosPitch = Math.cos(randomPitchAngleOffset);
         double sinPitch = Math.sin(randomPitchAngleOffset);
         double yPitch = initialDirection.y * cosPitch - zYaw * sinPitch;

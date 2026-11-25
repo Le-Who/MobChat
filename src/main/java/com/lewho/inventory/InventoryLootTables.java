@@ -8,9 +8,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biome;
 
-/**
- * Selects biome-specific loot tables for mob inventories.
- */
 public class InventoryLootTables {
     private static ResourceLocation id(String name) {
         return new ResourceLocation("creaturechat", "biomes/" + name);

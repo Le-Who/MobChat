@@ -10,10 +10,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * Provides a Screen class which renders a chat-background, and can be modified
- * for different versions of Minecraft (as API changes happen).
- */
 public abstract class ScreenHelper extends VersionedScreen {
     protected int BG_WIDTH, BG_HEIGHT, bgX, bgY, TITLE_OFFSET;
     protected static final TextureLoader textures = new TextureLoader();
@@ -23,35 +19,29 @@ public abstract class ScreenHelper extends VersionedScreen {
         super(title);
     }
 
-    /** Subclass must return its TextFieldWidget instance here */
     protected abstract EditBox getTextField();
 
-    /** Subclass must return its label Text here */
     protected abstract Component getLabelText();
 
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        // Draw the vanilla gradient once
         renderBackground(context, mouseX, mouseY, delta);
 
-        // Draw the chat-box texture
         ResourceLocation bgTex = textures.GetUI("chat-background");
         if (bgTex != null) {
             context.blit(
                     bgTex,
-                    bgX, bgY,          // on-screen pos
-                    0,   0,            // texture origin
+                    bgX, bgY,
+                    0,   0,
                     BG_WIDTH, BG_HEIGHT,
                     BG_WIDTH, BG_HEIGHT
             );
         }
 
-        // Render children, but suppress their background call
         skipNextBackground = true;
         super.render(context, mouseX, mouseY, delta);
         skipNextBackground = false;
 
-        // Draw the "Enter your message:" label
         EditBox tf = getTextField();
         Component label = getLabelText();
         Font renderer = this.font;

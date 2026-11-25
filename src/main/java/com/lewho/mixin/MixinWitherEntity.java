@@ -9,9 +9,6 @@ import net.minecraft.world.entity.boss.wither.WitherBoss;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-/**
- * Mixin to expose the protected dropEquipment method from WitherEntity.
- */
 @Mixin(WitherBoss.class)
 public abstract class MixinWitherEntity implements WitherEntityAccessor {
 

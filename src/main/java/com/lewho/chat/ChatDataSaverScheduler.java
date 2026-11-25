@@ -10,9 +10,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 
-/**
- * The {@code ChatDataSaverScheduler} class is used to start the auto save Runnable task and schedule it.
- */
 public class ChatDataSaverScheduler {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ChatSession session;
@@ -27,7 +24,6 @@ public class ChatDataSaverScheduler {
         scheduler.shutdownNow();
     }
 
-    // Schedule a task to run after 1 tick (basically immediately)
     public void scheduleTask(Runnable task) {
         ChatSession originatingSession = session;
         if (originatingSession == null || !originatingSession.isOpen()) {
@@ -36,7 +32,6 @@ public class ChatDataSaverScheduler {
         try {
             scheduler.schedule(() -> originatingSession.execute(task), 50, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException e) {
-            // Server shutdown already cancelled this scheduler's remaining work.
         }
     }
 }

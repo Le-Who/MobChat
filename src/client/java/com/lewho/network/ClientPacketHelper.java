@@ -9,45 +9,26 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 
-/**
- * 1.20.4-compatible wrapper around Fabric’s networking helpers.
- * Only the methods used by CreatureChat today are exposed;
- * add or adjust when you upgrade to 1.20.5+.
- */
 public final class ClientPacketHelper {
 
-    private ClientPacketHelper() {}  // no instances
+    private ClientPacketHelper() {}
 
-    /* ---------- CLIENT → SERVER ---------- */
 
-    /**
-     * Send a packet from the client to the server.
-     */
     public static void send(ResourceLocation channelId, FriendlyByteBuf buf) {
         ClientPlayNetworking.send(channelId, buf);
     }
 
-    /**
-     * Register a global receiver on the client (S2C).
-     */
     public static void registerReceiver(
             ResourceLocation channelId,
             ClientPlayNetworking.PlayChannelHandler handler) {
         ClientPlayNetworking.registerGlobalReceiver(channelId, handler);
     }
 
-    /* ---------- SERVER → CLIENT ---------- */
 
-    /**
-     * Send a packet from the server to a specific client.
-     */
     public static void send(ServerPlayer player, ResourceLocation channelId, FriendlyByteBuf buf) {
         ServerPlayNetworking.send(player, channelId, buf);
     }
 
-    /**
-     * Register a global receiver on the server (C2S).
-     */
     public static void registerReceiver(
             ResourceLocation channelId,
             ServerPlayNetworking.PlayChannelHandler handler) {

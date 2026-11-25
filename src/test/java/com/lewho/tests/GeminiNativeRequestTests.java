@@ -105,8 +105,6 @@ public class GeminiNativeRequestTests {
 
     @Test
     public void testStripAdditionalPropertiesRemovesAtAllLevels() {
-        // Build a schema that mirrors what creatureChatResponse() produces:
-        // root level and a nested object inside 'properties' both carry additionalProperties.
         Map<String, Object> inner = new LinkedHashMap<>();
         inner.put("type", "object");
         inner.put("additionalProperties", false);
@@ -135,7 +133,6 @@ public class GeminiNativeRequestTests {
         int port = 9099;
         server = HttpServer.create(new InetSocketAddress(port), 0);
 
-        // Capture the request body for both CHAT and CHARACTER modes in one shared handler.
         String[] capturedBody = {null};
         server.createContext("/models/gemini-3.5-flash-lite:generateContent", exchange -> {
             InputStream is = exchange.getRequestBody();

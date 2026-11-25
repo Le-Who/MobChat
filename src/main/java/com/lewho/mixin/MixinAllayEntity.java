@@ -17,9 +17,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Redirect Allay inventory to CreatureChat inventory when chat data exists.
- */
 @Mixin(Allay.class)
 public abstract class MixinAllayEntity {
 

@@ -15,12 +15,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 
-/**
- * 1.20.5+ variant of the loot-table provider.
- *
- * <p>The Fabric datagen API added a registry lookup parameter and changed the
- * {@code generate} signature beginning with 1.20.5.</p>
- */
 public class CreatureChatLootTableProvider extends SimpleFabricLootTableProvider {
     public CreatureChatLootTableProvider(FabricDataOutput output, CompletableFuture<HolderLookup.Provider> registries) {
         super(output, registries, LootContextParamSets.ALL_PARAMS);

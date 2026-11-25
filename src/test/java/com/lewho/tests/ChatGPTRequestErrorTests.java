@@ -29,9 +29,6 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Tests error handling in {@link ChatGPTRequest} for various HTTP and connection failures.
- */
 public class ChatGPTRequestErrorTests {
 
     private static final String PATH = "/v1/chat/completions";
@@ -437,27 +434,23 @@ public class ChatGPTRequestErrorTests {
 
     @Test
     public void socketTimeoutWithSingleKeySetsConnectionError() throws Exception {
-        // Server accepts the connection but never sends a response.
-        // With MAX_CONNECTION_RETRIES=1 the client will make 2 attempts total before giving up.
         List<String> authHeadersReceived = Collections.synchronizedList(new ArrayList<>());
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.createContext(PATH, exchange -> {
             String auth = exchange.getRequestHeaders().getFirst("Authorization");
             if (auth != null) authHeadersReceived.add(auth);
-            // Hang indefinitely — the client's 1-second read timeout will fire
             try { Thread.sleep(60_000); } catch (InterruptedException ignored) {}
         });
         server.start();
 
         String url = "http://localhost:" + server.getAddress().getPort() + PATH;
-        ConfigurationHandler.Config config = buildConfig(url); // timeout = 1 s
+        ConfigurationHandler.Config config = buildConfig(url);
         config.setApiKey("only-key");
 
         executeRequest(config);
         server.stop(0);
 
-        // 1 original attempt + 1 retry = 2 total calls to the server
         assertEquals(2, authHeadersReceived.size());
         assertEquals("Bearer only-key", authHeadersReceived.get(0));
         assertEquals("Bearer only-key", authHeadersReceived.get(1));
@@ -467,7 +460,6 @@ public class ChatGPTRequestErrorTests {
 
     @Test
     public void socketTimeoutSingleKeyRetriesAndSucceeds() throws Exception {
-        // First attempt hangs (transient failure), second attempt succeeds.
         List<String> authHeadersReceived = Collections.synchronizedList(new ArrayList<>());
         java.util.concurrent.atomic.AtomicInteger requestCount =
                 new java.util.concurrent.atomic.AtomicInteger(0);
@@ -479,10 +471,8 @@ public class ChatGPTRequestErrorTests {
             if (auth != null) authHeadersReceived.add(auth);
             int call = requestCount.incrementAndGet();
             if (call == 1) {
-                // First call: hang until the client's read timeout fires
                 try { Thread.sleep(60_000); } catch (InterruptedException ignored) {}
             } else {
-                // Retry: respond with success
                 String body = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Recovered\"}}]}";
                 byte[] resp = body.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(200, resp.length);
@@ -492,7 +482,7 @@ public class ChatGPTRequestErrorTests {
         server.start();
 
         String url = "http://localhost:" + server.getAddress().getPort() + PATH;
-        ConfigurationHandler.Config config = buildConfig(url); // timeout = 1 s
+        ConfigurationHandler.Config config = buildConfig(url);
         config.setApiKey("only-key");
 
         CompletableFuture<String> future = ChatGPTRequest.fetchMessageFromChatGPT(
@@ -510,18 +500,14 @@ public class ChatGPTRequestErrorTests {
         List<String> authHeadersReceived = Collections.synchronizedList(new ArrayList<>());
 
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        // CachedThreadPool so a hanging handler thread (key-timeout) does not block
-        // the server from serving the next request (key-ok) on a separate thread.
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.createContext(PATH, exchange -> {
             String auth = exchange.getRequestHeaders().getFirst("Authorization");
             if (auth != null) authHeadersReceived.add(auth);
 
             if ("Bearer key-timeout".equals(auth)) {
-                // Hang until the client times out
                 try { Thread.sleep(60_000); } catch (InterruptedException ignored) {}
             } else {
-                // Second key gets a normal success response
                 String body = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Retry Success\"}}]}";
                 byte[] resp = body.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(200, resp.length);
@@ -531,7 +517,7 @@ public class ChatGPTRequestErrorTests {
         server.start();
 
         String url = "http://localhost:" + server.getAddress().getPort() + PATH;
-        ConfigurationHandler.Config config = buildConfig(url); // timeout = 1 s
+        ConfigurationHandler.Config config = buildConfig(url);
         config.setApiKey("key-timeout,key-ok");
 
         CompletableFuture<String> future = ChatGPTRequest.fetchMessageFromChatGPT(

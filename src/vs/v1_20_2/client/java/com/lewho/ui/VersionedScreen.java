@@ -12,7 +12,6 @@ public abstract class VersionedScreen extends Screen {
     }
 
     protected final void renderModalBackground(GuiGraphics graphics) {
-        // Screen.renderWithTooltip renders the background before the screen content.
     }
 
     protected boolean scrollVertically(double mouseX, double mouseY, double amount) {
