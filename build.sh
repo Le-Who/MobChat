@@ -5,18 +5,17 @@ ONLY_VERSION=${ONLY_VERSION:-}
 DRY_RUN=${DRY_RUN:-0}
 ALLOW_GRADLE_RESTART=${ALLOW_GRADLE_RESTART:-}
 
-# Allow “pattern→empty” instead of “pattern→itself”
-shopt -s nullglob
+mod_version=$(sed -n 's/^mod_version=\(.*\)/\1/p' gradle.properties | tr -d '\r')
+archive_base=$(sed -n 's/^archives_base_name=\(.*\)/\1/p' gradle.properties | tr -d '\r')
+: "${mod_version:?Missing mod_version in gradle.properties}"
+: "${archive_base:?Missing archives_base_name in gradle.properties}"
 
 run_build() {
-  ./gradlew runDatagen </dev/null
-  ./gradlew build -x test -x validateAccessWidener --build-cache --parallel </dev/null && return 0
+  ./gradlew runDatagen "$@" </dev/null
+  ./gradlew build "$@" -x test -x compileTestJava --build-cache --parallel </dev/null && return 0
   [[ -n "$ALLOW_GRADLE_RESTART" ]] || return 1
-  echo "Gradle failed; attempting to clear locks and retry..."
-  ./gradlew --stop >/dev/null 2>&1 || true
-  find .gradle ~/.gradle -type f -name '*.lock' -delete 2>/dev/null || true
-  ./gradlew runDatagen </dev/null
-  ./gradlew build -x test -x validateAccessWidener --build-cache --parallel </dev/null
+  echo "Gradle failed; retrying with a fresh daemon..."
+  ./gradlew build "$@" -x test -x compileTestJava --build-cache --parallel --no-daemon </dev/null
 }
 
 # Format: minecraft_version  yarn_mappings       loader_version  loom_version      fabric_version
@@ -39,7 +38,7 @@ VERSIONS=$(cat <<'EOF'
 EOF
 )
 
-while read -r mc_version yarn_mapping loader_version loom_version fabric_version; do
+while read -r mc_version _yarn_mapping loader_version _loom_version fabric_version; do
   [[ -z "$mc_version" || "$mc_version" =~ ^# ]] && continue
   [[ -n "$ONLY_VERSION" && "$ONLY_VERSION" != "$mc_version" ]] && continue
 
@@ -47,41 +46,28 @@ while read -r mc_version yarn_mapping loader_version loom_version fabric_version
   echo "Building for MC $mc_version  Fabric API $fabric_version"
   echo "****"
 
+  gradle_properties=("-Pminecraft_version=$mc_version" "-Ploader_version=$loader_version"
+    "-Pfabric_version=$fabric_version" "-Pmod_version=$mod_version" "-Parchives_base_name=$archive_base")
+  jar="$archive_base-$mod_version+$mc_version.jar"
+
   if [[ "$DRY_RUN" == "1" ]]; then
     cat <<EOD
-[DRY RUN] gradle.properties -> \
-minecraft_version=$mc_version, \
-yarn_mappings=$yarn_mapping, \
-loader_version=$loader_version, \
-loom_version=$loom_version, \
-fabric_version=$fabric_version
-[DRY RUN] fabric.mod.json -> "minecraft": "~$mc_version"
-[DRY RUN] run './gradlew build -x test -x validateAccessWidener --build-cache --parallel'
+[DRY RUN] run './gradlew runDatagen ${gradle_properties[*]}'
+[DRY RUN] run './gradlew build ${gradle_properties[*]} -x test -x compileTestJava --build-cache --parallel'
+[DRY RUN] copy $jar and $jar.sha512 to the repository root
 [DRY RUN] download fabric-api-$fabric_version.jar from FabricMC
 EOD
     echo
     continue
   fi
 
-  sed -i \
-    -e "s/^minecraft_version=.*/minecraft_version=$mc_version/" \
-    -e "s/^yarn_mappings=.*/yarn_mappings=$yarn_mapping/" \
-    -e "s/^loader_version=.*/loader_version=$loader_version/" \
-    -e "s/^loom_version=.*/loom_version=$loom_version/" \
-    -e "s/^fabric_version=.*/fabric_version=$fabric_version/" \
-    gradle.properties
-
-  sed -i "s/\"minecraft\": \".*\"/\"minecraft\": \"~$mc_version\"/" \
-    src/main/resources/fabric.mod.json
-
   echo "Running build (datagen + mixin target validation)"
-  run_build
+  run_build "${gradle_properties[@]}"
   if ! compgen -G "build/classes/java/main/*refmap.json" > /dev/null; then
     echo "Error: mixin refmap missing; target validation did not run" >&2
     exit 1
   fi
-  find build/libs -name '*sources*.jar' -delete
-  mv build/libs/creaturechat-*.jar .
+  cp -- "build/libs/$jar" "build/libs/$jar.sha512" .
 
   # Safe Forge/NeoForge packaging
   case "$mc_version" in
@@ -91,16 +77,16 @@ EOD
   esac
 
   if [[ -n "$suffix" ]]; then
-    forge_jars=(creaturechat-*+"$mc_version".jar)
-    if (( ${#forge_jars[@]} )); then
-      jar="${forge_jars[0]}"
-      cp "$jar" "${jar%.jar}-$suffix.jar"
-      touch "${suffix^^}"  # Uppercase marker file: FORGE or NEOFORGE
-      zip -r "${jar%.jar}-$suffix.jar" "${suffix^^}"
-      rm "${suffix^^}"
-    else
-      echo "Warning: no jar matched for $suffix packaging (creaturechat-*+$mc_version.jar)" >&2
-    fi
+    connector_jar="${jar%.jar}-$suffix.jar"
+    cp -- "$jar" "$connector_jar"
+    marker_dir=$(mktemp -d)
+    trap 'rm -f -- "$marker_dir/${suffix^^}"; rmdir -- "$marker_dir"' EXIT
+    touch "$marker_dir/${suffix^^}"
+    zip -j "$connector_jar" "$marker_dir/${suffix^^}"
+    sha512sum "$connector_jar" > "$connector_jar.sha512"
+    rm -- "$marker_dir/${suffix^^}"
+    rmdir -- "$marker_dir"
+    trap - EXIT
   fi
 
   # download Fabric API

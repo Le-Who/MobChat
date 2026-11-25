@@ -46,6 +46,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.end.EndDragonFight;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.ChatFormatting;
@@ -381,9 +382,28 @@ public class EntityChatData {
         return newPlayerData;
     }
 
-    // Generate light version of chat data (no previous messages)
-    public EntityChatDataLight toLightVersion(String playerName) {
-        return new EntityChatDataLight(this, playerName);
+    public PlayerData getPlayerDataForDisplay(String playerId, String playerName) {
+        if (players != null) {
+            PlayerData data = players.get(playerId);
+            if (data == null && playerName != null && !playerName.isEmpty()) {
+                data = players.get(playerName);
+            }
+            if (data == null) {
+                data = players.get("");
+            }
+            if (data != null) {
+                return data;
+            }
+        }
+        return new PlayerData();
+    }
+
+    public EntityChatDataLight toLightVersion(String playerId) {
+        return toLightVersion(playerId, "");
+    }
+
+    public EntityChatDataLight toLightVersion(String playerId, String playerName) {
+        return new EntityChatDataLight(this, playerId, playerName);
     }
 
     public String getCharacterProp(String propertyName) {
@@ -931,8 +951,9 @@ public class EntityChatData {
                                         boolean doMobLoot = serverWorld.getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT);
 
                                         // If this is the first time the dragon is 'befriended', adjust the XP
+                                        EndDragonFight dragonFight = dragon.getDragonFight();
                                         int baseXP = 500;
-                                        if (dragon.getDragonFight() != null && !dragon.getDragonFight().hasPreviouslyKilledDragon()) {
+                                        if (dragonFight != null && !dragonFight.hasPreviouslyKilledDragon()) {
                                             baseXP = 12000;
                                         }
 
@@ -947,7 +968,9 @@ public class EntityChatData {
                                         }
 
                                         // Mark fight as over
-                                        dragon.getDragonFight().setDragonKilled(dragon);
+                                        if (dragonFight != null) {
+                                            dragonFight.setDragonKilled(dragon);
+                                        }
                                     }
                                 }
 

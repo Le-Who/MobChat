@@ -15,6 +15,11 @@ public class PlayerMessageManager {
     private static final ConcurrentHashMap<UUID, PlayerMessage> messages = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, Boolean> openChatUIs = new ConcurrentHashMap<>();
 
+    public static void clear() {
+        messages.clear();
+        openChatUIs.clear();
+    }
+
     public static void addMessage(UUID playerUUID, String messageText, String playerName, int ticks) {
         messages.put(playerUUID, new PlayerMessage(playerUUID.toString(), messageText, ticks));
     }

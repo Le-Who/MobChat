@@ -6,6 +6,7 @@ package com.lewho.chat;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.slf4j.Logger;
@@ -21,7 +22,7 @@ public class ChatPrompt {
     public static String loadPromptFromResource(ResourceManager resourceManager, String promptName) {
         ResourceLocation fileIdentifier = new ResourceLocation("creaturechat", "prompts/" + promptName);
         try (InputStream inputStream = resourceManager.getResource(fileIdentifier).get().open();
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
 
             StringBuilder contentBuilder = new StringBuilder();
             String line;

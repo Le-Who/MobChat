@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -65,6 +66,42 @@ public class GeminiUsageLimiterTests {
         assertFalse(limiter.tryReserve(config, config.getUrl(), "AIza-key-two", config.getActiveModel()).allowed());
     }
 
+    @Test
+    public void pacificMidnightResetsDailyCountButKeepsTheRollingMinuteWindow() {
+        ConfigurationHandler.Config config = geminiConfig();
+        config.setGeminiRequestsPerMinute(1);
+        config.setGeminiRequestsPerDay(1);
+        MutableClock clock = new MutableClock("2026-07-07T06:59:50Z");
+        ApiUsageLimiter limiter = new ApiUsageLimiter(clock);
+
+        assertTrue(limiter.tryReserve(config, config.getUrl(), config.getActiveApiKey(), config.getActiveModel()).allowed());
+        clock.set("2026-07-07T07:00:00Z");
+        ApiUsageLimiter.Reservation blocked = limiter.tryReserve(config, config.getUrl(),
+                config.getActiveApiKey(), config.getActiveModel());
+        assertFalse(blocked.allowed());
+        assertEquals("minute-limit", blocked.reason());
+
+        clock.set("2026-07-07T07:00:50Z");
+        assertTrue(limiter.tryReserve(config, config.getUrl(), config.getActiveApiKey(), config.getActiveModel()).allowed());
+    }
+
+    @Test
+    public void pacificMidnightKeepsTheProviderCooldown() {
+        ConfigurationHandler.Config config = geminiConfig();
+        MutableClock clock = new MutableClock("2026-07-07T06:59:50Z");
+        ApiUsageLimiter limiter = new ApiUsageLimiter(clock);
+
+        limiter.markProviderRateLimited(config, config.getUrl(), config.getActiveApiKey(), config.getActiveModel());
+        clock.set("2026-07-07T07:00:00Z");
+        ApiUsageLimiter.Reservation blocked = limiter.tryReserve(config, config.getUrl(),
+                config.getActiveApiKey(), config.getActiveModel());
+        assertFalse(blocked.allowed());
+        assertEquals("provider-rate-limit", blocked.reason());
+
+        clock.set("2026-07-07T07:00:50Z");
+        assertTrue(limiter.tryReserve(config, config.getUrl(), config.getActiveApiKey(), config.getActiveModel()).allowed());
+    }
+
     private ConfigurationHandler.Config geminiConfig() {
         ConfigurationHandler.Config config = new ConfigurationHandler.Config();
         config.setUrl("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
@@ -76,5 +113,32 @@ public class GeminiUsageLimiterTests {
 
     private Clock fixedClock(String instant) {
         return Clock.fixed(Instant.parse(instant), ZoneId.of("UTC"));
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(String instant) {
+            set(instant);
+        }
+
+        private void set(String instant) {
+            this.instant = Instant.parse(instant);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 }

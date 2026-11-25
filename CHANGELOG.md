@@ -6,6 +6,20 @@ All notable changes to **CreatureChat™** are documented in this file. The form
 
 ## Unreleased
 
+## [3.1.2] - 2026-11-25
+
+### Fixed
+
+- Preserve unreadable chat history and existing custom-role files. Save configuration through a temporary file and keep legacy player relationships eligible for UUID migration after login.
+- Assemble multipart Gemini replies and preserve the rolling minute limit and provider cooldown at the daily reset.
+- Recover incomplete login sync on reconnect, clear stale typing indicators, and preserve unsaved setup values when changing language or resizing the window.
+- Send each client only its own relationship data with NPC updates.
+- Respect accepted and filtered player chat for bubbles and nearby reactions. Open mounted inventories on the server thread and close them when the mob becomes unavailable.
+- Count the items actually given to mobs and keep equal goal priorities tied when inserting a new goal. Respect friendly relationships during protective attacks.
+- Recheck staged updates against the running mod and Minecraft target. Preserve existing files when an update encounters a jar-name conflict.
+- Repair client API adapters used by newer Minecraft builds and generate the Minecraft version requirement and SHA-512 with each packaged jar.
+- Use a Fabric Loader compatible with the default Minecraft 1.20.1 Fabric API.
+
 ## [3.1.1] - 2026-10-04
 
 ### Fixed

@@ -4,15 +4,13 @@
 package com.lewho.utils;
 
 import java.util.UUID;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.player.Player;
 
 /**
  * The {@code ClientEntityFinder} class is used to find a specific MobEntity by UUID, since
- * there is not a built-in method for this. Also has a method for client PlayerEntity lookup.
+ * the client level does not provide a mob lookup by UUID.
  */
 public class ClientEntityFinder {
     public static Mob getEntityByUUID(ClientLevel world, UUID uuid) {
@@ -24,10 +22,4 @@ public class ClientEntityFinder {
         return null; // Entity not found
     }
 
-    public static Player getPlayerEntityFromUUID(UUID uuid) {
-        return Minecraft.getInstance().level.players().stream()
-                .filter(player -> player.getUUID().equals(uuid))
-                .findFirst()
-                .orElse(null);
-    }
 }

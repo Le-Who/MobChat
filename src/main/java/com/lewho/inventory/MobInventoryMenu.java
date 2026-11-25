@@ -125,7 +125,8 @@ public class MobInventoryMenu extends MobInventoryTransferMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return inventory.stillValid(player);
+        return inventory.stillValid(player) && mob.isAlive() && !mob.isRemoved()
+                && player.level() == mob.level() && player.distanceToSqr(mob) < 64.0;
     }
 
     @Override

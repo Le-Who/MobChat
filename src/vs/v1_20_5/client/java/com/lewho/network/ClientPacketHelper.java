@@ -61,9 +61,10 @@ public final class ClientPacketHelper {
     public static void registerReceiver(ResourceLocation channel, ClientHandler h) {
         ClientPlayNetworking.registerGlobalReceiver(idOf(channel),
                 (LegacyPayload p, ClientPlayNetworking.Context ctx) -> {
+                    ClientPacketListener handler = ctx.player().connection;
                     ctx.client().execute(() -> h.receive(
                             ctx.client(),
-                            ctx.client().getConnection(),
+                            handler,
                             p.data(),
                             ctx.responseSender()));
                 });

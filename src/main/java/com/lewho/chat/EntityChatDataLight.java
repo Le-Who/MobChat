@@ -20,16 +20,15 @@ public class EntityChatDataLight {
     public Map<String, PlayerData> players;
 
     // Constructor to initialize the light version from the full version
-    public EntityChatDataLight(EntityChatData fullData, String playerName) {
+    public EntityChatDataLight(EntityChatData fullData, String playerId, String playerName) {
         this.entityId = fullData.entityId;
         this.currentMessage = fullData.currentMessage;
         this.currentLineNumber = fullData.currentLineNumber;
         this.status = fullData.status;
         this.sender = fullData.sender;
 
-        // Initialize the players map and add only the current player's data
+        // Login sync must leave legacy entries available for migration during gameplay.
         this.players = new HashMap<>();
-        PlayerData playerData = fullData.getPlayerData(playerName);
-        this.players.put(playerName, playerData);
+        this.players.put(playerId, fullData.getPlayerDataForDisplay(playerId, playerName));
     }
 }

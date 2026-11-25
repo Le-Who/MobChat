@@ -5,10 +5,11 @@ package com.lewho.update;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.lewho.utils.AtomicFile;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,14 +32,15 @@ public record PendingUpdate(
         json.addProperty("stagedJar", stagedJar.toAbsolutePath().normalize().toString());
         json.addProperty("backupJar", backupJar.toAbsolutePath().normalize().toString());
         json.addProperty("sha512", UpdateHashes.normalizeSha512(sha512));
-        try (Writer writer = Files.newBufferedWriter(pendingFile)) {
-            GSON.toJson(json, writer);
-        }
+        AtomicFile.replace(pendingFile, GSON.toJson(json).getBytes(StandardCharsets.UTF_8));
     }
 
     public static PendingUpdate load(Path pendingFile) throws IOException {
         try (Reader reader = Files.newBufferedReader(pendingFile)) {
             JsonObject json = GSON.fromJson(reader, JsonObject.class);
+            if (json == null) {
+                throw new IOException("Pending update metadata is empty.");
+            }
             return new PendingUpdate(
                     stringValue(json, "version"),
                     Paths.get(stringValue(json, "currentJar")),
@@ -50,7 +52,10 @@ public record PendingUpdate(
         }
     }
 
-    private static String stringValue(JsonObject json, String key) {
-        return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : "";
+    private static String stringValue(JsonObject json, String key) throws IOException {
+        if (!json.has(key) || !json.get(key).isJsonPrimitive() || !json.getAsJsonPrimitive(key).isString()) {
+            throw new IOException("Pending update metadata is missing a string for " + key + ".");
+        }
+        return json.get(key).getAsString();
     }
 }

@@ -26,6 +26,7 @@ import com.lewho.utils.Randomizer;
 import com.lewho.utils.ServerEntityFinder;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
@@ -265,7 +266,8 @@ public class ServerPackets {
 
             LOGGER.info("Server send compressed, chunked login message packets to player: " + player.getDisplayName().getString());
             // Get lite JSON data & compress to byte array
-            String chatDataJSON = ChatDataManager.getServerInstance().GetLightChatData(player.getStringUUID(), playerPreferences);
+            String chatDataJSON = ChatDataManager.getServerInstance().GetLightChatData(
+                    player.getStringUUID(), player.getDisplayName().getString(), playerPreferences);
             byte[] compressedData = Compression.compressString(chatDataJSON);
             if (compressedData == null) {
                 LOGGER.error("Failed to compress chat data.");
@@ -292,9 +294,23 @@ public class ServerPackets {
             }
         });
 
+        ServerMessageEvents.CHAT_MESSAGE.register((chat, player, bound) -> {
+            MinecraftServer server = player.getServer();
+            String message = chat.filterMask().apply(chat.signedContent());
+            if (server == null || server != serverInstance || message == null || message.isBlank()) {
+                return;
+            }
+            ConfigurationHandler.Config config = new ConfigurationHandler(server).loadConfig();
+            if (config.getChatBubbles()) {
+                EntityChatData bubble = new EntityChatData(player.getStringUUID());
+                bubble.currentMessage = message;
+                BroadcastPlayerMessage(bubble, player);
+            }
+            handleNearbyPlayerChat(player, message);
+        });
+
         ServerWorldEvents.LOAD.register((server, world) -> {
-            String world_name = world.dimension().location().getPath();
-            if (world_name.equals("overworld")) {
+            if (Level.OVERWORLD.equals(world.dimension())) {
                 if (scheduler != null) {
                     scheduler.stopAutoSaveTask();
                 }
@@ -308,8 +324,7 @@ public class ServerPackets {
             }
         });
         ServerWorldEvents.UNLOAD.register((server, world) -> {
-            String world_name = world.dimension().location().getPath();
-            if (world_name.equals("overworld") && serverInstance == server) {
+            if (Level.OVERWORLD.equals(world.dimension()) && serverInstance == server) {
                 ChatDataManager manager = ChatDataManager.getServerInstance();
                 // Stop producers and invalidate queued callbacks before the final snapshot.
                 if (scheduler != null) {
@@ -816,19 +831,18 @@ public class ServerPackets {
         return EntityChatData.truncateString(singleLine, AMBIENT_CONTEXT_MAX_CHARS);
     }
 
-    // Writing a Map<String, PlayerData> to the buffer
-    public static void writePlayerDataMap(FriendlyByteBuf buffer, Map<String, PlayerData> map) {
-        buffer.writeInt(map.size()); // Write the size of the map
-        for (Map.Entry<String, PlayerData> entry : map.entrySet()) {
-            buffer.writeUtf(entry.getKey()); // Write the key (playerName)
-            PlayerData data = entry.getValue();
-            buffer.writeInt(data.friendship); // Write PlayerData field(s)
-            buffer.writeInt(data.socialReputation);
-            buffer.writeInt(data.helpfulActions);
-            buffer.writeInt(data.harmfulActions);
-            buffer.writeInt(data.socialEventCount);
-            buffer.writeUtf(data.socialSummary == null ? "" : data.socialSummary);
-        }
+    public static void writeViewerRelationship(FriendlyByteBuf buffer, EntityChatData chatData,
+                                               String playerId, String playerName) {
+        PlayerData data = chatData.getPlayerDataForDisplay(playerId, playerName);
+        // The receiver expects a map. Send just the viewer's entry under their UUID.
+        buffer.writeInt(1);
+        buffer.writeUtf(playerId);
+        buffer.writeInt(data.friendship);
+        buffer.writeInt(data.socialReputation);
+        buffer.writeInt(data.helpfulActions);
+        buffer.writeInt(data.harmfulActions);
+        buffer.writeInt(data.socialEventCount);
+        buffer.writeUtf(data.socialSummary == null ? "" : data.socialSummary);
     }
 
     // Send new message to all connected players
@@ -872,7 +886,7 @@ public class ServerPackets {
                     buffer.writeInt(chatData.currentLineNumber);
                     buffer.writeUtf(chatData.status.toString());
                     buffer.writeUtf(chatData.sender.toString());
-                    writePlayerDataMap(buffer, chatData.players);
+                    writeViewerRelationship(buffer, chatData, player.getStringUUID(), player.getDisplayName().getString());
 
                     // Send message to player
                     PacketHelper.send(player, PACKET_S2C_ENTITY_MESSAGE, buffer);
@@ -955,6 +969,9 @@ public class ServerPackets {
 
     // Send an error message to all ops.
     public static void sendErrorToAllOps(MinecraftServer server, String message) {
+        if (server == null) {
+            return;
+        }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             // Check if the player is an operator
             if (server.getPlayerList().isOp(player.getGameProfile())) {

@@ -3,9 +3,11 @@
 package com.lewho.tests;
 
 import com.lewho.update.PendingUpdate;
+import com.lewho.update.RuntimeModInfo;
 import com.lewho.update.UpdateCandidate;
 import com.lewho.update.UpdateService;
 import com.lewho.update.UpdateSource;
+import com.lewho.update.UpdateStager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -55,6 +57,43 @@ public class UpdateServiceTests {
         assertTrue(Files.exists(pending.stagedJar()));
     }
 
+    @Test
+    public void rejectsAStagedUpgradeFromAnotherMinecraftTarget() throws Exception {
+        Path currentJar = tempDir.resolve("mods/creaturechat.jar");
+        Files.createDirectories(currentJar.getParent());
+        Files.writeString(currentJar, "current jar");
+        byte[] jar = "jar for another target".getBytes(StandardCharsets.UTF_8);
+        UpdateCandidate other = new UpdateCandidate("4.0.0+1.21.7", "creaturechat-4.0.0+1.21.7.jar",
+                "", "", sha512(jar), "", "");
+        UpdateStager.stage(tempDir, currentJar, other, jar);
+        UpdateService service = new UpdateService(new FakeUpdateSource(null, "", new byte[0]));
+        RuntimeModInfo runtime = new RuntimeModInfo("creaturechat", "3.1.1+1.20.1", "1.20.1",
+                currentJar, tempDir, null);
+
+        assertTrue(service.prepareUpdate(runtime).isEmpty());
+    }
+
+    @Test
+    public void reusesAnIntactUpdateAndRestagesWhenItsJarIsDamaged() throws Exception {
+        Path currentJar = tempDir.resolve("mods/creaturechat.jar");
+        Files.createDirectories(currentJar.getParent());
+        Files.writeString(currentJar, "current jar");
+        byte[] jar = "intact update".getBytes(StandardCharsets.UTF_8);
+        String hash = sha512(jar);
+        UpdateCandidate candidate = new UpdateCandidate("3.1.2+1.20.1", "creaturechat-3.1.2+1.20.1.jar",
+                "", "", hash, "", "");
+        PendingUpdate staged = UpdateStager.stage(tempDir, currentJar, candidate, jar);
+        RuntimeModInfo runtime = new RuntimeModInfo("creaturechat", "3.1.1+1.20.1", "1.20.1",
+                currentJar, tempDir, null);
+        UpdateService noNewRelease = new UpdateService(new FakeUpdateSource(null, "", new byte[0]));
+        assertEquals(staged, noNewRelease.prepareUpdate(runtime).orElseThrow());
+
+        Files.writeString(staged.stagedJar(), "damaged update");
+        UpdateService latestRelease = new UpdateService(new FakeUpdateSource(candidate, hash, jar));
+        Path restored = latestRelease.prepareUpdate(runtime).orElseThrow().stagedJar();
+        assertEquals("intact update", Files.readString(restored));
+    }
+
     private static final class FakeUpdateSource implements UpdateSource {
         private final UpdateCandidate candidate;
         private final String sha512Text;
@@ -68,7 +107,7 @@ public class UpdateServiceTests {
 
         @Override
         public Optional<UpdateCandidate> findUpdate(String archiveBaseName, String currentVersion, String minecraftVersion, boolean allowPrerelease) {
-            return Optional.of(candidate);
+            return Optional.ofNullable(candidate);
         }
 
         @Override

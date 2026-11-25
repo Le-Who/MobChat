@@ -5,14 +5,12 @@ package com.lewho.mixin;
 
 import com.lewho.chat.ChatDataManager;
 import com.lewho.chat.EntityChatData;
-import com.lewho.commands.ConfigurationHandler;
 import com.lewho.inventory.ChatInventory;
 import com.lewho.inventory.MobInventoryMenu;
-import com.lewho.network.ServerPackets;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ServerboundChatPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.entity.Mob;
@@ -26,27 +24,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import static com.lewho.network.ServerPackets.BroadcastPlayerMessage;
-
-/**
- * The {@code MixinOnChat} mixin class intercepts chat messages from players, and broadcasts them as chat bubbles
- */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class MixinOnChat {
-
-    @Inject(method = "handleChat(Lnet/minecraft/network/protocol/game/ServerboundChatPacket;)V", at = @At("HEAD"), cancellable = true)
-    private void onChatMessage(ServerboundChatPacket packet, CallbackInfo ci) {
-        ConfigurationHandler.Config config = new ConfigurationHandler(ServerPackets.serverInstance).loadConfig();
-        ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
-        ServerPlayer player = handler.player;
-        String chatMessage = packet.message();
-        if (config.getChatBubbles()) {
-            EntityChatData chatData = new EntityChatData(player.getStringUUID());
-            chatData.currentMessage = chatMessage;
-            BroadcastPlayerMessage(chatData, player);
-        }
-        ServerPackets.handleNearbyPlayerChat(player, chatMessage);
-    }
 
     @Inject(method = "handlePlayerCommand", at = @At("HEAD"), cancellable = true)
     private void creaturechat$openMobInventory(ServerboundPlayerCommandPacket packet, CallbackInfo ci) {
@@ -56,6 +35,10 @@ public abstract class MixinOnChat {
 
         ServerGamePacketListenerImpl handler = (ServerGamePacketListenerImpl) (Object) this;
         ServerPlayer serverPlayer = handler.player;
+        MinecraftServer server = serverPlayer.getServer();
+        if (server == null || !server.isSameThread()) {
+            return;
+        }
 
         if (!(serverPlayer.getVehicle() instanceof Mob mob)) {
             return;

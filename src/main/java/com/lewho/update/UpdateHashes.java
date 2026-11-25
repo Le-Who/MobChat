@@ -3,7 +3,6 @@
 package com.lewho.update;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -22,7 +21,7 @@ final class UpdateHashes {
     }
 
     static String sha512(Path path) throws IOException {
-        return sha512(Files.readAllBytes(path));
+        return CreatureChatUpdateHelper.sha512(path);
     }
 
     static String normalizeSha512(String hashText) {

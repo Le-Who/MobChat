@@ -5,7 +5,6 @@ package com.lewho.mixin;
 
 import com.lewho.chat.ChatDataManager;
 import com.lewho.chat.EntityChatData;
-import com.lewho.chat.MobInteractionHooks;
 import com.lewho.inventory.ChatInventory;
 import com.lewho.inventory.MobInventoryMenu;
 import net.minecraft.world.entity.HasCustomInventoryScreen;
@@ -164,8 +163,4 @@ public class MixinMobEntity implements ChatInventory, HasCustomInventoryScreen {
         });
     }
 
-    @Inject(method = "interact", at = @At(value = "RETURN"))
-    private void onItemGiven(Player player, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
-        MobInteractionHooks.onItemGiven((Mob) (Object) this, player, hand, cir.getReturnValue());
-    }
 }

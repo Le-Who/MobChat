@@ -29,31 +29,42 @@ public final class MobInteractionHooks {
         return data.getPlayerData(playerId, playerName);
     }
 
-    public static void onItemGiven(Mob mob, Player player, InteractionHand hand, InteractionResult result) {
-        if (!(mob.level() instanceof ServerLevel) || !(player instanceof ServerPlayer serverPlayer)
-                || hand != InteractionHand.MAIN_HAND || mob instanceof Villager || mob instanceof TamableAnimal) {
-            return;
-        }
+    public static boolean handlesInteraction(Mob mob, Player player, InteractionHand hand) {
+        return mob.level() instanceof ServerLevel && mob.isAlive() && player instanceof ServerPlayer
+                && hand == InteractionHand.MAIN_HAND && !(mob instanceof Villager) && !(mob instanceof TamableAnimal);
+    }
 
-        ItemStack stack = player.getItemInHand(hand);
-        if (isBucket(stack.getItem())) {
+    public static void onItemGiven(Mob mob, ServerPlayer player, ItemStack before, ItemStack after,
+                                   InteractionResult result) {
+        if (isBucket(before.getItem())) {
             return;
         }
 
         EntityChatData data = ChatDataManager.getServerInstance().getOrCreateChatData(mob.getStringUUID());
         String playerName = player.getDisplayName().getString();
+        int given = giftAmount(before, after, result.consumesAction(), player.getAbilities().instabuild);
         PlayerData playerData = recordItemInteraction(data, player.getStringUUID(), playerName,
-                !stack.isEmpty() && result.consumesAction());
-        if (!stack.isEmpty()) {
+                given > 0);
+        if (!before.isEmpty()) {
             if (!data.characterSheet.isEmpty()) {
-                String verb = result.consumesAction() ? " gives " : " shows ";
-                String message = "<" + playerName + verb + "you " + stack.getCount() + " "
-                        + stack.getItem().getName(stack).getString() + ">";
-                ServerPackets.generate_chat("N/A", data, serverPlayer, mob, message, true);
+                String verb = given > 0 ? " gives " : " shows ";
+                int amount = given > 0 ? given : before.getCount();
+                String message = "<" + playerName + verb + "you " + amount + " "
+                        + before.getItem().getName(before).getString() + ">";
+                ServerPackets.generate_chat("N/A", data, player, mob, message, true);
             }
         } else if (playerData.friendship == 3) {
             player.startRiding(mob, true);
         }
+    }
+
+    static int giftAmount(ItemStack before, ItemStack after, boolean accepted, boolean infiniteItems) {
+        if (before.isEmpty() || !accepted) {
+            return 0;
+        }
+        int remaining = ItemStack.isSameItem(before, after) ? after.getCount() : 0;
+        int consumed = Math.max(0, before.getCount() - remaining);
+        return consumed == 0 && infiniteItems ? 1 : consumed;
     }
 
     private static boolean isBucket(Item item) {

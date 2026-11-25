@@ -4,6 +4,7 @@
 package com.lewho.network;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import com.lewho.chat.ChatDataManager;
 import com.lewho.chat.EntityChatData;
@@ -12,18 +13,21 @@ import com.lewho.chat.PlayerData;
 import com.lewho.commands.ConfigurationScreenData;
 import com.lewho.ui.ChatScreen;
 import com.lewho.ui.CreatureChatConfigScreen;
+import com.lewho.ui.LanguageSelectorScreen;
 import com.lewho.ui.BubbleRenderer;
 import com.lewho.ui.PlayerMessageManager;
 import com.lewho.utils.ClientEntityFinder;
-import com.lewho.utils.Decompression;
+import com.lewho.utils.Compression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.zip.DataFormatException;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
@@ -37,7 +41,16 @@ import net.minecraft.world.entity.player.Player;
  */
 public class ClientPackets {
     public static final Logger LOGGER = LoggerFactory.getLogger("creaturechat");
-    static HashMap<Integer, byte[]> receivedChunks = new HashMap<>();
+    private static final LoginChatChunks loginChatChunks = new LoginChatChunks();
+    private static final Type CHAT_SNAPSHOT_TYPE = new TypeToken<Map<String, EntityChatData>>() {}.getType();
+
+    public static void reset() {
+        loginChatChunks.clear();
+        ChatDataManager.getClientInstance().clearData();
+        PlayerMessageManager.clear();
+        BubbleRenderer.whitelist = List.of();
+        BubbleRenderer.blacklist = List.of();
+    }
 
     public static void sendGenerateGreeting(Entity entity) {
         // Get user language
@@ -166,7 +179,7 @@ public class ClientPackets {
             Map<String, PlayerData> players = readPlayerDataMap(buffer);
 
             // Update the chat data manager on the client-side
-            client.execute(() -> { // Make sure to run on the client thread
+            executeForConnection(client, handler, () -> {
                 // Ensure client.player is initialized
                 if (client.player == null || client.level == null) {
                     LOGGER.warn("Client not fully initialized. Dropping message for entity '{}'.", entityId);
@@ -202,7 +215,7 @@ public class ClientPackets {
             String message = buffer.readUtf(32767);
 
             // Update the chat data manager on the client-side
-            client.execute(() -> { // Make sure to run on the client thread
+            executeForConnection(client, handler, () -> {
                 // Ensure client.player is initialized
                 if (client.player == null || client.level == null) {
                     LOGGER.warn("Client not fully initialized. Dropping message for sender '{}'.", senderPlayerId);
@@ -220,34 +233,22 @@ public class ClientPackets {
             int totalPackets = buffer.readInt(); // Total number of packets for this data
             byte[] chunk = buffer.readByteArray(); // Read the byte array chunk from the current packet
 
-            client.execute(() -> { // Make sure to run on the client thread
-                // Store the received chunk
-                receivedChunks.put(sequenceNumber, chunk);
+            executeForConnection(client, handler, () -> {
+                byte[] compressedSnapshot = loginChatChunks.accept(sequenceNumber, totalPackets, chunk);
+                if (compressedSnapshot == null) {
+                    return;
+                }
 
-                // Check if all chunks have been received
-                if (receivedChunks.size() == totalPackets) {
-                    LOGGER.info("Reassemble chunks on client and decompress lite JSON data string");
-
-                    // Combine all byte array chunks
-                    ByteArrayOutputStream combined = new ByteArrayOutputStream();
-                    for (int i = 0; i < totalPackets; i++) {
-                        combined.write(receivedChunks.get(i), 0, receivedChunks.get(i).length);
-                    }
-
-                    // Decompress the combined byte array to get the original JSON string
-                    String chatDataJSON = Decompression.decompressString(combined.toByteArray());
-                    if (chatDataJSON == null || chatDataJSON.isEmpty()) {
-                        LOGGER.warn("Received invalid or empty chat data JSON. Skipping processing.");
+                try {
+                    String json = Compression.decompressString(compressedSnapshot);
+                    Map<String, EntityChatData> snapshot = new Gson().fromJson(json, CHAT_SNAPSHOT_TYPE);
+                    if (snapshot == null || snapshot.containsValue(null)) {
+                        LOGGER.warn("Ignoring invalid login chat data.");
                         return;
                     }
-
-                    // Parse JSON and update client chat data
-                    Gson GSON = new Gson();
-                    Type type = new TypeToken<ConcurrentHashMap<String, EntityChatData>>(){}.getType();
-                    ChatDataManager.getClientInstance().entityChatDataMap = GSON.fromJson(chatDataJSON, type);
-
-                    // Clear receivedChunks for future use
-                    receivedChunks.clear();
+                    ChatDataManager.getClientInstance().entityChatDataMap = new ConcurrentHashMap<>(snapshot);
+                } catch (DataFormatException | JsonParseException e) {
+                    LOGGER.warn("Could not decode login chat data.");
                 }
             });
         });
@@ -268,7 +269,7 @@ public class ClientPackets {
                 blacklist.add(buffer.readUtf(32767));
             }
 
-            client.execute(() -> {
+            executeForConnection(client, handler, () -> {
                 BubbleRenderer.whitelist = whitelist;
                 BubbleRenderer.blacklist = blacklist;
             });
@@ -280,19 +281,13 @@ public class ClientPackets {
             UUID playerId = UUID.fromString(buffer.readUtf());
             boolean isChatOpen = buffer.readBoolean();
 
-            // Get player instance
-            Player player = ClientEntityFinder.getPlayerEntityFromUUID(playerId);
-
-            // Update the player status data manager on the client-side
-            client.execute(() -> {
-                if (player == null) {
-                    LOGGER.warn("Player entity is null. Skipping status update.");
-                    return;
-                }
-
+            executeForConnection(client, handler, () -> {
                 if (isChatOpen) {
                     PlayerMessageManager.openChatUI(playerId);
-                    playNearbyUISound(client, player, 0.2f);
+                    Player player = client.level == null ? null : client.level.getPlayerByUUID(playerId);
+                    if (player != null) {
+                        playNearbyUISound(client, player, 0.2f);
+                    }
                 } else {
                     PlayerMessageManager.closeChatUI(playerId);
                 }
@@ -312,7 +307,7 @@ public class ClientPackets {
                     buffer.readUtf(32767)
             );
 
-            client.execute(() -> client.setScreen(new CreatureChatConfigScreen(data)));
+            executeForConnection(client, handler, () -> client.setScreen(new CreatureChatConfigScreen(data)));
         });
 
         ClientPacketHelper.registerReceiver(ServerPackets.PACKET_S2C_CHAT_HISTORY, (client, handler, buffer, responseSender) -> {
@@ -327,7 +322,7 @@ public class ClientPackets {
                 entries.add(new ChatHistoryEntry(message, sender, name, timestamp));
             }
 
-            client.execute(() -> {
+            executeForConnection(client, handler, () -> {
                 if (client.screen instanceof ChatScreen screen) {
                     screen.updateHistory(entityId, entries);
                 }
@@ -339,13 +334,25 @@ public class ClientPackets {
             String message = buffer.readUtf(32767);
             String maskedKeys = buffer.readUtf(32767);
 
-            client.execute(() -> {
-                if (client.screen instanceof CreatureChatConfigScreen screen) {
+            executeForConnection(client, handler, () -> {
+                Screen activeScreen = client.screen;
+                if (activeScreen instanceof LanguageSelectorScreen languageScreen) {
+                    activeScreen = languageScreen.getParentScreen();
+                }
+                if (activeScreen instanceof CreatureChatConfigScreen screen) {
                     screen.updateServerStatus(success, message, maskedKeys);
                 } else if (client.player != null) {
                     client.player.displayClientMessage(Component.literal(message), false);
                 }
             });
+        });
+    }
+
+    private static void executeForConnection(Minecraft client, ClientPacketListener handler, Runnable task) {
+        client.execute(() -> {
+            if (handler != null && handler == client.getConnection()) {
+                task.run();
+            }
         });
     }
 

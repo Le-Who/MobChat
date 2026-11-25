@@ -557,8 +557,10 @@ public class BubbleRenderer {
                 scaledTextHeight = Math.max(scaledTextHeight, minTextHeight);
 
                 // Update Bubble Data for Click Handling using UUID (account for scaling)
-                BubbleLocationManager.updateBubbleData(entity.getUUID(), bubblePosition,
-                        128F / (1 / 0.02F), (scaledTextHeight + 25F) / (1 / 0.02F), yaw, pitch);
+                if (entity instanceof Mob) {
+                    BubbleLocationManager.updateBubbleData(entity.getUUID(), bubblePosition,
+                            128F / (1 / 0.02F), (scaledTextHeight + 25F) / (1 / 0.02F), yaw, pitch);
+                }
 
                 // Scale down before rendering textures (otherwise font is huge)
                 matrices.scale(-0.02F, -0.02F, 0.02F);

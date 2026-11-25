@@ -32,10 +32,11 @@ build_mod:
     - export PATH=$JAVA_HOME/bin:$PATH
     - java -version
   script:
-    - ./build.sh
+    - bash ./build.sh
   artifacts:
     paths:
       - creaturechat-*.jar
+      - creaturechat-*.jar.sha512
       - fabric-api-*.jar
   tags:
     - minecraft

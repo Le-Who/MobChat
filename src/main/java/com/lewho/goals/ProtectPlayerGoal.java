@@ -28,7 +28,6 @@ public class ProtectPlayerGoal extends AttackPlayerGoal {
             // Set target to attack
             this.lastAttackedTime = i;
             this.targetEntity = lastAttackedByEntity;
-            this.attackerEntity.setTarget(this.targetEntity);
         }
 
         if (this.targetEntity != null && !this.targetEntity.isAlive()) {

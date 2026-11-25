@@ -6,7 +6,6 @@ package com.lewho.ui;
 import com.lewho.utils.TextureLoader;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -14,7 +13,7 @@ import net.minecraft.resources.ResourceLocation;
  * Provides a Screen class which renders a chat-background, and can be modified
  * for different versions of Minecraft (as API changes happen).
  */
-public abstract class ScreenHelper extends Screen {
+public abstract class ScreenHelper extends VersionedScreen {
     protected int BG_WIDTH, BG_HEIGHT, bgX, bgY, TITLE_OFFSET;
     protected static final TextureLoader textures = new TextureLoader();
 

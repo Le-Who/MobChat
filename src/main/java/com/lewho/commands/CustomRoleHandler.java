@@ -14,10 +14,12 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.lang.reflect.Type;
+import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,7 +41,14 @@ public class CustomRoleHandler {
         }
         if (roles == null || roles.isEmpty()) {
             roles = this.generateDefaultRoles();
-            this.saveRoles(roles, false);
+            try (BufferedWriter writer = Files.newBufferedWriter(defaultConfigPath, StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE)) {
+                gson.toJson(roles, writer);
+            } catch (FileAlreadyExistsException ignored) {
+                // Existing role files may be intentionally empty or need repair.
+            } catch (IOException e) {
+                LOGGER.error("Error creating default custom_roles.json", e);
+            }
         }
         return roles;
     }

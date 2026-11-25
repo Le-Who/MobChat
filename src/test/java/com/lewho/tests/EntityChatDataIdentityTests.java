@@ -6,6 +6,7 @@ import com.lewho.chat.EntityChatData;
 import com.lewho.chat.PlayerData;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,6 +25,31 @@ public class EntityChatDataIdentityTests {
         assertSame(legacy, migrated);
         assertTrue(data.players.containsKey("player-uuid"));
         assertFalse(data.players.containsKey("Alex"));
+    }
+
+    @Test
+    public void loginProjectionPreservesLegacyEntryForLaterUuidMigration() {
+        EntityChatData data = new EntityChatData("entity-id");
+        PlayerData legacy = new PlayerData();
+        legacy.friendship = 2;
+        data.players.put("Alex", legacy);
+
+        assertEquals(0, data.toLightVersion("player-uuid").players.get("player-uuid").friendship);
+        assertFalse(data.players.containsKey("player-uuid"));
+
+        assertSame(legacy, data.getPlayerData("player-uuid", "Alex"));
+        assertEquals(2, data.toLightVersion("player-uuid").players.get("player-uuid").friendship);
+    }
+
+    @Test
+    public void loginProjectionKeepsTheLegacyBlankPlayerFallback() {
+        EntityChatData data = new EntityChatData("entity-id");
+        PlayerData legacy = new PlayerData();
+        legacy.friendship = 2;
+        data.players.put("", legacy);
+
+        assertEquals(2, data.toLightVersion("player-uuid").players.get("player-uuid").friendship);
+        assertFalse(data.players.containsKey("player-uuid"));
     }
 
     @Test

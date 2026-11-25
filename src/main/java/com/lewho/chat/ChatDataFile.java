@@ -3,45 +3,54 @@
 package com.lewho.chat;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
+import com.lewho.utils.AtomicFile;
 
 import java.io.IOException;
+import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** UTF-8 persistence boundary for a server-owned chat snapshot. */
 public final class ChatDataFile {
     private static final Gson GSON = new Gson();
+    private static final Type CHAT_DATA_TYPE = new TypeToken<ConcurrentHashMap<String, EntityChatData>>() {}.getType();
 
-    private ChatDataFile() {
+    private final Path path;
+    private boolean loadFailed;
+
+    public ChatDataFile(Path path) {
+        this.path = path;
     }
 
-    public static void save(Path path, Object snapshot) throws IOException {
-        // Traverse mutable state before touching either the old file or a temporary file.
-        byte[] json = GSON.toJson(snapshot).getBytes(StandardCharsets.UTF_8);
-        Path destination = path.toAbsolutePath();
-        Path temporary = Files.createTempFile(destination.getParent(), "chatdata-", ".tmp");
-        try {
-            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING)) {
-                ByteBuffer bytes = ByteBuffer.wrap(json);
-                while (bytes.hasRemaining()) {
-                    channel.write(bytes);
-                }
-                channel.force(true);
+    public ConcurrentHashMap<String, EntityChatData> load() throws IOException {
+        loadFailed = true;
+        ConcurrentHashMap<String, EntityChatData> data;
+        try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            data = GSON.fromJson(reader, CHAT_DATA_TYPE);
+            if (data == null) {
+                throw new JsonSyntaxException("Expected an object containing saved NPC data");
             }
-            try {
-                Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } finally {
-            Files.deleteIfExists(temporary);
+            data.values().removeIf(entity -> entity.status == ChatDataManager.ChatStatus.NONE);
+            data.values().forEach(EntityChatData::postDeserializeInitialization);
+        } catch (NoSuchFileException e) {
+            data = new ConcurrentHashMap<>();
         }
+        loadFailed = false;
+        return data;
+    }
+
+    public boolean save(Object snapshot) throws IOException {
+        if (loadFailed) {
+            return false;
+        }
+        // Traverse mutable state before touching either the old file or a temporary file.
+        AtomicFile.replace(path, GSON.toJson(snapshot).getBytes(StandardCharsets.UTF_8));
+        return true;
     }
 }

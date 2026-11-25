@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package com.lewho.update;
 
+import com.lewho.utils.AtomicFile;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +29,7 @@ public final class UpdateStager {
         Path updatesDir = updatesDir(gameDir);
         Path stagedJar = updatesDir.resolve(candidate.assetName());
         Files.createDirectories(updatesDir);
-        Files.write(stagedJar, jarBytes);
+        AtomicFile.replace(stagedJar, jarBytes);
 
         Path backupJar = updatesDir.resolve("backup")
                 .resolve(currentJar.getFileName().toString() + "." + Instant.now().toEpochMilli() + ".bak");

@@ -50,6 +50,26 @@ public class PendingUpdateInstallerTests {
     }
 
     @Test
+    public void preservesBothInstalledFilesWhenStableNameIsOccupied() throws Exception {
+        Path currentJar = tempDir.resolve("mods/creaturechat-3.0.0+1.20.1.jar");
+        Path targetJar = tempDir.resolve("mods/creaturechat.jar");
+        Path stagedJar = tempDir.resolve("updates/creaturechat-3.0.1+1.20.1.jar");
+        Path backupJar = tempDir.resolve("updates/backup/current.jar.bak");
+        Files.createDirectories(currentJar.getParent());
+        Files.createDirectories(stagedJar.getParent());
+        Files.writeString(currentJar, "current jar");
+        Files.writeString(targetJar, "existing stable jar");
+        Files.writeString(stagedJar, "new jar");
+        PendingUpdate pending = new PendingUpdate("3.0.1+1.20.1", currentJar, stagedJar, backupJar,
+                tempDir.resolve("updates/pending-update.json"), sha512(Files.readAllBytes(stagedJar)));
+
+        assertFalse(PendingUpdateInstaller.tryApplyNow(pending));
+        assertEquals("current jar", Files.readString(currentJar));
+        assertEquals("existing stable jar", Files.readString(targetJar));
+        assertEquals("new jar", Files.readString(stagedJar));
+    }
+
+    @Test
     public void refusesToInstallWhenStagedHashChanged() throws Exception {
         Path currentJar = tempDir.resolve("mods").resolve("creaturechat-3.0.0+1.20.1.jar");
         Path stagedJar = tempDir.resolve(".creaturechat-updates").resolve("creaturechat-3.0.1+1.20.1.jar");

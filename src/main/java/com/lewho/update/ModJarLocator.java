@@ -41,7 +41,7 @@ public final class ModJarLocator {
 
     private static boolean isCandidateName(Path path, String archiveBaseName) {
         String name = path.getFileName().toString();
-        return (name.equals(InstalledJarNames.STABLE_INSTALLED_JAR) || name.startsWith(archiveBaseName + "-"))
+        return (name.equals(CreatureChatUpdateHelper.STABLE_INSTALLED_JAR) || name.startsWith(archiveBaseName + "-"))
                 && name.endsWith(".jar")
                 && !name.endsWith("-sources.jar")
                 && !name.contains("_mapped_");

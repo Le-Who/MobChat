@@ -18,6 +18,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
+import org.joml.Vector4f;
 
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -30,6 +31,7 @@ import java.util.function.Supplier;
 @Environment(EnvType.CLIENT)
 public final class QuadBuffer {
     public static final QuadBuffer INSTANCE = new QuadBuffer();
+    private static final Vector4f WHITE = new Vector4f(1f, 1f, 1f, 1f);
     private BufferBuilder buf;
 
     // 🔧 STATIC CUSTOM PIPELINE SETUP (only once)
@@ -99,8 +101,10 @@ public final class QuadBuffer {
     public void draw() {
         if (buf == null) return;
 
-        try (MeshData meshData = buf.buildOrThrow()) {
-            buf = null; // always clear reference
+        BufferBuilder builder = buf;
+        buf = null;
+        try (MeshData meshData = builder.build()) {
+            if (meshData == null) return;
 
             GpuTextureView gpuTex = TextureLoader.lastTextureView;
             if (gpuTex == null) return;
@@ -125,16 +129,16 @@ public final class QuadBuffer {
                     fb.getColorTextureView(), OptionalInt.empty(),
                     fb.getDepthTextureView(), OptionalDouble.empty()
             )) {
+                pass.setPipeline(QUAD_PIPELINE);
+                RenderSystem.bindDefaultUniforms(pass);
+                pass.setUniform("DynamicTransforms", RenderSystem.getDynamicUniforms().writeTransform(
+                        RenderSystem.getModelViewMatrix(), WHITE, RenderSystem.getModelOffset(),
+                        RenderSystem.getTextureMatrix(), RenderSystem.getShaderLineWidth()));
                 pass.bindSampler("Sampler0", gpuTex);
                 pass.setVertexBuffer(0, vb);
                 pass.setIndexBuffer(ib, it);
-                pass.setPipeline(QUAD_PIPELINE);
                 pass.drawIndexed(0, 0,  meshData.drawState().indexCount(), 1);
             }
-
-        } catch (IllegalStateException e) {
-            // BufferBuilder was empty — clean up safely
-            buf = null;
         }
     }
 }

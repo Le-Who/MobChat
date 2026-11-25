@@ -109,7 +109,7 @@ public abstract class MobInventoryScreenBase extends AbstractContainerScreen<Mob
         if (playerData.socialSummary != null && !playerData.socialSummary.isEmpty()) {
             lines.add(Component.literal("Note: " + playerData.socialSummary));
         }
-        guiGraphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+        InventoryTooltip.render(guiGraphics, this.font, lines, mouseX, mouseY);
     }
 }
 

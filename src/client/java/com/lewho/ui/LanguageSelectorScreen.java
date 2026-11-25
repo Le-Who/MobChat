@@ -11,7 +11,6 @@ import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -20,7 +19,7 @@ import java.util.function.Consumer;
  * in-language display names, letting the admin pick one as the generation language
  * override. "Auto" (empty code) is always the first entry.
  */
-public class LanguageSelectorScreen extends Screen {
+public class LanguageSelectorScreen extends VersionedScreen {
 
     private static final int ITEM_HEIGHT = 20;
 
@@ -42,7 +41,7 @@ public class LanguageSelectorScreen extends Screen {
         int listTop = 40;
         int listBottom = this.height - 40;
 
-        list = new LanguageList(this.minecraft, this.width, listBottom - listTop, listTop, listBottom, ITEM_HEIGHT, currentCode);
+        list = new LanguageList(this.minecraft, this.width, listTop, listBottom, ITEM_HEIGHT, currentCode);
         addRenderableWidget(list);
 
         addRenderableWidget(Button.builder(Component.literal("Select"), button -> {
@@ -50,22 +49,30 @@ public class LanguageSelectorScreen extends Screen {
             if (selected != null) {
                 onSelect.accept(selected.code);
             }
-            this.minecraft.setScreen(parent);
+            onClose();
         }).bounds(this.width / 2 - 92, this.height - 32, 86, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("Cancel"), button ->
-                this.minecraft.setScreen(parent))
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> onClose())
                 .bounds(this.width / 2 + 6, this.height - 32, 86, 20).build());
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        this.renderBackground(graphics);
+        renderModalBackground(graphics);
         super.render(graphics, mouseX, mouseY, delta);
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 14, 0xFFFFFF);
+        graphics.drawCenteredString(this.font, this.title, this.width / 2, 14, 0xFFFFFFFF);
         graphics.drawCenteredString(this.font,
                 Component.literal("code / display name").withStyle(net.minecraft.ChatFormatting.GRAY),
-                this.width / 2, 28, 0xA0A0A0);
+                this.width / 2, 28, 0xFFA0A0A0);
+    }
+
+    public Screen getParentScreen() {
+        return parent;
+    }
+
+    @Override
+    public void onClose() {
+        this.minecraft.setScreen(parent);
     }
 
     @Override
@@ -75,12 +82,10 @@ public class LanguageSelectorScreen extends Screen {
 
     // ---- List widget ----
 
-    static class LanguageList extends ObjectSelectionList<LanguageEntry> {
+    static class LanguageList extends LanguageListWidget<LanguageEntry> {
 
-        LanguageList(Minecraft mc, int width, int height, int top, int bottom, int itemHeight, String currentCode) {
-            super(mc, width, height, top, bottom, itemHeight);
-            setRenderBackground(false);
-            setRenderTopAndBottom(false);
+        LanguageList(Minecraft mc, int width, int top, int bottom, int itemHeight, String currentCode) {
+            super(mc, width, top, bottom, itemHeight);
 
             // First entry: Auto
             LanguageEntry autoEntry = new LanguageEntry("", "Auto (client locale)", this);
@@ -124,7 +129,7 @@ public class LanguageSelectorScreen extends Screen {
         public void render(GuiGraphics graphics, int index, int top, int left,
                            int width, int height, int mouseX, int mouseY,
                            boolean isHovered, float partialTick) {
-            int color = isHovered ? 0xFFFFFF : 0xD0D0D0;
+            int color = isHovered ? 0xFFFFFFFF : 0xFFD0D0D0;
             graphics.drawString(Minecraft.getInstance().font,
                     label, left + 4, top + (height - 9) / 2, color, false);
         }

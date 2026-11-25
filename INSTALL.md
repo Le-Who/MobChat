@@ -46,6 +46,8 @@ The versioned jar is the remapped distribution. `creaturechat.jar` is an identic
 ## Install
 
 1. Install Fabric Loader and Fabric API for the Minecraft target used to build the jar.
+
+   The default 1.20.1 build uses Fabric Loader `0.17.2`. Its Fabric API `0.92.2+1.20.1` requires Loader `0.15.6` or later.
 2. Stop Minecraft or the dedicated server before changing its `mods/` directory.
 3. Copy `build/libs/creaturechat.jar` and the matching Fabric API jar into that installation's `mods/` directory. Keep a single MobChat jar there.
 4. Start the Fabric client/server and configure the server's provider with `/creaturechat setup`.
@@ -79,6 +81,6 @@ Ordinary `build` does not run datagen. Checked-in loot tables and advancements a
 
 `yarn_mappings` and `loom_version` in `gradle.properties` are legacy fields: the current build uses official mappings and selects Loom directly in `build.gradle`.
 
-Use the wrapper for ordinary validation. `build.sh` is a legacy matrix/packaging script: it edits `gradle.properties` and `fabric.mod.json` in place, does not restore them automatically, skips tests and access-widener validation, and moves versioned jars into the repository root. Its Connector marker variants need hashes computed after packaging. It does not produce a complete updater release bundle automatically.
+Use the wrapper for ordinary validation. The historical `build.sh` matrix passes the Minecraft, Fabric Loader, and Fabric API versions to Gradle as project properties. Gradle writes the matching Minecraft requirement into the jar metadata. The script validates access wideners, skips test compilation and execution, and copies each target's jar and SHA-512 file to the repository root. It computes a separate digest for each Connector marker variant after packaging. `DRY_RUN=1 ONLY_VERSION=1.21.7 bash build.sh` prints the selected commands and output names. A full run invokes `runDatagen`, which can update the tracked translations as described above.
 
 The existing `.gitlab-ci.yml` describes a legacy Linux runner and external publication jobs. Its pinned JDK differs from the current local toolchain; it is not evidence of a verified current CI matrix. An override directory or script target is a compatibility implementation to test, not a claim that every listed version currently builds or runs.

@@ -135,7 +135,7 @@ stateDiagram-v2
 
 The request token, rather than `PENDING` alone, owns the in-flight operation. Admission precedes automatic buckets, manual cooldown resets, TALK installation and character loot preparation. A busy or stale request changes none of these scheduling effects; independent social events are still recorded. Policy denial or preparation failure releases the admitted token, and ambient dispatch reports whether a request was actually admitted. A response is current only while its session, aggregate, world, mob and connected player identities remain current. A late result after unloading, moving worlds, replacing state or stopping the server cannot act on a replacement world. Discarding a current pending request also clears its automatic-generation marker so a later broadcast cannot set it back to `PENDING`. Persisted unfinished requests are normalized when loading; no HTTP request survives a server restart.
 
-The autosave timer schedules work on the owning server. Snapshot serialization and save ordering happen there. Shutdown closes the response session and stops scheduled saves before writing the final state and clearing the map. `ChatDataFile` serializes a complete UTF-8 snapshot before replacing the previous JSON, using atomic replacement where supported and a replace fallback otherwise. A serialization failure preserves the previous good file.
+The autosave timer schedules work on the owning server. Snapshot serialization and save ordering happen there. Shutdown closes the response session and stops scheduled saves before writing the final state and clearing the map. The vanilla overworld owns this lifecycle. `ChatDataFile` serializes a complete UTF-8 snapshot before replacing the previous JSON through `AtomicFile`. A serialization failure preserves the previous good file. If loading fails, autosave and shutdown leave the existing file intact for recovery. Restore or move `chatdata.json` and restart the server to resume saving history.
 
 ## 5. Provider contracts and request policy
 
@@ -200,13 +200,13 @@ Keep Minecraft-specific injection signatures and serialization in the version ad
 
 `CreatureChatConfigScreen` operates on `ConfigurationScreenData`, a sanitized DTO. Stored full keys stay server-side; a blank key field preserves them. Server handlers recheck OP permission before saving/testing. `LanguageSelectorScreen` uses the official Minecraft locale list from `MinecraftLanguages`; this list is separate from the mod's own translated UI locale files.
 
-Server packets send current state to connected viewers allowed by their display preferences, and serve shared history on request. The current-message broadcast has no distance/dimension filter. History is looked up by NPC UUID with a cap of 60 recent entries and 4096 characters per entry; it is not protected by a proximity or per-player-history boundary. Login state is compressed and split into chunks of up to 32,000 bytes. Common/client buffer and packet helpers isolate networking API differences; >=1.20.5 overrides use payload codecs. Most client state is applied through the client executor.
+Server packets send current state to connected viewers allowed by their display preferences, and serve shared history on request. Login and reply packets send each viewer only their own relationship entry. The current-message broadcast has no distance/dimension filter. History is looked up by NPC UUID with a cap of 60 recent entries and 4096 characters per entry. Players share this history across distances and dimensions. Login state is compressed and split into chunks of up to 32,000 bytes. Common/client buffer and packet helpers isolate networking API differences. The 1.20.5+ overrides use payload codecs. Client updates run on the client executor and check that their originating connection is still current.
 
 Custom entity icons mirror renderer texture paths under the `creaturechat` asset namespace and use 32×32 PNGs. `SkinUtils` detects the exact skin marker pixels and assembles the 24×24 player icon from UV tiles; client skin mixins cache the image. `BlendHelper`, `QuadBuffer`, `ShaderHelper`, `EntityTextureHelper`, `EntityRenderPosition`, `TickDelta`, `TextureLoader` and screen/menu helpers isolate rendering API changes. See [ICONS](ICONS.md) for asset instructions.
 
 ## 9. Configuration, files and resource generation
 
-`ConfigurationHandler` loads the world-specific `creaturechat.json` when present, otherwise the process-root default, otherwise built-in defaults. `/creaturechat setup` and its subcommands save the world configuration. Many older setting commands support explicit `--config server` / `--config default` and default to the root file; check their registered command tree before assuming a scope.
+`ConfigurationHandler` loads the world-specific `creaturechat.json` when present, otherwise the process-root default, otherwise built-in defaults. An unreadable configuration uses built-in settings with no credentials and logs the file path. `/creaturechat setup` and its subcommands save the world configuration. Many older setting commands support explicit `--config server` / `--config default` and default to the root file; check their registered command tree before assuming a scope.
 
 | File/location | Owner and contents |
 | --- | --- |
@@ -251,9 +251,7 @@ The build applies every `src/vs/vX_Y_Z` folder whose version is <= the target, o
 
 `build` produces a remapped versioned jar, matching SHA-512 file, stable `creaturechat.jar` and source jar. Every root Markdown file is included in the main jar, including this map. Nested audit plans are not packaged. No release is uploaded by the ordinary build.
 
-The historical `build.sh` matrix and `.gitlab-ci.yml` are separate legacy automation. They edit tracked build inputs, skip tests/access-widener checks in the matrix and do not establish current GitHub release automation. Their existence is not evidence of a passing newer-target build. See [INSTALL](INSTALL.md) for their exact limitations.
-
-During the 2026-10-04 audit, `compileJava` passed for 1.21.7 with the matrix's loader/API dependencies. `compileClientJava` remains blocked by eight existing GUI API errors: the inventory tooltip call, chat scroll-handler signature, configuration/language/update screen background calls, and selection-list background flags. These require client version adapters before a complete 1.21.7 jar can be advertised. The default-target suite is separate: 195 tests across 40 suites, with zero failures/errors and 12 intentional live-provider skips in a fresh offline run.
+The historical `build.sh` matrix and `.gitlab-ci.yml` are separate legacy automation. The script selects targets with Gradle project properties, checks the access widener, and copies each build's jar and hash. See [INSTALL](INSTALL.md) for its test and resource-generation behavior. The default test suite targets Minecraft 1.20.1. Newer targets need their own packaging and native runtime checks.
 
 ## 12. Verification map
 
@@ -278,14 +276,11 @@ HTTP regression tests use loopback fixtures, synthetic keys and deterministic re
 
 These source-level concerns remain separate from the repairs in this audit. They are useful follow-up targets, with their own behavioral reproduction required before changing policy:
 
-- `EntityBehaviorManager` priority shifting needs a regression for duplicate and sparse priorities; the current algorithm can move the wrong goals or compress unrelated priority gaps.
 - `PlayerBaseGoal` only rebinds a dead target in its former world. Disconnection and cross-dimension respawn need explicit target-lifetime policy; `ProtectPlayerGoal` also retains its original protected entity reference.
 - NPC history is shared and persisted without a total length cap, although provider context and UI history selection are bounded. A retention policy must preserve memory/relationship semantics and existing saves.
-- Initial hand synchronization and close-menu item accounting need component-aware cases; same-type items with different NBT/components require more than aggregate `Item` counts. Menu lifetime also needs explicit alive/distance/dimension scenarios.
-- Interaction hooks observe post-interaction held stacks. Consuming the last item requires a targeted test to define gift amount and event semantics.
-- Client login chunk assembly and transient UI maps need disconnect/reset tests. Compressed input needs truncated-stream and no-progress handling before a malformed sync can stall decompression; character encoding should be explicit on both ends.
+- Initial hand synchronization and close-menu item accounting need component-aware cases; same-type items with different NBT/components require more than aggregate `Item` counts.
 - Character normalization still accepts legacy plain sheets. Tightening this boundary needs tests distinguishing real legacy saves from unexpected provider text.
-- Complete the client GUI adapters identified by the 1.21.7 compile check above. Then verify applicable intermediate targets and in-game mixin/network/render behavior; source delegation checks or a server-only compile cannot prove a complete newer runtime.
-- The multi-version build/release scripts need isolated inputs, complete jar/hash pairs and reproducible CI before their matrix can be advertised as verified release support.
+- Verify newer-target mixin, network, and render behavior in Minecraft, including the 1.21.6+ bubble renderer and the alignment of clickable regions with the rendered bubbles.
+- The multi-version workflow still needs reproducible CI coverage for the full matrix and its datagen outputs.
 
 Keep these changes in their existing owners. Prefer narrow version helpers and shared rules over duplicating large classes or introducing a second state model.

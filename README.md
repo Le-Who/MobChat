@@ -104,6 +104,8 @@ Server OP commands:
 
 `check` looks for a newer release matching the running Minecraft target. `download` verifies and stages the jar under `.creaturechat-updates/`. `status` reports the running and staged versions. `apply` stages or reuses a compatible update and starts the helper process that installs it after the current JVM exits.
 
+`apply` reuses a staged jar only if it is newer than the running mod, matches its Minecraft version and installed jar, and passes the SHA-512 check again. If `mods/creaturechat.jar` is already occupied by a separate file, the helper preserves both files and reports the conflict in `.creaturechat-updates/helper.log`.
+
 The helper moves the old jar from `mods/` to a backup folder and places the verified new jar at `mods/creaturechat.jar`. It does not stop or restart the server; the admin decides when to restart. Run `apply` before stopping the server. If a host panel kills the helper too, replacement cannot finish through that helper; install the built/released jar manually or allow the helper to survive the stop.
 
 On clients, CreatureChat checks once shortly after the Minecraft main menu starts, and can also show the prompt while idle in-game. When a newer compatible release is found, it shows a consent screen. The jar is downloaded only after the player clicks `Download`, then the helper installs it after Minecraft exits.
@@ -111,6 +113,8 @@ On clients, CreatureChat checks once shortly after the Minecraft main menu start
 ## AI Provider Setup
 
 CreatureChat requires an LLM for generated character sheets and chat replies. Google AI Studio uses native Gemini `generateContent`; the other presets use OpenAI-compatible chat completions. The endpoint, credentials and model are chosen by the server administrator.
+
+The setup screen keeps unsaved fields when you resize the window or return from the generation-language picker. A missing world configuration uses the server's root configuration. If the world configuration is unreadable, repair it or save a new configuration through setup before generating replies.
 
 Recommended setup path:
 

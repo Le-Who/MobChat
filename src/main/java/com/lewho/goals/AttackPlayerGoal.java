@@ -3,6 +3,7 @@
 // Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © lewho LLC - unauthorized use prohibited
 package com.lewho.goals;
 
+import com.lewho.chat.LivingEntityChatHooks;
 import com.lewho.controls.DamageHelper;
 import java.util.EnumSet;
 import java.util.concurrent.ThreadLocalRandom;
@@ -56,7 +57,13 @@ public class AttackPlayerGoal extends PlayerBaseGoal {
     }
 
     private boolean isGoalActive() {
-        if (this.targetEntity == null || (this.targetEntity != null && !this.targetEntity.isAlive())) {
+        if (this.targetEntity == null || !this.targetEntity.isAlive()) {
+            return false;
+        }
+        if (LivingEntityChatHooks.preventsFriendlyAttack(this.attackerEntity, this.targetEntity)) {
+            if (this.attackerEntity.getTarget() == this.targetEntity) {
+                this.attackerEntity.setTarget(null);
+            }
             return false;
         }
 
@@ -88,6 +95,9 @@ public class AttackPlayerGoal extends PlayerBaseGoal {
     }
 
     private void performAttack() {
+        if (LivingEntityChatHooks.preventsFriendlyAttack(attackerEntity, targetEntity)) {
+            return;
+        }
         // Track the attacker (needed for protect to work)
         if (!this.attackerEntity.equals(this.targetEntity)) {
             this.targetEntity.setLastHurtByMob(this.attackerEntity);

@@ -5,6 +5,7 @@ package com.lewho.tests;
 import com.google.gson.JsonParser;
 import com.lewho.chat.ChatDataFile;
 import com.lewho.chat.ChatSession;
+import com.lewho.chat.EntityChatData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,7 +31,7 @@ public class ChatDataFileTests {
         Files.writeString(save, "{\"npc\":\"Последняя полная запись\"}");
         Map<String, Object> brokenSnapshot = new BrokenSnapshot();
 
-        assertThrows(RuntimeException.class, () -> ChatDataFile.save(save, brokenSnapshot));
+        assertThrows(RuntimeException.class, () -> new ChatDataFile(save).save(brokenSnapshot));
 
         assertEquals("{\"npc\":\"Последняя полная запись\"}", Files.readString(save));
     }
@@ -40,7 +41,7 @@ public class ChatDataFileTests {
         Path save = directory.resolve("chatdata.json");
         Files.writeString(save, "{\"old\":\"data\"}");
 
-        ChatDataFile.save(save, Map.of("npc", "Привет, мандрівнику! 🐈"));
+        new ChatDataFile(save).save(Map.of("npc", "Привет, мандрівнику! 🐈"));
 
         assertEquals("Привет, мандрівнику! 🐈", JsonParser.parseString(Files.readString(save)).getAsJsonObject().get("npc").getAsString());
         try (var files = Files.list(directory)) {
@@ -72,7 +73,7 @@ public class ChatDataFileTests {
         session.execute(() -> saveUnchecked(save, Map.of("npc", "stale")));
 
         session.close();
-        ChatDataFile.save(save, Map.of("npc", "final"));
+        new ChatDataFile(save).save(Map.of("npc", "final"));
         serverTasks.remove().run();
         session.execute(() -> saveUnchecked(save, Map.of("npc", "later timer tick")));
 
@@ -87,7 +88,7 @@ public class ChatDataFileTests {
         Path existing = save.resolve("previous.json");
         Files.writeString(existing, "{\"npc\":\"preserved\"}");
 
-        assertThrows(IOException.class, () -> ChatDataFile.save(save, Map.of("npc", "new")));
+        assertThrows(IOException.class, () -> new ChatDataFile(save).save(Map.of("npc", "new")));
 
         assertEquals("{\"npc\":\"preserved\"}", Files.readString(existing));
         try (var files = Files.list(directory)) {
@@ -95,9 +96,47 @@ public class ChatDataFileTests {
         }
     }
 
+    @Test
+    public void failedLoadPreservesExistingHistoryAcrossAutoAndFinalSave() throws Exception {
+        Path save = directory.resolve("chatdata.json");
+        String malformed = """
+                {"old-npc":{"currentMessage":"recoverable history"}
+                """;
+        Files.writeString(save, malformed);
+        ChatDataFile chatDataFile = new ChatDataFile(save);
+
+        assertThrows(RuntimeException.class, chatDataFile::load);
+        Queue<Runnable> serverTasks = new ArrayDeque<>();
+        ChatSession session = new ChatSession(serverTasks::add);
+        Map<String, EntityChatData> newHistory = Map.of("new-npc", new EntityChatData("new-npc"));
+        session.execute(() -> saveUnchecked(chatDataFile, newHistory));
+        serverTasks.remove().run();
+        session.close();
+
+        assertFalse(chatDataFile.save(newHistory));
+        assertEquals(malformed, Files.readString(save));
+    }
+
+    @Test
+    public void missingAndRecoveredHistoryCanBeSaved() throws Exception {
+        Path save = directory.resolve("chatdata.json");
+        ChatDataFile initialFile = new ChatDataFile(save);
+        assertTrue(initialFile.load().isEmpty());
+        assertTrue(initialFile.save(Map.of("npc", Map.of("entityId", "npc", "status", "HIDDEN"))));
+
+        ChatDataFile nextSessionFile = new ChatDataFile(save);
+        Map<String, EntityChatData> recovered = nextSessionFile.load();
+        assertEquals("npc", recovered.get("npc").entityId);
+        assertTrue(nextSessionFile.save(recovered));
+    }
+
     private static void saveUnchecked(Path save, Object state) {
+        saveUnchecked(new ChatDataFile(save), state);
+    }
+
+    private static void saveUnchecked(ChatDataFile save, Object state) {
         try {
-            ChatDataFile.save(save, state);
+            save.save(state);
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }

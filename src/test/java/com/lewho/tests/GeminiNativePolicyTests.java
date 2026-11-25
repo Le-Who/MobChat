@@ -173,6 +173,26 @@ public class GeminiNativePolicyTests {
     }
 
     @Test
+    void nativeStructuredReplyCombinesVisibleTextParts() throws Exception {
+        ConfigurationHandler.Config config = start(request -> new Response(200, """
+                {"candidates":[{"content":{"parts":[
+                    {"thought":true,"text":"This is a thought summary"},
+                    {"text":"{\\"message\\":\\"Hello"},
+                    {"thoughtSignature":"metadata"},
+                    {"thought":false,"text":" there\\",\\"actions\\":[]}"}
+                ]},"finishReason":"STOP"}],"usageMetadata":{"candidatesTokenCount":18}}
+                """));
+
+        String content = GeminiNativeRequest.fetchMessageFromGemini(config, "sys", Map.of(), List.of(),
+                ChatGPTRequest.StructuredOutputMode.CHAT).get(10, TimeUnit.SECONDS);
+
+        assertEquals("{\"message\":\"Hello there\",\"actions\":[]}", content);
+        assertEquals("STOP", ChatGPTRequest.lastFinishReason);
+        assertEquals(18, ChatGPTRequest.lastCompletionTokens);
+        assertNull(ChatGPTRequest.lastStructuredResponseWarning);
+    }
+
+    @Test
     void nativeTruncationPublishesFreshDiagnostics() throws Exception {
         ConfigurationHandler.Config config = start(request -> new Response(200,
                 "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"message\\\":\\\"hello\\\"\"}]},\"finishReason\":\"MAX_TOKENS\"}],\"usageMetadata\":{\"candidatesTokenCount\":17}}"));

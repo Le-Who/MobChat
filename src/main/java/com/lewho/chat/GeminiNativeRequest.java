@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package com.lewho.chat;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.lewho.commands.ConfigurationHandler;
@@ -134,17 +135,30 @@ public final class GeminiNativeRequest {
             JsonObject usage = root.getAsJsonObject("usageMetadata");
             if (usage.has("candidatesTokenCount")) completionTokens = usage.get("candidatesTokenCount").getAsInt();
         }
-        if (candidate.has("content")) {
-            JsonObject content = candidate.getAsJsonObject("content");
-            if (content.has("parts") && !content.getAsJsonArray("parts").isEmpty()) {
-                JsonObject part = content.getAsJsonArray("parts").get(0).getAsJsonObject();
-                if (part.has("text")) {
-                    return new ChatGPTRequest.ResponseContent(part.get("text").getAsString(), finishReason, completionTokens);
+        StringBuilder answer = new StringBuilder();
+        JsonElement content = candidate.get("content");
+        if (content != null && content.isJsonObject()) {
+            JsonElement parts = content.getAsJsonObject().get("parts");
+            if (parts != null && parts.isJsonArray()) {
+                for (JsonElement element : parts.getAsJsonArray()) {
+                    if (!element.isJsonObject()) {
+                        continue;
+                    }
+                    JsonObject part = element.getAsJsonObject();
+                    JsonElement thought = part.get("thought");
+                    if (thought != null && thought.isJsonPrimitive() && thought.getAsBoolean()) {
+                        continue;
+                    }
+                    JsonElement text = part.get("text");
+                    if (text != null && text.isJsonPrimitive() && text.getAsJsonPrimitive().isString()) {
+                        answer.append(text.getAsString());
+                    }
                 }
             }
         }
         // A valid candidate can stop at MAX_TOKENS before producing text. Keep its diagnostics.
-        return new ChatGPTRequest.ResponseContent(null, finishReason, completionTokens);
+        return new ChatGPTRequest.ResponseContent(answer.length() == 0 ? null : answer.toString(),
+                finishReason, completionTokens);
     }
 
     static class GeminiPayload {

@@ -3,7 +3,6 @@
 // Assets CC-BY-NC-SA-4.0; CreatureChat™ trademark © lewho LLC - unauthorized use prohibited
 package com.lewho;
 
-import com.lewho.chat.ChatDataManager;
 import com.lewho.network.ClientPackets;
 import com.lewho.particle.CreatureParticleFactory;
 import com.lewho.particle.LeadParticleFactory;
@@ -64,10 +63,6 @@ public class ClientInit implements ClientModInitializer {
             BubbleRenderer.drawTextAboveEntities(ctx, tickCounter, delta);
         });
 
-        // Register an event callback for when the client disconnects from a server or changes worlds
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            // Clear or reset the ChatDataManager
-            ChatDataManager.getClientInstance().clearData();
-        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientPackets.reset());
     }
 }

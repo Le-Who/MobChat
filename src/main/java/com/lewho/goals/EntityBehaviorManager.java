@@ -8,8 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.function.Predicate;
 
-import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
@@ -67,30 +67,21 @@ public class EntityBehaviorManager {
     }
 
     public static void moveConflictingGoals(GoalSelector goalSelector, GoalPriority newGoalPriority) {
-        // Collect all prioritized goals currently in the selector.
-        List<WrappedGoal> sortedGoals = goalSelector.getAvailableGoals().stream()
-                .sorted(Comparator.comparingInt(WrappedGoal::getPriority))
-                .collect(Collectors.toList());
-
-        // Check if there is an existing goal at the new priority level.
-        boolean conflictExists = sortedGoals.stream()
-                .anyMatch(pg -> pg.getPriority() == newGoalPriority.getPriority());
-
-        // If there is a conflict, we need to shift priorities of this and all higher priorities.
-        if (conflictExists) {
-            int shiftPriority = newGoalPriority.getPriority();
-            for (WrappedGoal pg : sortedGoals) {
-                if (pg.getPriority() >= shiftPriority) {
-                    // Remove the goal and increment its priority.
-                    goalSelector.removeGoal(pg.getGoal());
-                    goalSelector.addGoal(shiftPriority + 1, pg.getGoal());
-                    shiftPriority++;  // Update the shift priority for the next possible conflict.
-                }
+        List<WrappedGoal> goals = List.copyOf(goalSelector.getAvailableGoals());
+        Set<Integer> occupiedPriorities = goals.stream()
+                .map(WrappedGoal::getPriority)
+                .collect(Collectors.toSet());
+        int requestedPriority = newGoalPriority.getPriority();
+        int freePriority = requestedPriority;
+        while (occupiedPriorities.contains(freePriority)) {
+            freePriority++;
+        }
+        for (WrappedGoal wrappedGoal : goals) {
+            int priority = wrappedGoal.getPriority();
+            if (priority >= requestedPriority && priority < freePriority) {
+                goalSelector.removeGoal(wrappedGoal.getGoal());
+                goalSelector.addGoal(priority + 1, wrappedGoal.getGoal());
             }
-
-            LOGGER.debug("Moved conflicting goals starting from priority {}", newGoalPriority);
-        } else {
-            LOGGER.debug("No conflicting goal at priority {}, no action taken.", newGoalPriority);
         }
     }
 }

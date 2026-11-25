@@ -5,7 +5,10 @@ package com.lewho.commands;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonSyntaxException;
 import com.lewho.network.ServerPackets;
+import com.lewho.utils.AtomicFile;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
@@ -13,8 +16,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -33,8 +37,12 @@ public class ConfigurationHandler {
     private final Path defaultConfigPath;
 
     public ConfigurationHandler(MinecraftServer server) {
-        this.serverConfigPath = server.getWorldPath(LevelResource.ROOT).resolve("creaturechat.json");
-        this.defaultConfigPath = Paths.get(".", "creaturechat.json"); // Assumes the default location is the server root or a similar logical default
+        this(server.getWorldPath(LevelResource.ROOT).resolve("creaturechat.json"), Paths.get(".", "creaturechat.json"));
+    }
+
+    ConfigurationHandler(Path serverConfigPath, Path defaultConfigPath) {
+        this.serverConfigPath = serverConfigPath;
+        this.defaultConfigPath = defaultConfigPath;
     }
 
     public Config loadConfig() {
@@ -47,9 +55,12 @@ public class ConfigurationHandler {
 
     public boolean saveConfig(Config config, boolean useServerConfig) {
         Path path = useServerConfig ? serverConfigPath : defaultConfigPath;
-        try (Writer writer = Files.newBufferedWriter(path)) {
-            gson.toJson(config, writer);
+        try {
+            AtomicFile.replace(path, gson.toJson(config).getBytes(StandardCharsets.UTF_8));
             return true;
+        } catch (IllegalArgumentException e) {
+            LOGGER.error("CreatureChat config at {} could not be serialized", path.toAbsolutePath());
+            return false;
         } catch (IOException e) {
             String errorMessage = "Error saving `creaturechat.json`. CreatureChat config was not saved. " + e.getMessage();
             LOGGER.error(errorMessage, e);
@@ -61,13 +72,18 @@ public class ConfigurationHandler {
     private Config loadConfigFromFile(Path filePath) {
         try (Reader reader = Files.newBufferedReader(filePath)) {
             Config config = gson.fromJson(reader, Config.class);
-            if (config != null) {
-                Path parent = filePath.getParent();
-                config.setUsageDataPath((parent == null ? Paths.get(".") : parent).resolve("creaturechat_usage.json"));
+            if (config == null) {
+                throw new JsonSyntaxException("Expected a configuration object");
             }
+            Path parent = filePath.getParent();
+            config.setUsageDataPath((parent == null ? Paths.get(".") : parent).resolve("creaturechat_usage.json"));
             return config;
-        } catch (IOException e) {
-            return null; // File does not exist or other IO errors
+        } catch (NoSuchFileException e) {
+            return null;
+        } catch (IOException | JsonParseException e) {
+            // JSON syntax errors can quote fields containing stored credentials.
+            LOGGER.error("Could not read CreatureChat config at {}. Repair the file or run /creaturechat setup.", filePath.toAbsolutePath());
+            return new Config();
         }
     }
 

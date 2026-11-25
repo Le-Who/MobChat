@@ -183,8 +183,6 @@ public class ApiUsageLimiter {
         if (!today.equals(bucket.day)) {
             bucket.day = today;
             bucket.dailyCount = 0;
-            bucket.minuteRequests.clear();
-            bucket.blockedUntilMillis = 0L;
         }
     }
 

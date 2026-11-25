@@ -33,8 +33,10 @@ public record LegacyPayload(CustomPacketPayload.Type<LegacyPayload> id, Friendly
 
         return StreamCodec.of(
                 // encoder (two-arg, returns void)
-                (RegistryFriendlyByteBuf buf, LegacyPayload p) ->
-                        buf.writeBytes(p.data()),
+                (RegistryFriendlyByteBuf buf, LegacyPayload p) -> {
+                    FriendlyByteBuf data = p.data();
+                    buf.writeBytes(data, data.readerIndex(), data.readableBytes());
+                },
 
                 // decoder (one-arg, returns value)
                 (RegistryFriendlyByteBuf buf) -> {

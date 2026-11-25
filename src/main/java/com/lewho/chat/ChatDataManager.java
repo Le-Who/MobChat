@@ -4,7 +4,6 @@
 package com.lewho.chat;
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.lewho.commands.ConfigurationHandler;
 import com.lewho.network.ServerPackets;
 import net.minecraft.server.MinecraftServer;
@@ -17,9 +16,7 @@ import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
@@ -59,6 +56,7 @@ public class ChatDataManager {
     public ConcurrentHashMap<UUID, AutoMessageBucket> ambientResponseBuckets;
     private MinecraftServer sessionServer;
     private ChatSession responseSession;
+    private ChatDataFile chatDataFile;
 
     public void clearData() {
         if (responseSession != null) {
@@ -66,6 +64,7 @@ public class ChatDataManager {
         }
         responseSession = null;
         sessionServer = null;
+        chatDataFile = null;
         // Clear the chat data for the previous session
         entityChatDataMap.clear();
         autoResponseBuckets.clear();
@@ -303,6 +302,10 @@ public class ChatDataManager {
 
     // Save chat data to file
     public String GetLightChatData(String playerId, PlayerChatPreferences preferences) {
+        return GetLightChatData(playerId, "", preferences);
+    }
+
+    public String GetLightChatData(String playerId, String playerName, PlayerChatPreferences preferences) {
         try {
             // Create "light" version of entire chat data HashMap
             HashMap<String, EntityChatDataLight> lightVersionMap = new HashMap<>();
@@ -310,7 +313,7 @@ public class ChatDataManager {
             PlayerChatPreferences effectivePreferences = preferences == null ? new PlayerChatPreferences() : preferences;
             this.entityChatDataMap.forEach((name, entityChatData) -> {
                 if (effectivePreferences.canReceiveEntityUpdate(viewerId, entityChatData.currentPlayerId, entityChatData.sender)) {
-                    lightVersionMap.put(name, entityChatData.toLightVersion(playerId));
+                    lightVersionMap.put(name, entityChatData.toLightVersion(playerId, playerName));
                 }
             });
             return GSON.toJson(lightVersionMap);
@@ -343,14 +346,13 @@ public class ChatDataManager {
             }
             return;
         }
-        File saveFile = new File(server.getWorldPath(LevelResource.ROOT).toFile(), "chatdata.json");
-        LOGGER.info("Saving chat data to " + saveFile.getAbsolutePath());
-
         // Clean up blank, temp entities in data
         entityChatDataMap.values().removeIf(entityChatData -> entityChatData.status == ChatStatus.NONE);
 
         try {
-            ChatDataFile.save(saveFile.toPath(), this.entityChatDataMap);
+            if (chatDataFile.save(this.entityChatDataMap)) {
+                LOGGER.info("Saved CreatureChat chat history");
+            }
         } catch (Exception e) {
             String errorMessage = "Error saving `chatdata.json`. No CreatureChat chat history was saved! " + e.getMessage();
             LOGGER.error(errorMessage, e);
@@ -363,31 +365,14 @@ public class ChatDataManager {
         clearData();
         sessionServer = server;
         responseSession = new ChatSession(server);
-        File loadFile = new File(server.getWorldPath(LevelResource.ROOT).toFile(), "chatdata.json");
-        LOGGER.info("Loading chat data from " + loadFile.getAbsolutePath());
-
-        if (loadFile.exists()) {
-            try (InputStreamReader reader = new InputStreamReader(new FileInputStream(loadFile), StandardCharsets.UTF_8)) {
-                Type type = new TypeToken<ConcurrentHashMap<String, EntityChatData>>(){}.getType();
-                this.entityChatDataMap = GSON.fromJson(reader, type);
-                if (this.entityChatDataMap == null) {
-                    this.entityChatDataMap = new ConcurrentHashMap<>();
-                }
-
-                // Clean up blank, temp entities in data
-                entityChatDataMap.values().removeIf(entityChatData -> entityChatData.status == ChatStatus.NONE);
-
-                // Post-process each EntityChatData object
-                for (EntityChatData entityChatData : entityChatDataMap.values()) {
-                    entityChatData.postDeserializeInitialization();
-                }
-            } catch (Exception e) {
-                LOGGER.error("Error loading chat data", e);
-                this.entityChatDataMap = new ConcurrentHashMap<>();
-            }
-        } else {
-            // Init empty chat data
-            this.entityChatDataMap = new ConcurrentHashMap<>();
+        Path path = server.getWorldPath(LevelResource.ROOT).resolve("chatdata.json");
+        chatDataFile = new ChatDataFile(path);
+        LOGGER.info("Loading chat data from {}", path.toAbsolutePath());
+        try {
+            this.entityChatDataMap = chatDataFile.load();
+        } catch (Exception e) {
+            LOGGER.error("Could not load {}. Chat history saving is disabled for this session. "
+                    + "Restore or move the file and restart the server to resume saving.", path.toAbsolutePath(), e);
         }
     }
 }

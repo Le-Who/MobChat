@@ -23,7 +23,6 @@ import com.lewho.update.UpdateHelperLauncher;
 import com.lewho.update.UpdateRuntime;
 import com.lewho.update.UpdateService;
 import com.lewho.update.UpdateStager;
-import com.lewho.update.UpdateVersion;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.ChatFormatting;
@@ -302,39 +301,14 @@ public class CreatureChatCommands {
         sendUpdateMessage(source, true, "Checking GitHub Releases for CreatureChat updates...");
         CompletableFuture.runAsync(() -> {
             try {
-                UpdateService service = updateService(info);
-                Optional<UpdateCandidate> maybeLatest = service.check(
-                        info.archiveBaseName(), info.currentVersion(), info.minecraftVersion(), false);
-
-                // Determine the pending update to launch, downloading only when necessary.
-                final PendingUpdate pending;
-                Path pendingPath = UpdateStager.pendingFile(info.gameDir());
-                if (maybeLatest.isEmpty()) {
-                    // GitHub has nothing newer than the running version.
-                    // Use the staged update if one exists, otherwise nothing to do.
-                    if (!Files.exists(pendingPath)) {
-                        source.getServer().execute(() -> sendUpdateMessage(source, true,
-                                "CreatureChat is already up to date for Minecraft "
-                                + info.minecraftVersion() + " (" + info.currentVersion() + ")."));
-                        return;
-                    }
-                    pending = PendingUpdate.load(pendingPath);
-                } else {
-                    UpdateCandidate latest = maybeLatest.get();
-                    // Reuse the staged update if it is already the latest version.
-                    if (Files.exists(pendingPath)) {
-                        PendingUpdate staged = PendingUpdate.load(pendingPath);
-                        if (!UpdateVersion.isNewer(latest.version(), staged.version())) {
-                            pending = staged;
-                        } else {
-                            // GitHub has something newer than what is staged — re-download.
-                            pending = service.stageCandidate(info.gameDir(), info.currentJar(), latest);
-                        }
-                    } else {
-                        // Nothing staged yet — download and stage now.
-                        pending = service.stageCandidate(info.gameDir(), info.currentJar(), latest);
-                    }
+                Optional<PendingUpdate> prepared = updateService(info).prepareUpdate(info);
+                if (prepared.isEmpty()) {
+                    source.getServer().execute(() -> sendUpdateMessage(source, true,
+                            "CreatureChat is already up to date for Minecraft "
+                            + info.minecraftVersion() + " (" + info.currentVersion() + ")."));
+                    return;
                 }
+                PendingUpdate pending = prepared.get();
 
                 source.getServer().execute(() -> {
                     try {

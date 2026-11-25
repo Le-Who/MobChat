@@ -212,12 +212,12 @@ public class ChatScreen extends ScreenHelper {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (isMouseOverHistory(mouseX, mouseY)) {
+    protected boolean scrollVertically(double mouseX, double mouseY, double amount) {
+        if (amount != 0 && isMouseOverHistory(mouseX, mouseY)) {
             historyScrollLine -= amount > 0 ? 1 : -1;
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, amount);
+        return false;
     }
 
     private boolean isMouseOverHistory(double mouseX, double mouseY) {
